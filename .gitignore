@@ -1,3 +1,8 @@
+# Personal VS Code settings (keep workspace settings)
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
+
 # Dependencies (rarely used with Yarn PnP, but safe to ignore if created)
 node_modules/
 
