@@ -1,0 +1,23 @@
+{
+  "name": "drifellascape",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "author": "d347h.eth <wagdie.dev@gmail.com>",
+  "license": "AGPL-3.0-only",
+  "workspaces": [
+    "backend",
+    "worker",
+    "frontend",
+    "shared",
+    "database"
+  ],
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

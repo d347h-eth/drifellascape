@@ -1,0 +1,29 @@
+# Dependencies (rarely used with Yarn PnP, but safe to ignore if created)
+node_modules/
+
+# Yarn Berry (commit selected subdirs only)
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Yarn PnP artifacts
+.pnp.cjs
+.pnp.loader.mjs
+
+# Builds and caches
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+metadata/
+
