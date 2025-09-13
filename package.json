@@ -13,11 +13,12 @@
     "database"
   ],
   "devDependencies": {
-    "@types/node": "^24.0.10",
-    "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "@types/node": "24.3.3",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
   },
   "engines": {
-    "node": ">=18.0.0"
-  }
+    "node": "24.3.0"
+  },
+  "packageManager": "yarn@4.9.4"
 }

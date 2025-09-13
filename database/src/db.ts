@@ -1,6 +1,9 @@
 import Database from 'better-sqlite3';
 import { resolvePackagePath } from './paths.js';
 
+export type BetterSqlite3Database = Database.Database;
+export type BetterSqlite3Statement<TArgs extends any[] = any[]> = Database.Statement<TArgs>;
+
 export class SqliteDatabase {
   private static instance: SqliteDatabase | null = null;
   private db: Database.Database;
@@ -28,11 +31,11 @@ export class SqliteDatabase {
     this.db.exec(sql);
   }
 
-  prepare<T extends any[]>(sql: string) {
+  prepare<T extends any[]>(sql: string): BetterSqlite3Statement<T> {
     return this.db.prepare(sql) as unknown as Database.Statement<T>;
   }
 
-  get raw() {
+  get raw(): BetterSqlite3Database {
     return this.db;
   }
 }
