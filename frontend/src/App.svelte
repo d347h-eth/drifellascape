@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import ImageExplorer from "./ImageExplorer.svelte";
 
     type ListingRow = {
         token_mint_addr: string;
@@ -26,6 +27,8 @@
     let stagedVersionId: number | null = null;
     let loading = true;
     let error: string | null = null;
+    let exploreIndex: number | null = null;
+    let exploreItems: ListingRow[] | null = null;
 
     const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "http://localhost:3000";
 
@@ -53,6 +56,7 @@
     }
 
     function applyStagedIfAtTop() {
+        if (exploreIndex !== null) return; // ignore while in explore mode
         if (stagedItems && stagedVersionId && atTop()) {
             items = stagedItems;
             versionId = stagedVersionId;
@@ -134,6 +138,30 @@
         }
         return null;
     }
+
+    function openExplore(idx: number) {
+        exploreItems = items.slice(); // freeze current page order
+        exploreIndex = idx;
+    }
+    function closeExplore() {
+        exploreIndex = null;
+        exploreItems = null;
+    }
+
+    function navigatePrev() {
+        if (exploreItems && exploreIndex !== null) {
+            if (exploreIndex > 0) {
+                exploreIndex = exploreIndex - 1;
+            }
+        }
+    }
+    function navigateNext() {
+        if (exploreItems && exploreIndex !== null) {
+            if (exploreIndex < exploreItems.length - 1) {
+                exploreIndex = exploreIndex + 1;
+            }
+        }
+    }
 </script>
 
 <style>
@@ -157,6 +185,15 @@
     .img-wrap {
         width: 100%;
         overflow: hidden; /* hide overflow if any */
+    }
+    .img-button {
+        display: block;
+        width: 100%;
+        padding: 0;
+        margin: 0;
+        border: 0;
+        background: transparent;
+        cursor: zoom-in;
     }
     img.token {
         display: block;
@@ -198,17 +235,24 @@
         {/if}
     </div>
 
-    {#each items as it (it.token_mint_addr)}
+    {#each items as it, idx (it.token_mint_addr)}
         {@const m = marketplaceFor(it.listing_source, it.token_mint_addr)}
         <div class="row">
             <div class="img-wrap">
-                <img
-                    class="token"
-                    src={`/2560/${it.token_mint_addr}.jpg`}
-                    alt={`Token ${it.token_num ?? it.token_mint_addr}`}
-                    loading="lazy"
-                    decoding="async"
-                />
+                <button
+                    type="button"
+                    class="img-button"
+                    aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`}
+                    on:click={() => openExplore(idx)}
+                >
+                    <img
+                        class="token"
+                        src={`/2560/${it.token_mint_addr}.jpg`}
+                        alt={`Token ${it.token_num ?? it.token_mint_addr}`}
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </button>
             </div>
             <div class="meta">
                 {#if m}
@@ -227,4 +271,14 @@
             </div>
         </div>
     {/each}
+<!-- Full-screen explorer overlay -->
+{#if exploreIndex !== null && exploreItems}
+    <ImageExplorer
+        url={exploreItems[exploreIndex].image_url}
+        onClose={closeExplore}
+        maxZoomFactor={4}
+        onPrev={navigatePrev}
+        onNext={navigateNext}
+    />
+{/if}
 </div>
