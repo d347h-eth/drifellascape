@@ -1,4 +1,4 @@
-export { db, SqliteDatabase } from "./db.js";
+export { db, setDbPath } from "./db.js";
 export { migrationRunner } from "./migrations.js";
 
 import { migrationRunner as _migrationRunner } from "./migrations.js";

@@ -18,14 +18,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_listing_versions_active_unique
 -- Table: listings_current (append-only snapshots)
 CREATE TABLE IF NOT EXISTS listings_current (
   version_id INTEGER NOT NULL,
-  token_mint TEXT NOT NULL CHECK(length(token_mint) <= 44),
-  token_no INTEGER,
+  token_mint_addr TEXT NOT NULL CHECK(length(token_mint_addr) <= 44),
+  token_num INTEGER,
   price INTEGER NOT NULL,
   seller TEXT NOT NULL CHECK(length(seller) <= 44),
   image_url TEXT NOT NULL,
   listing_source TEXT NOT NULL CHECK(length(listing_source) <= 64),
   created_at INTEGER NOT NULL,
-  PRIMARY KEY (version_id, token_mint),
+  PRIMARY KEY (version_id, token_mint_addr),
   FOREIGN KEY (version_id) REFERENCES listing_versions(id) ON DELETE CASCADE
 );
 
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_listings_current_version_created
 
 -- Optional numeric display index for sorting/navigation
 CREATE INDEX IF NOT EXISTS idx_listings_current_version_tokenno
-  ON listings_current(version_id, token_no);
+  ON listings_current(version_id, token_num);
 
 -- Seed an initial empty active version to simplify first sync
 INSERT INTO listing_versions (created_at, total, active)

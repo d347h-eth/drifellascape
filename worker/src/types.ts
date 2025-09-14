@@ -1,6 +1,6 @@
 export type NormalizedListing = {
-    token_mint: string; // canonical SPL mint address
-    token_no?: number; // optional numeric display index (e.g., from name)
+    token_mint_addr: string; // canonical SPL mint address
+    token_num?: number; // optional numeric display index (e.g., from name)
     price: number; // integer: SOL raw amount with 9 decimals
     seller: string;
     image_url: string;

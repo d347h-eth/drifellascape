@@ -31,15 +31,15 @@ The steps are isolated and can be developed/tested incrementally with local fixt
     - Unique active constraint: `UNIQUE(active) WHERE active = 1`
   - `listings_current`
     - `version_id INTEGER NOT NULL` (FK → `listing_versions.id` ON DELETE CASCADE)
-    - `token_mint TEXT NOT NULL CHECK(length(token_mint) <= 44)` (canonical identifier)
-    - `token_no INTEGER` (optional numeric display index; stored informally)
+    - `token_mint_addr TEXT NOT NULL CHECK(length(token_mint_addr) <= 44)` (canonical identifier)
+    - `token_num INTEGER` (optional numeric display index; stored informally)
     - `price INTEGER NOT NULL` (integer raw amount from `priceInfo.solPrice.rawAmount` — SOL with 9 decimals)
     - `seller TEXT NOT NULL CHECK(length(seller) <= 44)`
     - `image_url TEXT NOT NULL`
     - `listing_source TEXT NOT NULL CHECK(length(listing_source) <= 64)`
     - `created_at INTEGER NOT NULL` (unix epoch seconds; when the snapshot row is written)
-    - Primary key: `(version_id, token_mint)`
-    - Indexes: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_no)`
+    - Primary key: `(version_id, token_mint_addr)`
+    - Indexes: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_num)`
 
 - Pragmas (already applied in code)
 
@@ -89,41 +89,40 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
 - SQL (single connection, short-lived temp table)
 
-  1. Create staging table and load rows
+  1.  Create staging table and load rows
 
-     - `CREATE TEMP TABLE temp_listings (
-   token_mint TEXT PRIMARY KEY,
-   token_no INTEGER,
-   price INTEGER NOT NULL,
-   seller TEXT NOT NULL,
-   image_url TEXT NOT NULL,
-   listing_source TEXT NOT NULL
- ) WITHOUT ROWID;`
-     - Insert all normalized rows with prepared statements.
+          - `CREATE TEMP TABLE temp_listings (
 
-  2. Compute counts (use only simple joins)
+      token_mint_addr TEXT PRIMARY KEY,
+      token_num INTEGER,
+      price INTEGER NOT NULL,
+      seller TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      listing_source TEXT NOT NULL
+      ) WITHOUT ROWID;` - Insert all normalized rows with prepared statements.
 
-     - Inserted:
-       - `SELECT COUNT(*) FROM temp_listings tl
- LEFT JOIN listings_current lc
-   ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
- WHERE lc.token_mint IS NULL;`
-     - Updated (with price drift threshold):
-       - `SELECT COUNT(*) FROM temp_listings tl
- JOIN listings_current lc
-   ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
- WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 */
-    OR tl.seller <> lc.seller
-    OR tl.image_url <> lc.image_url
-    OR tl.listing_source <> lc.listing_source;`
-     - Deleted:
-       - `SELECT COUNT(*) FROM listings_current lc
- LEFT JOIN temp_listings tl
-   ON tl.token_mint = lc.token_mint
- WHERE lc.version_id = :active_version AND tl.token_mint IS NULL;`
+  2.  Compute counts (use only simple joins)
 
-  3. If inserted + updated + deleted == 0
-     - Drop temp table and end: no new version.
+                - Inserted:
+                  - `SELECT COUNT(*) FROM temp_listings tl
+
+            LEFT JOIN listings*current lc
+            ON lc.version_id = :active_version AND lc.token_mint_addr = tl.token_mint_addr
+            WHERE lc.token_mint_addr IS NULL;`    - Updated (with price drift threshold):
+
+      -`SELECT COUNT(*) FROM temp*listings tl
+      JOIN listings_current lc
+      ON lc.version_id = :active_version AND lc.token_mint_addr = tl.token_mint_addr
+      WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 _/
+      OR tl.seller <> lc.seller
+      OR tl.image_url <> lc.image_url
+      OR tl.listing_source <> lc.listing_source;` - Deleted: -`SELECT COUNT(_) FROM listings_current lc
+      LEFT JOIN temp_listings tl
+      ON tl.token_mint_addr = lc.token_mint_addr
+      WHERE lc.version_id = :active_version AND tl.token_mint_addr IS NULL;`
+
+  3.  If inserted + updated + deleted == 0
+      - Drop temp table and end: no new version.
 
 ---
 
@@ -132,15 +131,15 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 - Create a pending version (inactive)
 
   - `INSERT INTO listing_versions (created_at, total, active)
- VALUES (unixepoch('now'), (SELECT COUNT(*) FROM temp_listings), 0);`
+VALUES (unixepoch('now'), (SELECT COUNT(*) FROM temp_listings), 0);`
   - `SELECT last_insert_rowid()` → `:new_version_id`.
 
 - Bulk insert the new snapshot rows
 
   - `INSERT INTO listings_current
-   (version_id, token_mint, token_no, price, seller, image_url, listing_source, created_at)
- SELECT :new_version_id, token_mint, token_no, price, seller, image_url, listing_source, unixepoch('now')
- FROM temp_listings;`
+  (version_id, token_mint_addr, token_num, price, seller, image_url, listing_source, created_at)
+SELECT :new_version_id, token_mint_addr, token_num, price, seller, image_url, listing_source, unixepoch('now')
+FROM temp_listings;`
 
 - Optional validation (defensive)
 
@@ -192,6 +191,10 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ---
 
 ## 6) Test Strategy & Fixtures
+
+- Progress
+
+  - [x] Add unit tests for worker repo.countDiffs (epsilon, insert/update/delete/no-op)
 
 - Database tests (better-sqlite3)
 
