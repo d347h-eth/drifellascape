@@ -38,7 +38,8 @@
     },
     "scripts": {
         "format": "prettier . --write",
-        "format:check": "prettier . --check"
+        "format:check": "prettier . --check",
+        "worker:run": "yarn tsx worker/src/index.ts"
     },
     "recommendations": [
         "esbenp.prettier-vscode"
