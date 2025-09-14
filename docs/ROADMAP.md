@@ -195,6 +195,7 @@ FROM temp_listings;`
 - Progress
 
   - [x] Add unit tests for worker repo.countDiffs (epsilon, insert/update/delete/no-op)
+  - [x] Add unit tests for worker fetcher.normalizeItem
 
 - Database tests (better-sqlite3)
 
