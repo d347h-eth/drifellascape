@@ -5,7 +5,8 @@ import { PRICE_EPSILON } from './types.js';
 function createTempTable() {
   db.exec(`
     CREATE TEMP TABLE temp_listings (
-      token_id INTEGER PRIMARY KEY,
+      token_mint TEXT PRIMARY KEY,
+      token_no INTEGER,
       price INTEGER NOT NULL,
       seller TEXT NOT NULL,
       image_url TEXT NOT NULL,
@@ -20,7 +21,7 @@ function dropTempTable() {
 
 function loadTempRows(rows: NormalizedListing[]) {
   const stmt = db.raw.prepare(
-    'INSERT OR REPLACE INTO temp_listings (token_id, price, seller, image_url, listing_source) VALUES (@token_id, @price, @seller, @image_url, @listing_source)'
+    'INSERT OR REPLACE INTO temp_listings (token_mint, token_no, price, seller, image_url, listing_source) VALUES (@token_mint, @token_no, @price, @seller, @image_url, @listing_source)'
   );
   const insertMany = db.raw.transaction((batch: NormalizedListing[]) => {
     for (const r of batch) stmt.run(r);
@@ -41,8 +42,8 @@ function countInserted(activeVersionId: number): number {
       `SELECT COUNT(*) AS c
        FROM temp_listings tl
        LEFT JOIN listings_current lc
-         ON lc.version_id = ? AND lc.token_id = tl.token_id
-       WHERE lc.token_id IS NULL;`
+         ON lc.version_id = ? AND lc.token_mint = tl.token_mint
+       WHERE lc.token_mint IS NULL;`
     )
     .get(activeVersionId) as { c: number };
   return row.c | 0;
@@ -54,7 +55,7 @@ function countUpdated(activeVersionId: number): number {
       `SELECT COUNT(*) AS c
        FROM temp_listings tl
        JOIN listings_current lc
-         ON lc.version_id = ? AND lc.token_id = tl.token_id
+         ON lc.version_id = ? AND lc.token_mint = tl.token_mint
        WHERE ABS(tl.price - lc.price) >= ?
           OR tl.seller <> lc.seller
           OR tl.image_url <> lc.image_url
@@ -70,8 +71,8 @@ function countDeleted(activeVersionId: number): number {
       `SELECT COUNT(*) AS c
        FROM listings_current lc
        LEFT JOIN temp_listings tl
-         ON tl.token_id = lc.token_id
-       WHERE lc.version_id = ? AND tl.token_id IS NULL;`
+         ON tl.token_mint = lc.token_mint
+       WHERE lc.version_id = ? AND tl.token_mint IS NULL;`
     )
     .get(activeVersionId) as { c: number };
   return row.c | 0;
@@ -93,16 +94,19 @@ export async function syncListings(listings: NormalizedListing[]): Promise<SyncR
   try {
     loadTempRows(listings);
 
-    const activeVersionId = getActiveVersionId();
-    if (activeVersionId == null) {
+    let activeId = getActiveVersionId();
+    if (activeId == null) {
       // Should not happen due to seeding, but treat as empty snapshot.
       db.raw.prepare(
         `INSERT INTO listing_versions (created_at, total, active)
          VALUES (unixepoch('now'), 0, 1)`
       ).run();
+      activeId = getActiveVersionId();
     }
-    const vId = getActiveVersionId();
-    const activeId = vId ?? 0;
+    activeId = activeId ?? 0;
+    if (activeId === 0) {
+      throw new Error('Invariant violated: expected a single active row in listing_versions');
+    }
 
     const inserted = countInserted(activeId);
     const updated = countUpdated(activeId);
@@ -124,8 +128,8 @@ export async function syncListings(listings: NormalizedListing[]): Promise<SyncR
     // Insert snapshot rows
     const insertSnapshot = db.raw.prepare(
       `INSERT INTO listings_current
-         (version_id, token_id, price, seller, image_url, listing_source, created_at)
-       SELECT ?, token_id, price, seller, image_url, listing_source, unixepoch('now')
+         (version_id, token_mint, token_no, price, seller, image_url, listing_source, created_at)
+       SELECT ?, token_mint, token_no, price, seller, image_url, listing_source, unixepoch('now')
        FROM temp_listings`
     );
     const res = insertSnapshot.run(newVersionId);
@@ -163,4 +167,3 @@ export async function syncListings(listings: NormalizedListing[]): Promise<SyncR
     dropTempTable();
   }
 }
-

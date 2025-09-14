@@ -28,14 +28,15 @@ The steps are isolated and can be developed/tested incrementally with local fixt
     - Unique active constraint: `UNIQUE(active) WHERE active = 1`
   - `listings_current`
     - `version_id INTEGER NOT NULL` (FK → `listing_versions.id` ON DELETE CASCADE)
-    - `token_id INTEGER NOT NULL`
+    - `token_mint TEXT NOT NULL CHECK(length(token_mint) <= 44)` (canonical identifier)
+    - `token_no INTEGER` (optional numeric display index; stored informally)
     - `price INTEGER NOT NULL` (integer raw amount from `priceInfo.solPrice.rawAmount` — SOL with 9 decimals)
-    - `seller TEXT NOT NULL`
+    - `seller TEXT NOT NULL CHECK(length(seller) <= 44)`
     - `image_url TEXT NOT NULL`
-    - `listing_source TEXT NOT NULL`
+    - `listing_source TEXT NOT NULL CHECK(length(listing_source) <= 64)`
     - `created_at INTEGER NOT NULL` (unix epoch seconds; when the snapshot row is written)
-    - Primary key: `(version_id, token_id)`
-    - Indexes: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`
+    - Primary key: `(version_id, token_mint)`
+    - Indexes: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_no)`
 
 - Pragmas (already applied in code)
   - `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`
@@ -81,7 +82,8 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 - SQL (single connection, short-lived temp table)
   1) Create staging table and load rows
      - `CREATE TEMP TABLE temp_listings (
-          token_id INTEGER PRIMARY KEY,
+          token_mint TEXT PRIMARY KEY,
+          token_no INTEGER,
           price INTEGER NOT NULL,
           seller TEXT NOT NULL,
           image_url TEXT NOT NULL,
@@ -93,12 +95,12 @@ The steps are isolated and can be developed/tested incrementally with local fixt
      - Inserted:
        - `SELECT COUNT(*) FROM temp_listings tl
           LEFT JOIN listings_current lc
-            ON lc.version_id = :active_version AND lc.token_id = tl.token_id
-          WHERE lc.token_id IS NULL;`
+            ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
+          WHERE lc.token_mint IS NULL;`
      - Updated (with price drift threshold):
        - `SELECT COUNT(*) FROM temp_listings tl
           JOIN listings_current lc
-            ON lc.version_id = :active_version AND lc.token_id = tl.token_id
+            ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
           WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 */
              OR tl.seller <> lc.seller
              OR tl.image_url <> lc.image_url
@@ -106,8 +108,8 @@ The steps are isolated and can be developed/tested incrementally with local fixt
      - Deleted:
        - `SELECT COUNT(*) FROM listings_current lc
           LEFT JOIN temp_listings tl
-            ON tl.token_id = lc.token_id
-          WHERE lc.version_id = :active_version AND tl.token_id IS NULL;`
+            ON tl.token_mint = lc.token_mint
+          WHERE lc.version_id = :active_version AND tl.token_mint IS NULL;`
 
   3) If inserted + updated + deleted == 0
      - Drop temp table and end: no new version.
@@ -123,8 +125,8 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
 - Bulk insert the new snapshot rows
   - `INSERT INTO listings_current
-       (version_id, token_id, price, seller, image_url, listing_source, created_at)
-     SELECT :new_version_id, token_id, price, seller, image_url, listing_source, unixepoch('now')
+       (version_id, token_mint, token_no, price, seller, image_url, listing_source, created_at)
+     SELECT :new_version_id, token_mint, token_no, price, seller, image_url, listing_source, unixepoch('now')
      FROM temp_listings;`
 
 - Optional validation (defensive)

@@ -1,5 +1,6 @@
 export type NormalizedListing = {
-  token_id: number;
+  token_mint: string; // canonical SPL mint address
+  token_no?: number;  // optional numeric display index (e.g., from name)
   price: number; // integer: SOL raw amount with 9 decimals
   seller: string;
   image_url: string;
@@ -13,4 +14,3 @@ export type SyncResult = {
 };
 
 export const PRICE_EPSILON = 10_000_000; // 0.01 SOL in raw units
-
