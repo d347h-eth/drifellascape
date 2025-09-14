@@ -1,6 +1,7 @@
 # drifellascape: Worker → DB → API Roadmap
 
 This plan implements the listings pipeline with a simple, durable, and testable flow:
+
 - Append-only snapshots in `listings_current` keyed by `version_id` + `token_id`.
 - A single active snapshot selected via `listing_versions.active = 1`.
 - Worker computes diffs using one temporary table and simple joins.
@@ -14,12 +15,14 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 1) Schema & Migrations
 
 - Progress
+
   - [x] Create tables and indexes
   - [x] Seed initial empty active version
   - [x] Refine column constraints (seller, listing_source)
   - [ ] Add migration tests (later)
 
 - Tables
+
   - `listing_versions`
     - `id INTEGER PRIMARY KEY AUTOINCREMENT`
     - `created_at INTEGER NOT NULL` (unix epoch seconds)
@@ -39,9 +42,11 @@ The steps are isolated and can be developed/tested incrementally with local fixt
     - Indexes: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_no)`
 
 - Pragmas (already applied in code)
+
   - `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`
 
 - Initial migration file (to add later)
+
   - `database/migrations/001_listings_schema.sql` containing the table and index DDL above, plus seeding an empty active version if none exists.
 
 - Tests
@@ -53,12 +58,14 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 2) Worker: Normalization & Throttled Fetch
 
 - Config
+
   - Remote endpoint: listings (paginated, `limit=100`, `offset` paging).
   - Rate limit: ≤ 2 RPS and ≤ 120 RPM.
   - Sync interval: ~30s (configurable).
   - Timeouts and simple retry policy (e.g., 3 tries, exponential backoff).
 
 - HTTP client
+
   - Sequentially fetch pages until a page returns < 100 items.
   - Throttle requests (token bucket or sleep-based limiter) to respect both RPS and RPM.
   - Unit tests with fixtures (mocked responses for multiple pages and edge cases).
@@ -75,43 +82,47 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 3) Worker: Diff Computation (Temp Table + Simple Joins)
 
 - Pre-conditions
+
   - Ensure a fully successful fetch of all pages; if not, abort this cycle to avoid accidental mass deletes.
   - Get the active version id: `SELECT id FROM listing_versions WHERE active = 1 LIMIT 1`.
     - If none, treat as empty active snapshot (or seed an empty version in migration).
 
 - SQL (single connection, short-lived temp table)
-  1) Create staging table and load rows
+
+  1. Create staging table and load rows
+
      - `CREATE TEMP TABLE temp_listings (
-          token_mint TEXT PRIMARY KEY,
-          token_no INTEGER,
-          price INTEGER NOT NULL,
-          seller TEXT NOT NULL,
-          image_url TEXT NOT NULL,
-          listing_source TEXT NOT NULL
-        ) WITHOUT ROWID;`
+   token_mint TEXT PRIMARY KEY,
+   token_no INTEGER,
+   price INTEGER NOT NULL,
+   seller TEXT NOT NULL,
+   image_url TEXT NOT NULL,
+   listing_source TEXT NOT NULL
+ ) WITHOUT ROWID;`
      - Insert all normalized rows with prepared statements.
 
-  2) Compute counts (use only simple joins)
+  2. Compute counts (use only simple joins)
+
      - Inserted:
        - `SELECT COUNT(*) FROM temp_listings tl
-          LEFT JOIN listings_current lc
-            ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
-          WHERE lc.token_mint IS NULL;`
+ LEFT JOIN listings_current lc
+   ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
+ WHERE lc.token_mint IS NULL;`
      - Updated (with price drift threshold):
        - `SELECT COUNT(*) FROM temp_listings tl
-          JOIN listings_current lc
-            ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
-          WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 */
-             OR tl.seller <> lc.seller
-             OR tl.image_url <> lc.image_url
-             OR tl.listing_source <> lc.listing_source;`
+ JOIN listings_current lc
+   ON lc.version_id = :active_version AND lc.token_mint = tl.token_mint
+ WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 */
+    OR tl.seller <> lc.seller
+    OR tl.image_url <> lc.image_url
+    OR tl.listing_source <> lc.listing_source;`
      - Deleted:
        - `SELECT COUNT(*) FROM listings_current lc
-          LEFT JOIN temp_listings tl
-            ON tl.token_mint = lc.token_mint
-          WHERE lc.version_id = :active_version AND tl.token_mint IS NULL;`
+ LEFT JOIN temp_listings tl
+   ON tl.token_mint = lc.token_mint
+ WHERE lc.version_id = :active_version AND tl.token_mint IS NULL;`
 
-  3) If inserted + updated + deleted == 0
+  3. If inserted + updated + deleted == 0
      - Drop temp table and end: no new version.
 
 ---
@@ -119,31 +130,37 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 4) Worker: Append-Only Snapshot + Activate + Cleanup
 
 - Create a pending version (inactive)
+
   - `INSERT INTO listing_versions (created_at, total, active)
-     VALUES (unixepoch('now'), (SELECT COUNT(*) FROM temp_listings), 0);`
+ VALUES (unixepoch('now'), (SELECT COUNT(*) FROM temp_listings), 0);`
   - `SELECT last_insert_rowid()` → `:new_version_id`.
 
 - Bulk insert the new snapshot rows
+
   - `INSERT INTO listings_current
-       (version_id, token_mint, token_no, price, seller, image_url, listing_source, created_at)
-     SELECT :new_version_id, token_mint, token_no, price, seller, image_url, listing_source, unixepoch('now')
-     FROM temp_listings;`
+   (version_id, token_mint, token_no, price, seller, image_url, listing_source, created_at)
+ SELECT :new_version_id, token_mint, token_no, price, seller, image_url, listing_source, unixepoch('now')
+ FROM temp_listings;`
 
 - Optional validation (defensive)
+
   - Verify inserted row count equals `(SELECT total FROM listing_versions WHERE id = :new_version_id)`.
 
 - Atomically activate the new version (only transactional step)
+
   - `BEGIN IMMEDIATE;`
   - `UPDATE listing_versions SET active = 0 WHERE active = 1;`
   - `UPDATE listing_versions SET active = 1 WHERE id = :new_version_id;`
   - `COMMIT;`
 
 - Cleanup stale rows (idempotent)
+
   - `DELETE FROM listings_current WHERE version_id <> :new_version_id;`
   - `DELETE FROM listing_versions WHERE active = 0;`
   - Drop temp table.
 
 - Crash resilience
+
   - If the process dies before activation, pending version stays inactive and is ignored by readers.
   - If it dies after activation but before cleanup, the next run’s cleanup removes all non-active rows.
 
@@ -158,11 +175,13 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 5) Backend API: In-Memory Snapshot + Polling
 
 - Cache
+
   - On startup, read `active_version_id` and load all rows from `listings_current` for that version into memory.
   - Background polling every ~30s: check for a new `active_version_id`.
     - If changed, reload the in-memory snapshot; keep a lightweight in-process lock to avoid overlapping reloads.
 
 - Endpoints (initial)
+
   - `GET /listings?offset&limit&sort=price_asc|price_desc`
     - Serve from memory. Apply pagination and simple filters locally (fast for ~1–2k rows).
 
@@ -175,11 +194,13 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 6) Test Strategy & Fixtures
 
 - Database tests (better-sqlite3)
+
   - Use a temp-file DB per test run (or `:memory:` per test) and run migrations.
   - Helper to seed `listing_versions` with an empty active version for first-run tests.
   - Verify constraints and indexes exist.
 
 - Worker tests
+
   - Mock HTTP client with JSON fixtures (including pagination and edge cases).
   - Unit-test normalization (token_id parsing, price integer conversion, required fields).
   - Diff scenarios: no change, inserts, updates (price/seller/image/source), deletes, mixed.
@@ -193,27 +214,32 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
 ## 7) Implementation Order (Milestones)
 
-1) Database migrations for listings schema (001)
+1. Database migrations for listings schema (001)
+
    - Add DDL for `listing_versions` and `listings_current`, plus unique active constraint and indexes.
    - Optional seed: empty active version.
 
-2) Worker core (sync without HTTP)
+2. Worker core (sync without HTTP)
+
    - Implement temp-table diff + append-only snapshot + activate + cleanup.
    - Unit tests for all diff scenarios using direct row arrays (no network).
 
-3) Worker HTTP integration
+3. Worker HTTP integration
+
    - Add throttled, paginated fetcher and normalization.
    - End-to-end sync test with mocked pages.
 
-4) Backend API cache & read endpoints
+4. Backend API cache & read endpoints
+
    - Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
    - Tests for cache behavior and endpoint outputs.
 
-5) Observability & ops (optional)
+5. Observability & ops (optional)
+
    - Minimal logs (sync success/fail, version id, counts).
    - Health endpoint exposing last sync time/version.
 
-6) Future: Token metadata & traits (out of scope for now)
+6. Future: Token metadata & traits (out of scope for now)
    - Normalize tokens and traits for filterable queries; integrate with listings.
 
 ---

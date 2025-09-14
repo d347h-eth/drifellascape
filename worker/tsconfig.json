@@ -1,16 +1,12 @@
 {
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./build",
-    "rootDir": "./src",
-    "composite": true,
-    "noEmit": false
-  },
-  "references": [
-    { "path": "../shared" },
-    { "path": "../database" }
-  ],
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "build"]
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./build",
+        "rootDir": "./src",
+        "composite": true,
+        "noEmit": false
+    },
+    "references": [{ "path": "../shared" }, { "path": "../database" }],
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "build"]
 }
-

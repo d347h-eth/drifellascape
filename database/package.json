@@ -1,13 +1,13 @@
 {
-  "name": "@drifellascape/database",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "better-sqlite3": "^v12.2.0"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^24.3.3"
-  }
+    "name": "@drifellascape/database",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "better-sqlite3": "^v12.2.0"
+    },
+    "devDependencies": {
+        "@types/better-sqlite3": "^7.6.12",
+        "@types/node": "^24.3.3"
+    }
 }

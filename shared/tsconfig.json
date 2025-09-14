@@ -1,14 +1,13 @@
 {
-  "extends": "../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./build",
-    "rootDir": "./",
-    "allowImportingTsExtensions": true,
-    "composite": true,
-    "noEmit": false,
-    "emitDeclarationOnly": true
-  },
-  "include": ["**/*"],
-  "exclude": ["node_modules", "build"]
+    "extends": "../tsconfig.json",
+    "compilerOptions": {
+        "outDir": "./build",
+        "rootDir": "./",
+        "allowImportingTsExtensions": true,
+        "composite": true,
+        "noEmit": false,
+        "emitDeclarationOnly": true
+    },
+    "include": ["**/*"],
+    "exclude": ["node_modules", "build"]
 }
-

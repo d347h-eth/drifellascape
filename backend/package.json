@@ -1,9 +1,9 @@
 {
-  "name": "@drifellascape/backend",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@drifellascape/shared": "workspace:*"
-  }
+    "name": "@drifellascape/backend",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@drifellascape/shared": "workspace:*"
+    }
 }

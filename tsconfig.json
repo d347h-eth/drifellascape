@@ -1,29 +1,28 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "@drifellascape/database": ["database/src/index.ts"]
-    }
-  },
-  "references": [
-    { "path": "./backend" },
-    { "path": "./worker" },
-    { "path": "./frontend" },
-    { "path": "./shared" },
-    { "path": "./database" }
-  ],
-  "files": [],
-  "include": []
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "strict": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "baseUrl": ".",
+        "paths": {
+            "@drifellascape/database": ["database/src/index.ts"]
+        }
+    },
+    "references": [
+        { "path": "./backend" },
+        { "path": "./worker" },
+        { "path": "./frontend" },
+        { "path": "./shared" },
+        { "path": "./database" }
+    ],
+    "files": [],
+    "include": []
 }
-

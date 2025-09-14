@@ -1,10 +1,10 @@
 {
-  "name": "@drifellascape/worker",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@drifellascape/database": "workspace:*",
-    "@drifellascape/shared": "workspace:*"
-  }
+    "name": "@drifellascape/worker",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@drifellascape/database": "workspace:*",
+        "@drifellascape/shared": "workspace:*"
+    }
 }
