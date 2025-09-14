@@ -57,6 +57,12 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
 ## 2) Worker: Normalization & Throttled Fetch
 
+- Progress
+  - [x] Implement rate limiter (2 RPS / 120 RPM)
+  - [x] Implement paginated fetcher with retries and timeout
+  - [x] Implement normalization and basic tests
+  - [x] Wire worker loop with configurable interval (default 30s)
+
 - Config
 
   - Remote endpoint: listings (paginated, `limit=100`, `offset` paging).
@@ -80,6 +86,10 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ---
 
 ## 3) Worker: Diff Computation (Temp Table + Simple Joins)
+
+- Progress
+  - [x] Implemented diff queries and helper APIs in worker/src/repo.ts
+  - [x] Tested countDiffs across insert/update/delete/no-op and epsilon cases
 
 - Pre-conditions
 
@@ -127,6 +137,10 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ---
 
 ## 4) Worker: Append-Only Snapshot + Activate + Cleanup
+
+- Progress
+  - [x] Implemented append-only snapshot, activation flip, and cleanup in syncListings
+  - [x] Added idempotent cleanup of non-active rows and inactive versions
 
 - Create a pending version (inactive)
 
@@ -220,23 +234,23 @@ FROM temp_listings;`
 
 1. Database migrations for listings schema (001)
 
-   - Add DDL for `listing_versions` and `listings_current`, plus unique active constraint and indexes.
-   - Optional seed: empty active version.
+   - [x] Add DDL for `listing_versions` and `listings_current`, plus unique active constraint and indexes.
+   - [x] Seed: empty active version.
 
 2. Worker core (sync without HTTP)
 
-   - Implement temp-table diff + append-only snapshot + activate + cleanup.
-   - Unit tests for all diff scenarios using direct row arrays (no network).
+   - [x] Implement temp-table diff + append-only snapshot + activate + cleanup.
+   - [x] Unit tests for diff scenarios using direct row arrays (no network).
 
 3. Worker HTTP integration
 
-   - Add throttled, paginated fetcher and normalization.
-   - End-to-end sync test with mocked pages.
+   - [x] Add throttled, paginated fetcher and normalization.
+   - [x] Wire minimal worker entry and loop.
 
 4. Backend API cache & read endpoints
 
-   - Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
-   - Tests for cache behavior and endpoint outputs.
+   - [ ] Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
+   - [ ] Tests for cache behavior and endpoint outputs.
 
 5. Observability & ops (optional)
 
