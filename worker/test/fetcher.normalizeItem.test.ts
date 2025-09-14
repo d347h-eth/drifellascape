@@ -35,7 +35,10 @@ describe("normalizeItem", () => {
         expect(normalizeItem({ ...base, seller: undefined })).toBeNull();
         expect(normalizeItem({ ...base, priceInfo: {} })).toBeNull();
         expect(
-            normalizeItem({ ...base, priceInfo: { solPrice: { rawAmount: undefined } } }),
+            normalizeItem({
+                ...base,
+                priceInfo: { solPrice: { rawAmount: undefined } },
+            }),
         ).toBeNull();
         expect(normalizeItem({ ...base, extra: {} })).toBeNull();
         expect(normalizeItem({ ...base, listingSource: undefined })).toBeNull();
@@ -68,4 +71,3 @@ describe("normalizeItem", () => {
         expect(normalizeItem(item)).toBeNull();
     });
 });
-

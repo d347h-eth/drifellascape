@@ -1,11 +1,15 @@
 import Database from "better-sqlite3";
 import { resolvePackagePath } from "./paths.js";
+import fs from "node:fs";
+import path from "node:path";
 
 export type BetterSqlite3Database = Database.Database;
 export type BetterSqlite3Statement<TArgs extends any[] = any[]> =
     Database.Statement<TArgs>;
 
-let currentPath = resolvePackagePath("drifellascape.db");
+// Default DB lives under a dedicated folder to keep -wal/-shm together
+const DEFAULT_DIR = resolvePackagePath("drifellascape.db");
+let currentPath = path.join(DEFAULT_DIR, "sqlite.db");
 let currentDb: BetterSqlite3Database | null = null;
 
 function applyPragmas(conn: BetterSqlite3Database) {
@@ -18,6 +22,10 @@ function applyPragmas(conn: BetterSqlite3Database) {
 
 function ensureConnection(): BetterSqlite3Database {
     if (!currentDb) {
+        // Ensure parent directory exists (especially for the default nested path)
+        try {
+            fs.mkdirSync(path.dirname(currentPath), { recursive: true });
+        } catch {}
         const db = new Database(currentPath);
         applyPragmas(db);
         currentDb = db;

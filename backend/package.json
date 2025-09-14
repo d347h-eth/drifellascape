@@ -4,6 +4,11 @@
     "private": true,
     "type": "module",
     "dependencies": {
+        "@drifellascape/database": "workspace:*",
         "@drifellascape/shared": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "24.3.3",
+        "vitest": "3.2.4"
     }
 }

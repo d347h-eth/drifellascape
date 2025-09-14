@@ -2,11 +2,12 @@
     "extends": "../tsconfig.json",
     "compilerOptions": {
         "outDir": "./build",
-        "rootDir": "./src",
+        "rootDir": ".",
         "composite": true,
-        "noEmit": false
+        "noEmit": false,
+        "types": ["vitest"]
     },
-    "references": [{ "path": "../shared" }],
-    "include": ["src/**/*"],
+    "references": [{ "path": "../shared" }, { "path": "../database" }],
+    "include": ["src/**/*", "test/**/*"],
     "exclude": ["node_modules", "build"]
 }

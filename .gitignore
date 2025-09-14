@@ -30,6 +30,8 @@ logs/
 .DS_Store
 Thumbs.db
 
-metadata/
+# SQLite database files (consolidated under dedicated folder)
+database/drifellascape.db/*
+!database/drifellascape.db/.gitkeep
 
-database/drifellascape.db
+metadata/

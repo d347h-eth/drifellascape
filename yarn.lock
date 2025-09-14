@@ -9,6 +9,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@drifellascape/backend@workspace:backend"
   dependencies:
+    "@drifellascape/database": "workspace:*"
     "@drifellascape/shared": "workspace:*"
   languageName: unknown
   linkType: soft

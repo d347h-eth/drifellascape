@@ -19,6 +19,7 @@ The steps are isolated and can be developed/tested incrementally with local fixt
   - [x] Create tables and indexes
   - [x] Seed initial empty active version
   - [x] Refine column constraints (seller, listing_source)
+  - [x] Consolidate SQLite artifacts under `database/drifellascape.db/` (default path)
   - [ ] Add migration tests (later)
 
 - Tables
@@ -58,6 +59,7 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 2) Worker: Normalization & Throttled Fetch
 
 - Progress
+
   - [x] Implement rate limiter (2 RPS / 120 RPM)
   - [x] Implement paginated fetcher with retries and timeout
   - [x] Implement normalization and basic tests
@@ -88,6 +90,7 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 3) Worker: Diff Computation (Temp Table + Simple Joins)
 
 - Progress
+
   - [x] Implemented diff queries and helper APIs in worker/src/repo.ts
   - [x] Tested countDiffs across insert/update/delete/no-op and epsilon cases
 
@@ -113,20 +116,21 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
   2.  Compute counts (use only simple joins)
 
-                - Inserted:
-                  - `SELECT COUNT(*) FROM temp_listings tl
+                      - Inserted:
+                        - `SELECT COUNT(*) FROM temp_listings tl
 
-            LEFT JOIN listings*current lc
-            ON lc.version_id = :active_version AND lc.token_mint_addr = tl.token_mint_addr
-            WHERE lc.token_mint_addr IS NULL;`    - Updated (with price drift threshold):
+                  LEFT JOIN listings*current lc
+                  ON lc.version_id = :active_version AND lc.token_mint_addr = tl.token_mint_addr
+                  WHERE lc.token_mint_addr IS NULL;`    - Updated (with price drift threshold):
 
-      -`SELECT COUNT(*) FROM temp*listings tl
-      JOIN listings_current lc
+            -`SELECT COUNT(*) FROM temp*listings tl
+
+      JOIN listings*current lc
       ON lc.version_id = :active_version AND lc.token_mint_addr = tl.token_mint_addr
-      WHERE ABS(tl.price - lc.price) >= :epsilon /* 0.01 SOL = 10,000,000 _/
+      WHERE ABS(tl.price - lc.price) >= :epsilon /\* 0.01 SOL = 10,000,000 */
       OR tl.seller <> lc.seller
-      OR tl.image_url <> lc.image_url
-      OR tl.listing_source <> lc.listing_source;` - Deleted: -`SELECT COUNT(_) FROM listings_current lc
+      OR tl.image*url <> lc.image_url
+      OR tl.listing_source <> lc.listing_source;` - Deleted: -`SELECT COUNT(*) FROM listings_current lc
       LEFT JOIN temp_listings tl
       ON tl.token_mint_addr = lc.token_mint_addr
       WHERE lc.version_id = :active_version AND tl.token_mint_addr IS NULL;`
@@ -139,6 +143,7 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 ## 4) Worker: Append-Only Snapshot + Activate + Cleanup
 
 - Progress
+
   - [x] Implemented append-only snapshot, activation flip, and cleanup in syncListings
   - [x] Added idempotent cleanup of non-active rows and inactive versions
 
@@ -198,6 +203,13 @@ FROM temp_listings;`
   - `GET /listings?offset&limit&sort=price_asc|price_desc`
     - Serve from memory. Apply pagination and simple filters locally (fast for ~1–2k rows).
 
+- Progress
+
+  - [x] Implemented ListingsCache with consistent snapshot load
+  - [x] Added refresh loop with `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s)
+  - [x] Implemented `/listings` with offset/limit and price sorting
+  - [ ] Add health endpoint and backend tests
+
 - Tests
   - Cache warms on startup.
   - Cache reloads on version flip; concurrent reads continue to serve previous snapshot until reload completes.
@@ -249,7 +261,7 @@ FROM temp_listings;`
 
 4. Backend API cache & read endpoints
 
-   - [ ] Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
+   - [x] Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
    - [ ] Tests for cache behavior and endpoint outputs.
 
 5. Observability & ops (optional)

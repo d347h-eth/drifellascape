@@ -162,7 +162,12 @@ export function normalizeItem(item: any): NormalizedListing | null {
 }
 
 export type FetchListingsResult =
-    | { ok: true; listings: NormalizedListing[]; pages: number; skipped: number }
+    | {
+          ok: true;
+          listings: NormalizedListing[];
+          pages: number;
+          skipped: number;
+      }
     | { ok: false; error: string };
 
 export async function fetchAllListings(): Promise<FetchListingsResult> {
