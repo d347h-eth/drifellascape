@@ -18,6 +18,8 @@ node_modules/
 .pnp.cjs
 .pnp.loader.mjs
 
+.env
+
 # Builds and caches
 dist/
 build/
@@ -35,3 +37,7 @@ database/drifellascape.db/*
 !database/drifellascape.db/.gitkeep
 
 metadata/
+static/
+
+frontend/vite.config.ts*.mjs
+frontend/public/2560/

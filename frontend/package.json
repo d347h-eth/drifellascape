@@ -2,5 +2,16 @@
     "name": "@drifellascape/frontend",
     "version": "0.0.1",
     "private": true,
-    "type": "module"
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview --port 4173"
+    },
+    "devDependencies": {
+        "@sveltejs/vite-plugin-svelte": "^3.1.2",
+        "svelte": "^4.2.19",
+        "svelte-preprocess": "^5.1.4",
+        "vite": "^5.4.10"
+    }
 }
