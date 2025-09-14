@@ -87,6 +87,53 @@
             window.removeEventListener("scroll", onScroll);
         };
     });
+
+    function formatSol(raw: number): string {
+        const sol = raw / 1_000_000_000;
+        // Round up to 2 decimals
+        const up = Math.ceil(sol * 100) / 100;
+        return up.toFixed(2);
+    }
+
+    // Integer arithmetic helpers for fees
+    function ceilDiv(n: number, d: number): number {
+        return Math.floor((n + d - 1) / d);
+    }
+
+    // Returns nominal + maker(2%) + royalty(5%), each fee based on nominal price
+    function priceWithFees(nominalLamports: number): number {
+        const maker = ceilDiv(nominalLamports * 2, 100); // 2%
+        const royalty = ceilDiv(nominalLamports * 5, 100); // 5%
+        return nominalLamports + maker + royalty;
+    }
+
+    function marketplaceFor(
+        src: string | undefined,
+        mint: string,
+    ): { href: string; title: string } | null {
+        if (!src) return null;
+        // Magic Eden sources
+        if (src === "M2" || src === "MMM" || src === "M3" || src === "HADESWAP_AMM") {
+            return {
+                href: `https://magiceden.io/item-details/${mint}`,
+                title: "View on Magic Eden",
+            };
+        }
+        // Tensor sources
+        if (
+            src === "TENSOR_LISTING" ||
+            src === "TENSOR_CNFT_LISTING" ||
+            src === "TENSOR_MARKETPLACE_LISTING" ||
+            src === "TENSOR_AMM" ||
+            src === "TENSOR_AMM_V2"
+        ) {
+            return {
+                href: `https://tensor.trade/item/${mint}`,
+                title: "View on Tensor",
+            };
+        }
+        return null;
+    }
 </script>
 
 <style>
@@ -119,6 +166,24 @@
         margin: 0 auto; /* center horizontally */
         object-fit: contain; /* keep landscape ratio */
     }
+    .meta {
+        display: flex;
+        align-items: center;
+        justify-content: center; /* center horizontally */
+        padding: 8px 0; /* use full width, minimal height */
+        font-size: 14px;
+    }
+    .price,
+    .price-link {
+        font-variant-numeric: tabular-nums;
+    }
+    .price-link {
+        text-decoration: none; /* no underline */
+        color: inherit;       /* no visited color change */
+    }
+    .price-link:visited {
+        color: inherit;
+    }
 </style>
 
 <div class="container">
@@ -134,6 +199,7 @@
     </div>
 
     {#each items as it (it.token_mint_addr)}
+        {@const m = marketplaceFor(it.listing_source, it.token_mint_addr)}
         <div class="row">
             <div class="img-wrap">
                 <img
@@ -143,6 +209,21 @@
                     loading="lazy"
                     decoding="async"
                 />
+            </div>
+            <div class="meta">
+                {#if m}
+                    <a
+                        class="price-link"
+                        href={m.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={m.title}
+                    >
+                        {formatSol(priceWithFees(it.price))} SOL
+                    </a>
+                {:else}
+                    <span class="price">{formatSol(priceWithFees(it.price))} SOL</span>
+                {/if}
             </div>
         </div>
     {/each}
