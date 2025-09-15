@@ -139,9 +139,10 @@
         return null;
     }
 
-    function openExplore(idx: number) {
+    function openExploreByMint(mint: string) {
         exploreItems = items.slice(); // freeze current page order
-        exploreIndex = idx;
+        const idx = exploreItems.findIndex((r) => r.token_mint_addr === mint);
+        exploreIndex = idx >= 0 ? idx : 0;
     }
     function closeExplore() {
         exploreIndex = null;
@@ -243,7 +244,7 @@
                     type="button"
                     class="img-button"
                     aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`}
-                    on:click={() => openExplore(idx)}
+                    on:click={() => openExploreByMint(it.token_mint_addr)}
                 >
                     <img
                         class="token"

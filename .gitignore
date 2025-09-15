@@ -39,5 +39,4 @@ database/drifellascape.db/*
 metadata/
 static/
 
-frontend/vite.config.ts*.mjs
 frontend/public/2560/

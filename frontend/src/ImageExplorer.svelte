@@ -8,11 +8,18 @@
     export let onNext: (() => void) | undefined;
     export let maxZoomFactor: number = 4; // 4x over fit-to-view
 
+    const IMG_WIDTH = 3125;
+    const IMG_HEIGHT = 1327;
+
     let mapEl: HTMLDivElement | null = null;
     let map: any = null;
     let loading = true;
     let overlay: any = null;
     let currentUrl: string | null = null;
+    let imageBounds: any = null;
+    let baseZoomByWidth = 0;
+    let keyHandler: ((e: KeyboardEvent) => void) | null = null;
+    let resizeHandler: (() => void) | null = null;
 
     function lockScroll(lock: boolean) {
         if (typeof document === "undefined") return;
@@ -27,24 +34,62 @@
         }
     }
 
+    // Compute base zoom so image width fits container width
+    function computeBaseZoomByWidth(): number {
+        if (!map) return 0;
+        const size = map.getSize();
+        return Math.log2(size.x / IMG_WIDTH);
+    }
+
+    // Compute zoom to fit full image height; cap to 1:1 (<= 0)
+    function computeZoomForHeight(): number {
+        if (!map) return 0;
+        const size = map.getSize();
+        const z = Math.log2(size.y / IMG_HEIGHT);
+        return Math.min(z, 0);
+    }
+
+    function setViewFitWidthCentered(animate: boolean) {
+        if (!map) return;
+        baseZoomByWidth = computeBaseZoomByWidth();
+        map.setMinZoom(baseZoomByWidth);
+        map.setMaxZoom(baseZoomByWidth + Math.log2(maxZoomFactor));
+        const center = [(IMG_HEIGHT / 2) as any, (IMG_WIDTH / 2) as any];
+        map.setView(center as any, baseZoomByWidth, { animate });
+    }
+
+    function setViewFitHeightAt(centerX: number, animate: boolean) {
+        if (!map) return;
+        const zH = computeZoomForHeight();
+        const minZ = Math.min(baseZoomByWidth, zH);
+        map.setMinZoom(minZ);
+        map.setMaxZoom(minZ + Math.log2(maxZoomFactor));
+        const clampedX = Math.max(0, Math.min(IMG_WIDTH, centerX));
+        const center = [(IMG_HEIGHT / 2) as any, clampedX as any];
+        map.setView(center as any, zH, { animate });
+    }
+
     onMount(async () => {
         lockScroll(true);
         const L = await import("leaflet");
         if (!mapEl) return;
 
         // Known image dimensions; can be made dynamic later
-        const imgWidth = 3125;
-        const imgHeight = 1327;
+        const imgWidth = IMG_WIDTH;
+        const imgHeight = IMG_HEIGHT;
         const southWest: [number, number] = [0, 0];
         const northEast: [number, number] = [imgHeight, imgWidth];
-        const bounds = [southWest, northEast] as unknown as any;
+        const bounds = (L as any).latLngBounds(southWest as any, northEast as any);
+        imageBounds = bounds;
 
         map = L.map(mapEl, {
             crs: L.CRS.Simple,
             zoomControl: false,
             attributionControl: false,
             zoomSnap: 0.1,
-            wheelDebounceTime: 20,
+            zoomAnimation: false,
+            doubleClickZoom: false,
+            wheelDebounceTime: 0,
             wheelPxPerZoomLevel: 120,
         });
         if (mapEl) {
@@ -53,14 +98,19 @@
         overlay = L.imageOverlay(url, bounds, { interactive: false }).addTo(map);
         overlay.on("load", () => {
             loading = false;
+            try { overlay.setOpacity(1); } catch {}
         });
-        const baseZoom = map.getBoundsZoom(bounds, true);
-        map.setMinZoom(baseZoom);
+        map.invalidateSize(false);
+        // Fit-by-width base zoom computation
+        const size = map.getSize();
+        baseZoomByWidth = Math.log2(size.x / IMG_WIDTH);
+        map.setMinZoom(baseZoomByWidth);
         const extra = Math.log2(maxZoomFactor);
-        map.setMaxZoom(baseZoom + extra);
-        map.fitBounds(bounds);
+        map.setMaxZoom(baseZoomByWidth + extra);
+        const center = [(IMG_HEIGHT / 2) as any, (IMG_WIDTH / 2) as any];
+        map.setView(center as any, baseZoomByWidth, { animate: false });
 
-        const onKey = (e: KeyboardEvent) => {
+        keyHandler = (e: KeyboardEvent) => {
             const k = e.key;
             if (k === "Escape") {
                 e.preventDefault();
@@ -77,21 +127,52 @@
                 onNext?.();
                 return;
             }
+            if (k === "s" || k === "S") {
+                e.preventDefault();
+                setViewFitWidthCentered(true);
+                return;
+            }
+            if (k === "w" || k === "W") {
+                e.preventDefault();
+                setViewFitHeightAt(IMG_WIDTH / 2, true);
+                return;
+            }
+            if (k === "q" || k === "Q") {
+                e.preventDefault();
+                setViewFitHeightAt(IMG_WIDTH / 2 - 980, true);
+                return;
+            }
+            if (k === "e" || k === "E") {
+                e.preventDefault();
+                setViewFitHeightAt(IMG_WIDTH / 2 + 980, true);
+                return;
+            }
         };
-        window.addEventListener("keydown", onKey);
+        window.addEventListener("keydown", keyHandler);
 
-        const onResize = () => {
-            map?.invalidateSize();
+        resizeHandler = () => {
+            if (!map) return;
+            map.invalidateSize(false);
+            baseZoomByWidth = computeBaseZoomByWidth();
+            map.setMinZoom(baseZoomByWidth);
+            map.setMaxZoom(baseZoomByWidth + Math.log2(maxZoomFactor));
         };
-        window.addEventListener("resize", onResize);
+        window.addEventListener("resize", resizeHandler);
 
-        onDestroy(() => {
-            window.removeEventListener("keydown", onKey);
-            window.removeEventListener("resize", onResize);
-        });
+        // Double-click resets to centered fit-by-width
+        map.on("dblclick", () => setViewFitWidthCentered(true));
+
     });
 
     onDestroy(() => {
+        if (keyHandler) {
+            window.removeEventListener("keydown", keyHandler);
+            keyHandler = null;
+        }
+        if (resizeHandler) {
+            window.removeEventListener("resize", resizeHandler);
+            resizeHandler = null;
+        }
         try {
             map?.remove?.();
         } catch {}
@@ -99,11 +180,14 @@
         lockScroll(false);
     });
 
-    // Swap image URL when prop changes; keep zoom/center
+    // Swap image URL when prop changes; reset to fit-by-width centered.
+    // To avoid flicker, hide current overlay (opacity 0) before repositioning and swapping URL.
     $: if (overlay && url && url !== currentUrl) {
         loading = true;
         currentUrl = url;
         try {
+            if (map) setViewFitWidthCentered(false);
+            try { overlay.setOpacity(0); } catch {}
             overlay.setUrl(url);
         } catch {}
     }
@@ -123,6 +207,12 @@
     :global(.leaflet-container) {
         background: #000;
     }
+    /* Prefer sharp sampling to reduce blur during scaling */
+    :global(.leaflet-image-layer) {
+        image-rendering: -webkit-optimize-contrast; /* Chrome */
+        image-rendering: crisp-edges;               /* Firefox */
+        image-rendering: pixelated;                 /* Fallback */
+    }
     .close {
         position: absolute;
         top: 12px;
@@ -137,7 +227,7 @@
         background: rgba(0, 0, 0, 0.4);
         color: #fff;
         cursor: pointer;
-        z-index: 1001;
+        z-index: 1003;
         user-select: none;
     }
     .close:hover {
@@ -159,12 +249,17 @@
     .edge:focus-visible {
         opacity: 1;
     }
+    .edge:focus {
+        outline: none;
+        box-shadow: none;
+    }
     .edge-left {
         left: 0;
         cursor: w-resize;
     }
     .edge-right {
         right: 0;
+        top: 56px; /* don't overlap close button area */
         cursor: e-resize;
     }
     .edge-left:hover {
@@ -204,6 +299,8 @@
             class="edge edge-left"
             aria-label="Previous"
             title="Previous (← / A)"
+            tabindex="-1"
+            on:mousedown|preventDefault
             on:click={() => onPrev?.()}
         />
     {/if}
@@ -212,6 +309,8 @@
             class="edge edge-right"
             aria-label="Next"
             title="Next (→ / D)"
+            tabindex="-1"
+            on:mousedown|preventDefault
             on:click={() => onNext?.()}
         />
     {/if}
