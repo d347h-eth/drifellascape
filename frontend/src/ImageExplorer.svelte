@@ -6,7 +6,7 @@
     export let onClose: () => void;
     export let onPrev: (() => void) | undefined;
     export let onNext: (() => void) | undefined;
-    export let maxZoomFactor: number = 4; // 4x over fit-to-view
+    export let maxZoomFactor: number = 8; // 8x over fit-to-view (one more step from previous)
 
     const IMG_WIDTH = 3125;
     const IMG_HEIGHT = 1327;
@@ -87,6 +87,7 @@
             zoomControl: false,
             attributionControl: false,
             zoomSnap: 0.1,
+            zoomDelta: 0.1,
             zoomAnimation: false,
             doubleClickZoom: false,
             wheelDebounceTime: 0,
@@ -101,14 +102,8 @@
             try { overlay.setOpacity(1); } catch {}
         });
         map.invalidateSize(false);
-        // Fit-by-width base zoom computation
-        const size = map.getSize();
-        baseZoomByWidth = Math.log2(size.x / IMG_WIDTH);
-        map.setMinZoom(baseZoomByWidth);
-        const extra = Math.log2(maxZoomFactor);
-        map.setMaxZoom(baseZoomByWidth + extra);
-        const center = [(IMG_HEIGHT / 2) as any, (IMG_WIDTH / 2) as any];
-        map.setView(center as any, baseZoomByWidth, { animate: false });
+        // Fit-by-width and snap to integer zoom levels
+        setViewFitWidthCentered(false);
 
         keyHandler = (e: KeyboardEvent) => {
             const k = e.key;

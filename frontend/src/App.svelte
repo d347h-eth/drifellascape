@@ -277,7 +277,7 @@
     <ImageExplorer
         url={exploreItems[exploreIndex].image_url}
         onClose={closeExplore}
-        maxZoomFactor={4}
+        maxZoomFactor={8}
         onPrev={navigatePrev}
         onNext={navigateNext}
     />
