@@ -10,6 +10,9 @@
 
     const IMG_WIDTH = 3125;
     const IMG_HEIGHT = 1327;
+    const REGION_HEIGHT = 1007;
+    const REGION_TOP_CENTER = (IMG_HEIGHT - REGION_HEIGHT) / 2; // vertically centered region
+    const REGION_TOP = REGION_TOP_CENTER + 36; // adjusted placement per visual alignment
 
     let mapEl: HTMLDivElement | null = null;
     let map: any = null;
@@ -20,6 +23,8 @@
     let baseZoomByWidth = 0;
     let keyHandler: ((e: KeyboardEvent) => void) | null = null;
     let resizeHandler: (() => void) | null = null;
+    let debug = false;
+    let debugRect: any = null;
 
     function lockScroll(lock: boolean) {
         if (typeof document === "undefined") return;
@@ -46,7 +51,16 @@
         if (!map) return 0;
         const size = map.getSize();
         const z = Math.log2(size.y / IMG_HEIGHT);
+        // Keep 1:1 cap for full-image fit (Q/W/E)
         return Math.min(z, 0);
+    }
+
+    // Compute zoom to fit a region height exactly to viewport height
+    function computeZoomForRegion(regionHeight: number): number {
+        if (!map) return 0;
+        const size = map.getSize();
+        // Exact region fit (no cap); epsilon avoids 1px overflow from rounding.
+        return Math.log2(size.y / regionHeight) - 1e-6;
     }
 
     function setViewFitWidthCentered(animate: boolean) {
@@ -69,6 +83,22 @@
         map.setView(center as any, zH, { animate });
     }
 
+    function setViewRegionHeightAt(centerX: number, top: number, height: number, animate: boolean) {
+        if (!map) return;
+        // Ensure layout is up-to-date before measuring
+        map.invalidateSize(false);
+        // Compute exact zoom so region height fits viewport height
+        const zR = computeZoomForRegion(height);
+        // Do not cap to fit-by-width; allow region zoom fully.
+        // Provide a generous lower bound so Leaflet doesn't clamp.
+        map.setMinZoom(zR - 5);
+        map.setMaxZoom(zR + Math.log2(maxZoomFactor));
+        const clampedX = Math.max(0, Math.min(IMG_WIDTH, centerX));
+        const centerY = Math.max(0, Math.min(IMG_HEIGHT, top + height / 2));
+        const center = [centerY as any, clampedX as any];
+        map.setView(center as any, zR, { animate });
+    }
+
     onMount(async () => {
         lockScroll(true);
         const L = await import("leaflet");
@@ -86,7 +116,7 @@
             crs: L.CRS.Simple,
             zoomControl: false,
             attributionControl: false,
-            zoomSnap: 0.1,
+            zoomSnap: 0, // allow arbitrary fractional zoom (no snapping)
             zoomDelta: 0.1,
             zoomAnimation: false,
             doubleClickZoom: false,
@@ -142,6 +172,28 @@
                 setViewFitHeightAt(IMG_WIDTH / 2 + 980, true);
                 return;
             }
+            if (k === "1") {
+                e.preventDefault();
+                setViewRegionHeightAt(IMG_WIDTH / 2 - 980, REGION_TOP, REGION_HEIGHT, true);
+                return;
+            }
+            if (k === "2") {
+                e.preventDefault();
+                setViewRegionHeightAt(IMG_WIDTH / 2, REGION_TOP, REGION_HEIGHT, true);
+                return;
+            }
+            if (k === "3") {
+                e.preventDefault();
+                setViewRegionHeightAt(IMG_WIDTH / 2 + 980, REGION_TOP, REGION_HEIGHT, true);
+                return;
+            }
+            if (k === "g" || k === "G") {
+                e.preventDefault();
+                debug = !debug;
+                // Reuse on-mount helper to toggle debug rectangle
+                updateDebug();
+                return;
+            }
         };
         window.addEventListener("keydown", keyHandler);
 
@@ -156,6 +208,30 @@
 
         // Double-click resets to centered fit-by-width
         map.on("dblclick", () => setViewFitWidthCentered(true));
+
+        // Debug rectangle for region of interest (toggle with 'G')
+        const updateDebug = () => {
+            if (!map) return;
+            if (debug) {
+                if (!debugRect) {
+                    debugRect = (L as any)
+                        .rectangle(
+                            (L as any).latLngBounds(
+                                [REGION_TOP, 0] as any,
+                                [REGION_TOP + REGION_HEIGHT, IMG_WIDTH] as any,
+                            ),
+                            { color: "#00FFFF", weight: 1, fill: false, interactive: false },
+                        )
+                        .addTo(map);
+                }
+            } else if (debugRect) {
+                try {
+                    debugRect.remove();
+                } catch {}
+                debugRect = null;
+            }
+        };
+        updateDebug();
 
     });
 
