@@ -117,11 +117,11 @@
             zoomControl: false,
             attributionControl: false,
             zoomSnap: 0, // allow arbitrary fractional zoom (no snapping)
-            zoomDelta: 0.1,
+            zoomDelta: 0.01,
             zoomAnimation: false,
             doubleClickZoom: false,
             wheelDebounceTime: 0,
-            wheelPxPerZoomLevel: 120,
+            wheelPxPerZoomLevel: 480,
         });
         if (mapEl) {
             mapEl.style.background = "#000";
