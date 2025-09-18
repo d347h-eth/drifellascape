@@ -4,7 +4,7 @@ import { ListingsCache } from "./cache.js";
 import type { ListingRow } from "./types.js";
 
 function getEnvPort(): number {
-    const raw = process.env.PORT;
+    const raw = process.env.DRIFELLASCAPE_PORT;
     const n = raw ? Number(raw) : NaN;
     return Number.isFinite(n) ? n : 3000;
 }
@@ -68,7 +68,9 @@ function route(req: IncomingMessage, res: ServerResponse) {
 }
 
 async function startRefreshLoop() {
-    const interval = Number(process.env.BACKEND_REFRESH_MS || 30000);
+    const interval = Number(
+        process.env.DRIFELLASCAPE_BACKEND_REFRESH_MS || 30000,
+    );
     // Priming load
     await cache.ensureLoaded().catch(() => {});
     setInterval(

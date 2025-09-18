@@ -28,7 +28,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getIntervalMs(): number {
-    const raw = process.env.SYNC_INTERVAL_MS;
+    const raw = process.env.DRIFELLASCAPE_SYNC_INTERVAL_MS;
     const parsed = raw ? Number(raw) : NaN;
     const val = Number.isFinite(parsed) ? Math.max(5_000, parsed) : 30_000;
     return val;

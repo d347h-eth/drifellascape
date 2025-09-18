@@ -2,7 +2,7 @@
 
 This plan implements the listings pipeline with a simple, durable, and testable flow:
 
-- Append-only snapshots in `listings_current` keyed by `version_id` + `token_id`.
+- Append-only snapshots in `listings_current` keyed by `(version_id, token_mint_addr)`.
 - A single active snapshot selected via `listing_versions.active = 1`.
 - Worker computes diffs using one temporary table and simple joins.
 - Price drift threshold to ignore micro relistings (epsilon = 0.01 SOL = 10,000,000 in raw units).
@@ -79,11 +79,10 @@ The steps are isolated and can be developed/tested incrementally with local fixt
   - Unit tests with fixtures (mocked responses for multiple pages and edge cases).
 
 - Normalization
-  - Extract `token_id` from `token.name` by regex (e.g., `/#(\d+)/`).
-  - `price` = integer from `priceInfo.solPrice.rawAmount` (string → integer).
-  - `seller`, `image_url` from `extra.img` or equivalent, `listing_source` from response.
+  - Accept primary fields only: `tokenMint`, `priceInfo.solPrice.rawAmount`, `seller`, `extra.img`, `listingSource`.
+  - Key: `token_mint_addr` (canonical). Optional `token_num` parsed from `token.name`.
   - Exclude `expiry` (not used).
-  - Tests for robust parsing, including malformed names or missing fields.
+  - Tests for robust parsing and required field enforcement.
 
 ---
 
@@ -242,7 +241,19 @@ FROM temp_listings;`
 
 ---
 
-## 7) Implementation Order (Milestones)
+## 7) Frontend: Listings + Exploration Mode
+
+- Progress
+
+  - [x] Listings page fetch (limit=100) + staged polling (apply when at top)
+  - [x] Price with maker (2%) + royalty (5%) fees; SOL rounding
+  - [x] Exploration mode (Leaflet) with hard‑pixel rendering and fit‑by‑width default
+  - [x] Next/prev via hotkeys and invisible edge targets; ESC to close
+  - [x] Positioning hotkeys: S/W/Q/E and 1/2/3 (region‑fit with tuned offset); G toggles debug overlay
+
+---
+
+## 8) Implementation Order (Milestones)
 
 1. Database migrations for listings schema (001)
 
@@ -264,17 +275,22 @@ FROM temp_listings;`
    - [x] Implement cache warm + poll loop; basic listings endpoint with pagination/sort.
    - [ ] Tests for cache behavior and endpoint outputs.
 
-5. Observability & ops (optional)
+5. Frontend
+
+   - [x] Listings page, price display, and staged polling
+   - [x] Exploration mode with hard‑pixel rendering, hotkeys, next/prev, and debug overlay
+
+6. Observability & ops (optional)
 
    - Minimal logs (sync success/fail, version id, counts).
    - Health endpoint exposing last sync time/version.
 
-6. Future: Token metadata & traits (out of scope for now)
+7. Future: Token metadata & traits (out of scope for now)
    - Normalize tokens and traits for filterable queries; integrate with listings.
 
 ---
 
-## 8) Configuration & Defaults
+## 9) Configuration & Defaults
 
 - Sync interval: 30s (env-configurable).
 - Rate limit: 2 RPS / 120 RPM, exponential backoff retries.
@@ -284,7 +300,7 @@ FROM temp_listings;`
 
 ---
 
-## 9) Open Questions
+## 10) Open Questions
 
 - Do we seed an initial empty active version in migration (recommended for simpler first run)?
 - Any need to prune old inactive `listing_versions` rows (rows in `listings_current` are cleaned automatically after activation)?
