@@ -112,15 +112,50 @@ For the single‑collection scope, these indices are sufficient for basic pagina
   2) Run `initializeDatabase()` to apply migrations
   3) Use `better-sqlite3` prepared statements or repo helpers to assert behavior
 
-## Future Work (TBD)
+## Traits Schema
 
-- Traits schema
-  - `tokens(token_mint_addr PK, token_num?, name, image_url, …)`
-  - `traits(trait_id PK, trait_name)`
-  - `token_traits(token_mint_addr, trait_id, value)` with indices on `(trait_id, value)` and `(token_mint_addr)`
-  - Precomputed distributions for fast filtering
-- Additional indices for server‑side filtering (by source, price ranges, etc.)
-- Lightweight integrity checks (e.g., row count = `listing_versions.total` for active snapshot)
+ Migration `002_traits_schema.sql` adds normalized tables for static token metadata and traits (raw ingestion, no canonicalization):
+
+- `tokens`
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `token_mint_addr TEXT NOT NULL UNIQUE CHECK(length(token_mint_addr) <= 44)`
+  - `token_num INTEGER NOT NULL UNIQUE`
+  - `name TEXT`
+  - `image_url TEXT NOT NULL`
+  - Indexes: `(token_mint_addr)`, `(token_num)`
+
+- `trait_types`
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `name TEXT NOT NULL UNIQUE` (raw `trait_type` from metadata)
+  - `tokens_with_type INTEGER NOT NULL DEFAULT 0` (populated by the ingest script)
+
+- `trait_values`
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `value TEXT NOT NULL UNIQUE` (raw `value`, global across all types)
+  - `tokens_with_value INTEGER NOT NULL DEFAULT 0`
+  - Indexes: `(value)`
+
+- `trait_types_values`
+  - `type_id INTEGER NOT NULL` (FK → `trait_types.id`)
+  - `value_id INTEGER NOT NULL` (FK → `trait_values.id`)
+  - `tokens_with_type_value INTEGER NOT NULL DEFAULT 0`
+  - Primary key: `(type_id, value_id)`
+  - Indexes: `(value_id)`
+
+- `token_traits`
+  - `token_id INTEGER NOT NULL` (FK → `tokens.id`)
+  - `type_id INTEGER NOT NULL` (FK → `trait_types.id`)
+  - `value_id INTEGER NOT NULL` (FK → `trait_values.id`)
+  - Primary key: `(token_id, type_id)` — one value per raw type per token
+  - Indexes: `(type_id, value_id, token_id)`, `(value_id, token_id)`, `(token_id)`
+
+Ingestion script (`scripts/ingest-traits.ts`) populates these tables from the local metadata dump and a CSV mapping of mint ↔ image URL. All strings are ingested exactly as they appear in metadata (no normalization). The script recomputes counts for types, values, and type/value pairs.
+
+## Future Work
+
+- Additional indices for server‑side filtering (price ranges, sources, compound trait filters)
+- Optional numeric normalization for trait values that represent numbers (range filtering)
+- Lightweight integrity checks (e.g., counts consistency)
 
 ## Operations Notes
 

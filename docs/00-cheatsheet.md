@@ -57,3 +57,5 @@
 - Download originals and produce 2560px JPGs (if needed locally):
   - `yarn tsx scripts/download-images.ts`
   - `yarn tsx scripts/resize-to-2560.ts`
+- Ingest traits (CSV + metadata → DB):
+  - `yarn tsx scripts/ingest-traits.ts`
