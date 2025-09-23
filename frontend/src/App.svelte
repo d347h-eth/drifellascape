@@ -2,6 +2,15 @@
     import { onMount } from "svelte";
     import ImageExplorer from "./ImageExplorer.svelte";
 
+    type ListingTrait = {
+        type_id: number;
+        type_name: string;
+        spatial_group: string | null;
+        purpose_class: string | null;
+        value_id: number;
+        value: string;
+    };
+
     type ListingRow = {
         token_mint_addr: string;
         token_num: number | null;
@@ -9,6 +18,10 @@
         seller: string;
         image_url: string;
         listing_source: string;
+        // enriched fields from POST /listings/search
+        token_id: number;
+        token_name: string | null;
+        traits?: ListingTrait[];
     };
 
     type ApiResponse = {
@@ -56,7 +69,18 @@
         loading = true;
         error = null;
         try {
-            const res = await fetch(`${API_BASE}/listings?limit=100`);
+            const res = await fetch(`${API_BASE}/listings/search`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    mode: "value",
+                    valueIds: [],
+                    sort: "price_asc",
+                    offset: 0,
+                    limit: 100,
+                    includeTraits: true,
+                }),
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data: ApiResponse = await res.json();
             items = data.items ?? [];
@@ -89,7 +113,18 @@
 
     async function pollForUpdates() {
         try {
-            const res = await fetch(`${API_BASE}/listings?limit=100`);
+            const res = await fetch(`${API_BASE}/listings/search`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({
+                    mode: "value",
+                    valueIds: [],
+                    sort: "price_asc",
+                    offset: 0,
+                    limit: 100,
+                    includeTraits: true,
+                }),
+            });
             if (!res.ok) return; // silent
             const data: ApiResponse = await res.json();
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
