@@ -130,8 +130,11 @@ Migration `002_traits_schema.sql` adds normalized tables for static token metada
 - `trait_types`
 
   - `id INTEGER PRIMARY KEY AUTOINCREMENT`
-  - `name TEXT NOT NULL UNIQUE` (raw `trait_type` from metadata)
+  - `name TEXT NOT NULL` (raw `trait_type` from metadata)
   - `tokens_with_type INTEGER NOT NULL DEFAULT 0` (populated by the ingest script)
+  - `spatial_group TEXT` (artist “group” / spatial layer attribution)
+  - `purpose_class TEXT` (custom categorization for UI filtering)
+  - Indexes: `(name)`, `(purpose_class)`, and a composite unique index on `(name, spatial_group)`
 
 - `trait_values`
 

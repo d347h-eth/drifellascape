@@ -16,11 +16,17 @@ CREATE INDEX IF NOT EXISTS idx_tokens_num ON tokens(token_num);
 -- Table: trait_types (raw keys as present in metadata)
 CREATE TABLE IF NOT EXISTS trait_types (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  tokens_with_type INTEGER NOT NULL DEFAULT 0
+  name TEXT NOT NULL,
+  tokens_with_type INTEGER NOT NULL DEFAULT 0,
+  spatial_group TEXT,
+  purpose_class TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_trait_types_name ON trait_types(name);
+CREATE INDEX IF NOT EXISTS idx_trait_types_purpose_class ON trait_types(purpose_class);
+-- Enforce uniqueness per spatial group (name + spatial_group)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_trait_types_unique_name_group
+  ON trait_types(name, spatial_group);
 
 -- Table: trait_values (global unique text values across all types; raw, no normalization)
 CREATE TABLE IF NOT EXISTS trait_values (
