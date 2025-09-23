@@ -35,6 +35,15 @@
 - Backend: `GET /listings?offset&limit&sort=price_asc|price_desc`
 - Returns: `{ versionId, total, offset, limit, sort, items }`
 
+## Frontend Hotkeys (Gallery)
+
+- Navigation: Left/Right or `A`/`D` (prev/next)
+- Focus current: `F` (center nearest image)
+- Motion toggle: `M` (enable/disable auto‑snap + animation)
+- Jump ends: `Home` (first), `End` (last)
+- Help: `H` or `F1` (toggle overlay)
+- Mouse: wheel for horizontal travel; click screen edges to prev/next
+
 ## Frontend Hotkeys (Exploration)
 
 - Navigation: Left/Right or `A`/`D` (prev/next), `ESC` (close)

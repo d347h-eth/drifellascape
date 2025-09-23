@@ -73,6 +73,7 @@ WHERE NOT EXISTS (SELECT 1 FROM listing_versions WHERE active = 1);
 ```
 
 Design choices:
+
 - Canonical key: `token_mint_addr` (Solana mint)
 - Snapshot rows keyed by `(version_id, token_mint_addr)` to enable cheap version switching
 - Minimal CHECKs on text lengths for `seller` and `listing_source`
@@ -85,6 +86,7 @@ Design choices:
 - Readers (backend) always filter on the single `active` version id
 
 Why append‑only?
+
 - Readers never observe partial updates; activation is atomic and fast
 - Cleanup is idempotent; interrupted runs recover on the next cycle
 - Diff logic stays simple and write patterns remain predictable
@@ -108,15 +110,16 @@ For the single‑collection scope, these indices are sufficient for basic pagina
 
 - The DB package exposes `setDbPath(newPath)` to retarget the connection for tests
 - Tests typically:
-  1) Create a temp directory and pass its `…/test.db` to `setDbPath()`
-  2) Run `initializeDatabase()` to apply migrations
-  3) Use `better-sqlite3` prepared statements or repo helpers to assert behavior
+  1. Create a temp directory and pass its `…/test.db` to `setDbPath()`
+  2. Run `initializeDatabase()` to apply migrations
+  3. Use `better-sqlite3` prepared statements or repo helpers to assert behavior
 
 ## Traits Schema
 
- Migration `002_traits_schema.sql` adds normalized tables for static token metadata and traits (raw ingestion, no canonicalization):
+Migration `002_traits_schema.sql` adds normalized tables for static token metadata and traits (raw ingestion, no canonicalization):
 
 - `tokens`
+
   - `id INTEGER PRIMARY KEY AUTOINCREMENT`
   - `token_mint_addr TEXT NOT NULL UNIQUE CHECK(length(token_mint_addr) <= 44)`
   - `token_num INTEGER NOT NULL UNIQUE`
@@ -125,17 +128,20 @@ For the single‑collection scope, these indices are sufficient for basic pagina
   - Indexes: `(token_mint_addr)`, `(token_num)`
 
 - `trait_types`
+
   - `id INTEGER PRIMARY KEY AUTOINCREMENT`
   - `name TEXT NOT NULL UNIQUE` (raw `trait_type` from metadata)
   - `tokens_with_type INTEGER NOT NULL DEFAULT 0` (populated by the ingest script)
 
 - `trait_values`
+
   - `id INTEGER PRIMARY KEY AUTOINCREMENT`
   - `value TEXT NOT NULL UNIQUE` (raw `value`, global across all types)
   - `tokens_with_value INTEGER NOT NULL DEFAULT 0`
   - Indexes: `(value)`
 
 - `trait_types_values`
+
   - `type_id INTEGER NOT NULL` (FK → `trait_types.id`)
   - `value_id INTEGER NOT NULL` (FK → `trait_values.id`)
   - `tokens_with_type_value INTEGER NOT NULL DEFAULT 0`

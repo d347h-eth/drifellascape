@@ -22,7 +22,7 @@ This document describes the Drifellascape synchronization worker in depth: what 
 
 ## Control Flow (One Cycle)
 
-1) Fetch all pages (see Rate Limiting) and normalize to `NormalizedListing`:
+1. Fetch all pages (see Rate Limiting) and normalize to `NormalizedListing`:
    - `token_mint_addr`: string (from `tokenMint`)
    - `token_num?`: number | null (parsed from `token.name` as a convenience)
    - `price`: integer (rawAmount, SOL base units: 9 decimals)
@@ -30,16 +30,17 @@ This document describes the Drifellascape synchronization worker in depth: what 
    - `image_url`: string (original artwork URL)
    - `listing_source`: string (source enum)
    - Listings missing any required field are skipped and counted.
-2) Stage rows into a temp table: `CREATE TEMP TABLE temp_listings (...) PRIMARY KEY(token_mint_addr)`.
-3) Compute diffs via joins against the active snapshot (see SQL below).
-4) If inserted + updated + deleted == 0 → drop temp; end (no new snapshot, no DB churn).
-5) Else:
+2. Stage rows into a temp table: `CREATE TEMP TABLE temp_listings (...) PRIMARY KEY(token_mint_addr)`.
+3. Compute diffs via joins against the active snapshot (see SQL below).
+4. If inserted + updated + deleted == 0 → drop temp; end (no new snapshot, no DB churn).
+5. Else:
    - Insert a new inactive version in `listing_versions` with `total = COUNT(temp_listings)`.
    - Bulk insert the new snapshot rows from `temp_listings` with `created_at = unixepoch('now')`.
    - Atomically flip `active` (BEGIN IMMEDIATE; set previous to 0, new to 1; COMMIT).
    - Cleanup: delete non‑active rows in `listings_current` and any `listing_versions` with `active=0`.
 
 Crash safety:
+
 - If process dies before activation, the pending version remains inactive and is ignored.
 - If it dies after activation but before cleanup, the next run’s cleanup removes any stragglers.
 
@@ -136,12 +137,14 @@ DELETE FROM listing_versions WHERE active = 0;
 ```
 
 Notes:
+
 - Only the activation flip is transactional to minimize lock time; cleanup is idempotent.
 - Diff detection is performed once; apply phase never re‑evaluates conditions.
 
 ## Implementation Structure
 
 Source layout (worker):
+
 - `worker/src/fetcher.ts`
   - Rate limiter, retry wrapper, pagination, and normalization.
   - Returns `{ ok: true, listings, pages, skipped } | { ok: false, error }`.
@@ -157,6 +160,7 @@ Source layout (worker):
   - Infinite loop: fetch → sync → sleep. Interval via `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
 
 DB module (shared):
+
 - `database/src/db.ts`
   - Pragmas: WAL, synchronous=NORMAL, foreign_keys=ON, busy_timeout=5000.
   - `setDbPath(path)` for tests (reopens connection).

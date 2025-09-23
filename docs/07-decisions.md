@@ -1,30 +1,46 @@
 # Architectural Decisions (ADR Summary)
 
 ## ADR-001: Canonical Token Key
+
 - Decision: Use `token_mint_addr` (Solana mint) as the canonical key everywhere.
 - Rationale: Marketplace APIs and activity endpoints reference mint; robust across sources.
 
 ## ADR-002: Append-only Snapshots with Atomic Flip
+
 - Decision: Store listings in versioned snapshots; create new snapshot only if diffs exist; atomically flip active version, then clean stale rows.
 - Rationale: Readers never observe partial writes; cleanup is idempotent; simplifies race handling.
 
 ## ADR-003: Diff Epsilon on Price
+
 - Decision: Ignore price changes < 0.01 SOL (10,000,000 raw units).
 - Rationale: Avoid churn from market‑maker micro relists; focus on material changes.
 
 ## ADR-004: In-memory Cache for Backend
+
 - Decision: Backend keeps the active snapshot in memory and reloads only when version changes.
 - Rationale: Low latency, low cost; reads are DB‑independent.
 
 ## ADR-005: Hard-pixel Rendering + Fractional Zoom
+
 - Decision: Use CSS `image-rendering` hints to avoid smoothing and allow fractional zoom for exact fits.
 - Rationale: Crisp pixels at any zoom without snapping; precise fit‑to‑width and region‑fit behaviors.
 
 ## ADR-006: Staged Frontend Updates
+
 - Decision: Poll for new snapshots; stage results; apply only when user is near the top.
 - Rationale: Avoid viewport jumps; respect user’s scroll position.
 
 ## ADR-007: Listings Normalization (Primary Fields Only)
+
 - Decision: Accept only `tokenMint`, `priceInfo.solPrice.rawAmount`, `seller`, `extra.img`, `listingSource`.
 - Rationale: Simplify invariants; avoid fragile fallbacks; skip invalid rows explicitly.
 
+## ADR-008: Horizontal Gallery Scroll + Snap
+
+- Decision: Implement desktop‑first horizontal browsing with linear wheel scrolling, no CSS snap, and a small JS finalize‑to‑center that only triggers after moving far enough from the last center and always in the direction of travel. Provide a motion toggle to disable auto‑snap completely.
+- Rationale: Achieves a continuous “travel” feel across wide artwork while retaining precise centering on demand. Avoids CSS snap stickiness and snap‑back. Keeps logic simple and tunable (threshold, debounce, easing, duration) and respects reduced‑motion.
+- Key parameters:
+  - `WHEEL_MULTIPLIER` (default 1.4), `LEAVE_THRESHOLD_PX` (1000), `FINALIZE_DELAY_MS` (0 ms), `BLOCK_SCROLL_MS` (100 ms)
+  - Easing: ease‑in‑out cubic; duration ≈ 0.233 ms/px (80–160 ms caps)
+  - Motion off: no automated snap; keys/edges are instant
+  - Reduced motion: disables auto‑snap

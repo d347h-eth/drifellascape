@@ -41,4 +41,3 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Tests (Vitest): `yarn vitest run`
 
 If something feels ambiguous, add a brief note to `docs/07-decisions.md` and reference the change.
-

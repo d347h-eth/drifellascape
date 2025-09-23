@@ -30,6 +30,44 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - A periodic poll (default 30s) fetches again. If a new `versionId` arrives, the result is staged; it applies automatically when the user is near the top (≤ 50 px), preventing viewport jumps while scrolling.
 - Price shown is fee‑inclusive (see below). Clicking the price opens the marketplace listing in a new tab.
 
+## Horizontal Gallery (Continuous Travel)
+
+Goal: a desktop‑first horizontal “travel” experience where wide, landscape images flow side‑by‑side. Default rendering preserves 1:1 pixels (max‑width 2560px); images are pinned to the top (no vertical centering).
+
+- Layout
+
+  - One slide per viewport: a flex row scroller with `overflow-x: auto`, each slide `flex: 0 0 100vw`.
+  - Images: `width: 100%`, `max-width: 2560px`, `height: auto`, centered horizontally, top‑aligned vertically.
+  - Edge navigation bands: fixed left/right buttons (height 1327px, width 6vw, min 60px) to jump ±1.
+
+- Scrolling & Snap Logic
+
+  - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned with `WHEEL_MULTIPLIER` (default 1.5).
+  - No CSS scroll‑snap. Instead, a small JS “finalize to center” runs on scroll‑end when motion is on:
+    - Directional finalize: if you moved at least `LEAVE_THRESHOLD_PX` away from the last centered slide (default 1000 px), snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
+    - Debounce: `FINALIZE_DELAY_MS` (default 120 ms) waits briefly after the last wheel event.
+    - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (default 100 ms) to avoid accidental re‑scrolls right after landing.
+  - Motion toggle: users can toggle motion with `M`. When motion is off, there is no automated snap at all (pure linear scrolling). With motion on and `prefers‑reduced‑motion`, auto‑snap is also disabled.
+
+- Animation (when motion is on)
+
+  - Custom rAF tween (no CSS snap) with ease‑in‑out cubic.
+  - Distance‑based duration: about 0.233 ms/px with caps → min 80 ms, max 160 ms.
+  - Interrupt handling: while animating, wheel input is ignored; finalize never triggers mid‑tween; indices update on landing.
+
+- Hotkeys — Gallery
+
+  - Navigation: Left/Right or `A`/`D` (prev/next)
+  - Focus current: `F` (centers the nearest image)
+  - Motion toggle: `M` (enables/disables auto‑snap + animation)
+  - Jump ends: `Home` (first), `End` (last) — instant
+  - Help: `H` or `F1` toggles a hotkeys overlay
+  - Mouse: wheel for travel; click screen edges to prev/next
+
+- Help Overlay
+  - Opaque modal with grouped shortcuts for Gallery and Exploration.
+  - Open/close with `H` or `F1`; `ESC` closes; clicking backdrop closes.
+
 ## Listings View
 
 - Layout: single column, each row contains a centered artwork image.
