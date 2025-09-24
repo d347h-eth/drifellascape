@@ -26,8 +26,8 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Data Flow
 
-- On mount, the app requests `GET {VITE_API_BASE}/listings?limit=100` and stores `items`, `versionId`.
-- A periodic poll (default 30s) fetches again. If a new `versionId` arrives, the result is staged; it applies automatically when the user is near the top (≤ 50 px), preventing viewport jumps while scrolling.
+- On mount, the app requests `POST {VITE_API_BASE}/listings/search` with `{ mode: "value", valueIds: [], sort: "price_asc", limit: 100, includeTraits: true }` and stores `items`, `versionId`.
+- A periodic poll (default 30s) posts again; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
 - Price shown is fee‑inclusive (see below). Clicking the price opens the marketplace listing in a new tab.
 
 ## Horizontal Gallery (Continuous Travel)
@@ -38,7 +38,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
   - One slide per viewport: a flex row scroller with `overflow-x: auto`, each slide `flex: 0 0 100vw`.
   - Images: `width: 100%`, `max-width: 2560px`, `height: auto`, centered horizontally, top‑aligned vertically.
-  - Edge navigation bands: fixed left/right buttons (height 1327px, width 6vw, min 60px) to jump ±1.
+  - Edge navigation bands: fixed left/right buttons (height 1087px, width 6vw, min 60px) to jump ±1.
 
 - Scrolling & Snap Logic
 
@@ -57,16 +57,33 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 - Hotkeys — Gallery
 
-  - Navigation: Left/Right or `A`/`D` (prev/next)
-  - Focus current: `F` (centers the nearest image)
-  - Motion toggle: `M` (enables/disables auto‑snap + animation)
-  - Jump ends: `Home` (first), `End` (last) — instant
-  - Help: `H` or `F1` toggles a hotkeys overlay
-  - Mouse: wheel for travel; click screen edges to prev/next
+  - Previous/Next image — Left/Right or `A`/`D`
+  - Focus current — `F`
+  - Toggle motion — `M`
+  - Toggle trait bar — `V`
+  - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
+  - Next trait page (wrap) — `X`
+  - Jump to first/last — `Home` / `End`
+  - Horizontal travel — mouse wheel; click screen edges to prev/next
 
 - Help Overlay
   - Opaque modal with grouped shortcuts for Gallery and Exploration.
   - Open/close with `H` or `F1`; `ESC` closes; clicking backdrop closes.
+
+## Trait Bar (Bottom Overlay)
+
+- Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible).
+- Purpose classes (pills) centered above the bar: `left`, `middle`, `right`, `decor`, `items`, `special`, `undefined`.
+  - Default selected: `middle`.
+  - Pills show counts for the current token (e.g., `middle (5)`); empty pills are disabled and skipped by keyboard nav.
+  - Hotkeys: `Z` / `V` cycle purpose left/right (wrap; skip empties).
+- Trait boxes strip within the bar:
+  - Shows only traits for the selected purpose class of the current token in focus.
+  - Box size 150×50; head: `spatial_group. type_name`; value wraps to two lines as needed.
+  - Fixed page size: arrow pads (50×50) navigate pages at a constant offset; no overlap between pages. Hotkey `X` jumps to the next page and wraps to the start.
+  - Hotkeys: `X` / `C` page left/right (no wrap).
+- Clicking a box toggles value‑based filtering (adds/removes that `value_id`) and immediately refreshes listings via `POST /listings/search`.
+  - The frontend keeps the same token in focus across filter changes (by mint), including when removing the last/only filter.
 
 ## Listings View
 
@@ -105,21 +122,16 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Center view at image midpoint `(IMG_HEIGHT/2, IMG_WIDTH/2)`.
 - Double‑click resets to this centered fit‑by‑width view.
 
-### Hotkeys
+### Hotkeys — Exploration
 
-- Navigation: Left/Right arrow or `A`/`D` to go to previous/next; `ESC` to close.
-- Edges: invisible full‑height targets on left/right; hover reveals subtle gradient. Right edge leaves space for the close button and does not steal focus.
-- Positioning:
-  - `S` — fit‑by‑width centered (default view)
-  - `W`, `Q`, `E` — fit the entire image height (middle/left/right), capped at 1:1
-  - `1`, `2`, `3` — fit a 1006 px tall band to viewport height (left/middle/right) with a tuned vertical offset
-    - Region math:
-      - `IMG_WIDTH = 3125`, `IMG_HEIGHT = 1327`
-      - `REGION_HEIGHT = 1006`
-      - `REGION_TOP_CENTER = (IMG_HEIGHT - REGION_HEIGHT)/2`
-      - `REGION_TOP = REGION_TOP_CENTER + 36` (tuned for correct placement)
-    - Region zoom: `log2(containerHeight / REGION_HEIGHT) - epsilon` (no 1:1 cap; small epsilon avoids off‑by‑1 px)
-- `G` — toggle a cyan debug rectangle outlining the 1006 px region used by 1/2/3.
+- Previous/Next — Left/Right or `A`/`D`
+- Close exploration — `Esc`
+- Fit‑by‑width centered — `S`
+- Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
+- Fit 1006 px band (left/middle/right) — `1` / `2` / `3`
+  - Region math: `IMG_WIDTH = 3125`, `IMG_HEIGHT = 1327`, `REGION_HEIGHT = 1006`, `REGION_TOP = (IMG_HEIGHT − 1006)/2 + 36`
+  - Region zoom: `log2(containerHeight / REGION_HEIGHT) - epsilon`
+- Toggle debug overlay — `G` (cyan rectangle for the 1006 px band)
 
 ### Image Swapping & Flicker Control
 
@@ -148,6 +160,10 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 ## Extensibility
 
 - Deep‑linking the explorer to `/explore/:mint` for shareable links.
-- Filters UI: price ranges, marketplace source, token number; later, trait filters (once available in the backend).
+- Filters UI: value‑based and trait‑based modes backed by `POST /listings/search`.
 - Preload or double‑buffer next/prev artwork for instant transitions.
 - Virtualize the listing grid if we ever render many more rows per page.
+
+## Debugging
+
+- Global debug helper under `frontend/src/debug.ts` (`DEBUG=false` by default). Import `dbg(label, data?)` and flip `DEBUG=true` for development logs.

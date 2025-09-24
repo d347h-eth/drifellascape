@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import ImageExplorer from "./ImageExplorer.svelte";
 
     type ListingTrait = {
@@ -57,13 +57,14 @@
     let scrollerEl: HTMLDivElement | null = null;
     let activeIndex = 0; // nearest item to viewport center
     // Linear horizontal scroll with JS finalize-to-center
-    const WHEEL_MULTIPLIER = 1.4; // tuned for continuous travel feel
+    const WHEEL_MULTIPLIER = 1.5; // tuned for continuous travel feel
     const FINALIZE_DELAY_MS = 0; // debounce scroll-end
-    const LEAVE_THRESHOLD_PX = 1000; // must move this far from last center to snap
-    const BLOCK_SCROLL_MS = 100; // post-snap block window (auto-snap mode only)
+    const LEAVE_THRESHOLD_PX = 1280; // must move this far from last center to snap
+    const BLOCK_SCROLL_MS = 150; // post-snap block window (auto-snap mode only)
     let scrollEndTimer: any = null;
     let lastSnapIndex = 0; // last centered slide index
     let blockUntilTs = 0; // timestamp until which wheel is blocked (auto-snap)
+    let suppressFinalizeUntilTs = 0; // suppress finalize after programmatic jumps
 
     // Motion toggle and animator
     const prefersReducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -164,16 +165,16 @@
                 showHelp = false;
                 return;
             }
-            // Trait bar toggle (both modes)
-            if (k === 'b' || k === 'B') {
+            // Trait bar toggle (both modes) — moved to V
+            if (k === 'v' || k === 'V') {
                 e.preventDefault();
                 showTraitBar = !showTraitBar;
                 traitBarOffset = 0;
                 setTimeout(recomputeVisibleTraitSlots, 0);
                 return;
             }
-            // Purpose class nav (both modes; wrap and skip empty)
-            if (k === 'z' || k === 'Z' || k === 'v' || k === 'V') {
+            // Purpose class nav (both modes; wrap and skip empty) — right moved to C
+            if (k === 'z' || k === 'Z' || k === 'c' || k === 'C') {
                 e.preventDefault();
                 const dir = (k === 'z' || k === 'Z') ? -1 : 1;
                 const it = currentItem();
@@ -189,14 +190,10 @@
                 traitBarOffset = 0;
                 return;
             }
-            // Trait bar internal nav (no wrap)
-            if (k === 'x' || k === 'X' || k === 'c' || k === 'C') {
+            // Trait bar page next (wrap) — moved to X
+            if (k === 'x' || k === 'X') {
                 e.preventDefault();
-                const dir = (k === 'x' || k === 'X') ? -1 : 1;
-                const total = currentFilteredTraits().length;
-                const step = Math.max(1, visibleTraitSlots || 1);
-                if (dir < 0) traitBarOffset = Math.max(0, traitBarOffset - step);
-                else traitBarOffset = Math.min(Math.max(0, total - step), traitBarOffset + step);
+                nextTraitPageWrapped();
                 return;
             }
             if (exploreIndex !== null) return;
@@ -356,11 +353,26 @@
     function isValueSelected(id: number): boolean {
         return selectedValueIds.has(id);
     }
+    import { dbg } from "./debug";
+
     async function applyValueFilterAndFetch() {
         loading = true;
         try {
             const cur = currentItem();
             const curMint = cur?.token_mint_addr || null;
+            const beforeScrollLeft = scrollerEl?.scrollLeft ?? -1;
+            const beforeClientWidth = scrollerEl?.clientWidth ?? -1;
+            dbg('[traits] apply start', {
+                selectedValueIds: Array.from(selectedValueIds),
+                curMint,
+                curTokenNum: cur?.token_num ?? null,
+                activeIndex,
+                lastSnapIndex,
+                exploreIndex,
+                itemsLen: items.length,
+                beforeScrollLeft,
+                beforeClientWidth,
+            });
             const res = await fetch(`${API_BASE}/listings/search`, {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
@@ -379,20 +391,48 @@
             items = newItems;
             versionId = data.versionId ?? null;
             // Keep current token in focus if present in new result
-            let idx = Math.min(activeIndex, Math.max(0, newItems.length - 1));
+            let found = -1;
             if (curMint) {
-                const found = newItems.findIndex((r) => r.token_mint_addr === curMint);
-                if (found >= 0) idx = found;
+                found = newItems.findIndex((r) => r.token_mint_addr === curMint);
             }
             // Update exploration state if open
             if (exploreIndex !== null) {
                 exploreItems = newItems.slice();
-                exploreIndex = idx;
+                if (found >= 0) exploreIndex = found; // keep same token if possible
+                else exploreIndex = Math.min(exploreIndex, Math.max(0, newItems.length - 1));
             }
-            // Scroll gallery to same token
-            scrollToIndex(idx, false, true);
-            activeIndex = idx;
-            lastSnapIndex = idx;
+            // Wait for DOM to reflect the new items so scroll range is correct
+            await tick();
+            await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+            if (found >= 0) {
+                // Scroll gallery to the same token explicitly
+                scrollToIndex(found, false, true);
+                activeIndex = found;
+                lastSnapIndex = found;
+            } else {
+                // Do not jump; keep visual position and recompute nearest index
+                const nIdx = nearestIndex();
+                activeIndex = nIdx;
+                lastSnapIndex = nIdx;
+            }
+            const afterScrollLeft = scrollerEl?.scrollLeft ?? -1;
+            dbg('[traits] apply end (pre-tick)', {
+                newTotal: data.total,
+                newItemsLen: newItems.length,
+                found,
+                decidedIndex: activeIndex,
+                lastSnapIndex,
+                afterScrollLeft,
+            });
+            // Extra: log a tick later for post-layout verification
+            setTimeout(() => {
+                dbg('[traits] post-tick', {
+                    scrollLeft: scrollerEl?.scrollLeft ?? -1,
+                    clientWidth: scrollerEl?.clientWidth ?? -1,
+                    activeIndex,
+                    lastSnapIndex,
+                });
+            }, 0);
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
@@ -413,6 +453,12 @@
     function nextTraitPage() {
         const step = Math.max(1, visibleTraitSlots || 1);
         traitBarOffset = Math.min(Math.max(0, totalTraits - step), traitBarOffset + step);
+    }
+    function nextTraitPageWrapped() {
+        const step = Math.max(1, visibleTraitSlots || 1);
+        if (totalTraits <= 0) return;
+        const next = traitBarOffset + step;
+        traitBarOffset = next >= totalTraits ? 0 : next;
     }
 
     // Animation helpers
@@ -482,6 +528,9 @@
             if (autoSnap && motionEnabled) {
                 blockUntilTs = Date.now() + BLOCK_SCROLL_MS;
             }
+            if (forceInstant) {
+                suppressFinalizeUntilTs = Date.now() + 200;
+            }
         }
     }
     function handleScroll() {
@@ -491,6 +540,7 @@
         if (!motionEnabled || prefersReducedMotion) {
             return; // no automated snap when motion is off or reduced
         }
+        if (Date.now() < suppressFinalizeUntilTs) return;
         if (scrollEndTimer) clearTimeout(scrollEndTimer);
         scrollEndTimer = setTimeout(() => {
             if (!scrollerEl) return;
@@ -670,7 +720,7 @@
     .trait-box:hover { background: rgba(255,255,255,0.06); }
     .trait-box.selected { background: rgba(255,255,255,0.12); }
     .trait-head { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .trait-val { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .trait-val { font-size: 13px; font-weight: 600; white-space: normal; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
 </style>
 
 <div class="container">
@@ -723,24 +773,26 @@
 
                 <h3>Gallery (Horizontal Scroll)</h3>
                 <ul>
-                    <li><span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span> — Previous/Next image</li>
-                    <li><span class="kbd">F</span> — Focus/center current image</li>
-                    <li><span class="kbd">M</span> — Toggle motion (auto‑snap + animation)</li>
-                    <li><span class="kbd">Home</span>/<span class="kbd">End</span> — Jump to first/last</li>
-                    <li>Mouse wheel — Horizontal travel</li>
-                    <li>Click screen edges — Previous/Next</li>
-                    <li><span class="kbd">H</span> / <span class="kbd">F1</span> — Toggle this help</li>
+                    <li>Previous/Next image — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
+                    <li>Focus current — <span class="kbd">F</span></li>
+                    <li>Toggle motion — <span class="kbd">M</span></li>
+                    <li>Toggle trait bar — <span class="kbd">V</span></li>
+                    <li>Purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
+                    <li>Next trait page (wrap) — <span class="kbd">X</span></li>
+                    <li>Jump to first/last — <span class="kbd">Home</span> / <span class="kbd">End</span></li>
+                    <li>Horizontal travel — mouse wheel; Click screen edges to prev/next</li>
+                    <li>Toggle help — <span class="kbd">H</span> / <span class="kbd">F1</span></li>
                 </ul>
 
                 <h3>Exploration Mode</h3>
                 <ul>
-                    <li><span class="kbd">Esc</span> — Close exploration</li>
-                    <li><span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span> — Previous/Next</li>
-                    <li><span class="kbd">S</span> — Fit‑by‑width centered</li>
-                    <li><span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span> — Fit entire height (middle/left/right)</li>
-                    <li><span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span> — Fit 1006px band (left/middle/right)</li>
-                    <li><span class="kbd">G</span> — Toggle debug overlay</li>
-                    <li>Double‑click — Reset to fit‑by‑width</li>
+                    <li>Previous/Next — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
+                    <li>Close exploration — <span class="kbd">Esc</span></li>
+                    <li>Fit‑by‑width centered — <span class="kbd">S</span></li>
+                    <li>Fit entire height (middle/left/right) — <span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span></li>
+                    <li>Fit 1006px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>
+                    <li>Reset to fit‑by‑width — Double‑click</li>
+                    <li>Toggle debug overlay — <span class="kbd">G</span></li>
                 </ul>
             </div>
         </div>
@@ -770,7 +822,7 @@
             <div class="trait-strip">
                 {#each traitsForBar.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
                     <div class="trait-box {isValueSelected(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => onClickTraitValue(tr)}>
-                        <div class="trait-head">{(tr.spatial_group ?? 'undf').toLowerCase()}. {tr.type_name}</div>
+                        <div class="trait-head">{(tr.spatial_group ?? 'undf').toUpperCase()}. {tr.type_name}</div>
                         <div class="trait-val">{tr.value}</div>
                     </div>
                 {/each}

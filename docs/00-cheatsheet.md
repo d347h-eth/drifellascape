@@ -32,26 +32,30 @@
 
 ## Endpoints
 
-- Backend: `GET /listings?offset&limit&sort=price_asc|price_desc`
-- Returns: `{ versionId, total, offset, limit, sort, items }`
+- `GET /listings?offset&limit&sort=price_asc|price_desc` — in‑memory snapshot
+- `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings
 
 ## Frontend Hotkeys (Gallery)
 
-- Navigation: Left/Right or `A`/`D` (prev/next)
-- Focus current: `F` (center nearest image)
-- Motion toggle: `M` (enable/disable auto‑snap + animation)
-- Jump ends: `Home` (first), `End` (last)
-- Help: `H` or `F1` (toggle overlay)
-- Mouse: wheel for horizontal travel; click screen edges to prev/next
+- Previous/Next image — Left/Right or `A`/`D`
+- Focus current — `F`
+- Toggle motion — `M`
+- Toggle trait bar — `V`
+- Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
+- Next trait page (wrap) — `X`
+- Jump to first/last — `Home` / `End`
+- Help — `H` or `F1`
+- Horizontal travel — mouse wheel; click screen edges to prev/next
 
 ## Frontend Hotkeys (Exploration)
 
-- Navigation: Left/Right or `A`/`D` (prev/next), `ESC` (close)
-- Default view: `S` (fit‑by‑width centered), double‑click to reset
-- Height‑fit: `W` (middle), `Q` (left), `E` (right), capped at 1:1
-- Region‑fit (1006 px band): `1` (left), `2` (middle), `3` (right)
-  - Region math: `REGION_HEIGHT=1006`, `REGION_TOP=(IMG_HEIGHT−1006)/2 + 36`
-- Debug overlay: `G` (cyan rectangle for region‑fit)
+- Previous/Next — Left/Right or `A`/`D`
+- Close exploration — `Esc`
+- Fit‑by‑width centered — `S`
+- Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
+- Fit 1006 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1006)/2 + 36`)
+- Reset to fit‑by‑width — Double‑click
+- Toggle debug overlay — `G`
 
 ## Env Vars
 

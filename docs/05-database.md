@@ -136,6 +136,10 @@ Migration `002_traits_schema.sql` adds normalized tables for static token metada
   - `purpose_class TEXT` (custom categorization for UI filtering)
   - Indexes: `(name)`, `(purpose_class)`, and a composite unique index on `(name, spatial_group)`
 
+Operational note:
+
+- The backend excludes the special `trait_values.id = 217` (representing “None”) from filtering and from attached traits in responses to reduce noise.
+
 - `trait_values`
 
   - `id INTEGER PRIMARY KEY AUTOINCREMENT`

@@ -44,3 +44,14 @@
   - Easing: ease‑in‑out cubic; duration ≈ 0.233 ms/px (80–160 ms caps)
   - Motion off: no automated snap; keys/edges are instant
   - Reduced motion: disables auto‑snap
+
+## ADR-009: Enriched Listings + Trait Search API
+
+- Decision: Add `POST /listings/search` with value‑based and trait‑based modes using numeric IDs, with pagination and price sorting. Return enriched listings (token + traits) by default.
+- Rationale: Keep the API uniform and explicit, expose the DB “as is” for exploration, and avoid GET query limits.
+- Notes: Unknown IDs are ignored; consistent reads on active snapshot; value `trait_values.id=217` (None) is excluded from filters and attached traits.
+
+## ADR-010: Trait Bar UX & Token Focus
+
+- Decision: Show a bottom trait bar toggled by `B` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
+- Rationale: Provide fast, bottom‑up value discovery while preserving user context; avoid disorientation when list size changes.
