@@ -39,6 +39,7 @@
 
 - Previous/Next image — Left/Right or `A`/`D`
 - Focus current — `F`
+- Enter exploration — `W`
 - Toggle motion — `M`
 - Toggle trait bar — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)

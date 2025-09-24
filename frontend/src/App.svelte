@@ -256,12 +256,16 @@
                 return;
             }
             if (exploreIndex !== null) return;
-            if (k === "ArrowLeft" || k === "a" || k === "A") {
+            // Enter exploration for current token (gallery)
+            if (k === 'w' || k === 'W') {
                 e.preventDefault();
-                prevSlide();
-            } else if (k === "ArrowRight" || k === "d" || k === "D") {
-                e.preventDefault();
-                nextSlide();
+                const it = items[activeIndex];
+                if (it) openExploreByMint(it.token_mint_addr);
+                return;
+            }
+            // navigation handled on keyup to avoid key-repeat drag
+            if (k === "ArrowLeft" || k === "a" || k === "A" || k === "ArrowRight" || k === "d" || k === "D") {
+                return;
             } else if (k === 'Home') {
                 e.preventDefault();
                 scrollToIndex(0, false, true); // instant jump to start
@@ -280,13 +284,26 @@
                 }
             }
         };
+        const onKeyUp = (e: KeyboardEvent) => {
+            if (exploreIndex !== null) return; // gallery only
+            const k = e.key;
+            if (k === "ArrowLeft" || k === "a" || k === "A") {
+                e.preventDefault();
+                prevSlide();
+            } else if (k === "ArrowRight" || k === "d" || k === "D") {
+                e.preventDefault();
+                nextSlide();
+            }
+        };
         window.addEventListener("keydown", onKey);
+        window.addEventListener("keyup", onKeyUp);
         return () => {
             clearInterval(id);
             scrollerEl?.removeEventListener('pointerdown', onPointerDown as any);
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('pointercancel', onPointerUp);
             window.removeEventListener("keydown", onKey);
+            window.removeEventListener("keyup", onKeyUp);
         };
     });
 
@@ -856,6 +873,7 @@
                 <ul>
                     <li>Previous/Next image — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
                     <li>Focus current — <span class="kbd">F</span></li>
+                    <li>Enter exploration — <span class="kbd">W</span></li>
                     <li>Toggle motion — <span class="kbd">M</span></li>
                     <li>Toggle trait bar — <span class="kbd">V</span></li>
                     <li>Purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>

@@ -21,7 +21,8 @@
     let currentUrl: string | null = null;
     let imageBounds: any = null;
     let baseZoomByWidth = 0;
-    let keyHandler: ((e: KeyboardEvent) => void) | null = null;
+    let keyHandlerDown: ((e: KeyboardEvent) => void) | null = null;
+    let keyHandlerUp: ((e: KeyboardEvent) => void) | null = null;
     let resizeHandler: (() => void) | null = null;
     let debug = false;
     let debugRect: any = null;
@@ -135,21 +136,11 @@
         // Fit-by-width and snap to integer zoom levels
         setViewFitWidthCentered(false);
 
-        keyHandler = (e: KeyboardEvent) => {
+        keyHandlerDown = (e: KeyboardEvent) => {
             const k = e.key;
             if (k === "Escape") {
                 e.preventDefault();
                 onClose?.();
-                return;
-            }
-            if (k === "ArrowLeft" || k === "a" || k === "A") {
-                e.preventDefault();
-                onPrev?.();
-                return;
-            }
-            if (k === "ArrowRight" || k === "d" || k === "D") {
-                e.preventDefault();
-                onNext?.();
                 return;
             }
             if (k === "s" || k === "S") {
@@ -195,7 +186,21 @@
                 return;
             }
         };
-        window.addEventListener("keydown", keyHandler);
+        keyHandlerUp = (e: KeyboardEvent) => {
+            const k = e.key;
+            if (k === "ArrowLeft" || k === "a" || k === "A") {
+                e.preventDefault();
+                onPrev?.();
+                return;
+            }
+            if (k === "ArrowRight" || k === "d" || k === "D") {
+                e.preventDefault();
+                onNext?.();
+                return;
+            }
+        };
+        window.addEventListener("keydown", keyHandlerDown);
+        window.addEventListener("keyup", keyHandlerUp);
 
         resizeHandler = () => {
             if (!map) return;
@@ -236,10 +241,8 @@
     });
 
     onDestroy(() => {
-        if (keyHandler) {
-            window.removeEventListener("keydown", keyHandler);
-            keyHandler = null;
-        }
+        if (keyHandlerDown) { window.removeEventListener("keydown", keyHandlerDown); keyHandlerDown = null; }
+        if (keyHandlerUp) { window.removeEventListener("keyup", keyHandlerUp); keyHandlerUp = null; }
         if (resizeHandler) {
             window.removeEventListener("resize", resizeHandler);
             resizeHandler = null;
