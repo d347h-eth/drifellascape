@@ -44,7 +44,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
   - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned with `WHEEL_MULTIPLIER` (default 1.5).
   - No CSS scroll‑snap. Instead, a small JS “finalize to center” runs on scroll‑end when motion is on:
-    - Directional finalize: if you moved at least `LEAVE_THRESHOLD_PX` away from the last centered slide (default 1000 px), snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
+    - Directional finalize: if you moved at least a threshold (default 50% of viewport width) away from the last centered slide, snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
     - Debounce: `FINALIZE_DELAY_MS` (default 120 ms) waits briefly after the last wheel event.
     - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (default 100 ms) to avoid accidental re‑scrolls right after landing.
   - Motion toggle: users can toggle motion with `M`. When motion is off, there is no automated snap at all (pure linear scrolling). With motion on and `prefers‑reduced‑motion`, auto‑snap is also disabled.

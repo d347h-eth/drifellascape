@@ -59,7 +59,8 @@
     // Linear horizontal scroll with JS finalize-to-center
     const WHEEL_MULTIPLIER = 1.5; // tuned for continuous travel feel
     const FINALIZE_DELAY_MS = 0; // debounce scroll-end
-    const LEAVE_THRESHOLD_PX = 1280; // must move this far from last center to snap
+    // Snap threshold as a fraction of viewport width (e.g., 0.5 = 50%)
+    const LEAVE_THRESHOLD_FRAC = 0.5;
     const BLOCK_SCROLL_MS = 150; // post-snap block window (auto-snap mode only)
     let scrollEndTimer: any = null;
     let lastSnapIndex = 0; // last centered slide index
@@ -550,7 +551,8 @@
             const dist = Math.abs(dx);
             // Only snap if user moved sufficiently away from the last center;
             // and always snap to the adjacent slide in the direction of travel
-            if (dist >= LEAVE_THRESHOLD_PX) {
+            const thresholdPx = cw * LEAVE_THRESHOLD_FRAC;
+            if (dist >= thresholdPx) {
                 const dir = dx > 0 ? 1 : -1;
                 const idx = clamp(lastSnapIndex + dir, 0, Math.max(0, items.length - 1));
                 scrollToIndex(idx, true);

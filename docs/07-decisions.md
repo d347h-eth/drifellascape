@@ -40,7 +40,7 @@
 - Decision: Implement desktop‑first horizontal browsing with linear wheel scrolling, no CSS snap, and a small JS finalize‑to‑center that only triggers after moving far enough from the last center and always in the direction of travel. Provide a motion toggle to disable auto‑snap completely.
 - Rationale: Achieves a continuous “travel” feel across wide artwork while retaining precise centering on demand. Avoids CSS snap stickiness and snap‑back. Keeps logic simple and tunable (threshold, debounce, easing, duration) and respects reduced‑motion.
 - Key parameters:
-  - `WHEEL_MULTIPLIER` (default 1.4), `LEAVE_THRESHOLD_PX` (1000), `FINALIZE_DELAY_MS` (0 ms), `BLOCK_SCROLL_MS` (100 ms)
+  - `WHEEL_MULTIPLIER` (default 1.5), `LEAVE_THRESHOLD_FRAC` (0.5 viewport width), `FINALIZE_DELAY_MS` (0 ms), `BLOCK_SCROLL_MS` (100–150 ms)
   - Easing: ease‑in‑out cubic; duration ≈ 0.233 ms/px (80–160 ms caps)
   - Motion off: no automated snap; keys/edges are instant
   - Reduced motion: disables auto‑snap
