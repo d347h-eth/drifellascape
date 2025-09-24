@@ -70,7 +70,7 @@ export function searchListingsByValues(
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
-            WHERE value_id IN (${ph})
+            WHERE value_id IN (${ph}) AND value_id <> 217
             GROUP BY token_id
             HAVING COUNT(DISTINCT value_id) = ${havingN}
           ) ft ON ft.token_id = t.id
@@ -84,7 +84,7 @@ export function searchListingsByValues(
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
-            WHERE value_id IN (${ph})
+            WHERE value_id IN (${ph}) AND value_id <> 217
             GROUP BY token_id
             HAVING COUNT(DISTINCT value_id) = ${havingN}
           ) ft ON ft.token_id = t.id
@@ -152,7 +152,7 @@ export function searchListingsByTraits(
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
-            WHERE ${whereUnion}
+            WHERE (${whereUnion}) AND value_id <> 217
             GROUP BY token_id
             HAVING COUNT(DISTINCT type_id) = ${needDistinctTypes}
           ) ft ON ft.token_id = t.id
@@ -167,7 +167,7 @@ export function searchListingsByTraits(
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
-            WHERE ${whereUnion}
+            WHERE (${whereUnion}) AND value_id <> 217
             GROUP BY token_id
             HAVING COUNT(DISTINCT type_id) = ${needDistinctTypes}
           ) ft ON ft.token_id = t.id
@@ -195,7 +195,7 @@ export function attachTraits(
              FROM token_traits tt
              JOIN trait_types ty ON ty.id = tt.type_id
              JOIN trait_values tv ON tv.id = tt.value_id
-             WHERE tt.token_id IN (${ph})`,
+             WHERE tt.token_id IN (${ph}) AND tt.value_id <> 217`,
         )
         .all(...tokenIds) as Array<
         { token_id: number } & ListingTrait

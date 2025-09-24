@@ -43,6 +43,13 @@
     let exploreIndex: number | null = null;
     let exploreItems: ListingRow[] | null = null;
     let showHelp = false;
+    let showTraitBar = false;
+    const PURPOSE_CLASSES = ["left", "middle", "right", "decor", "items", "special", "undefined"] as const;
+    type Purpose = typeof PURPOSE_CLASSES[number];
+    let selectedPurpose: Purpose = "middle";
+    let traitBarOffset = 0; // index within filtered traits for current token
+    let visibleTraitSlots = 0; // computed on resize
+    const selectedValueIds = new Set<number>();
 
     const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "http://localhost:3000";
 
@@ -157,6 +164,41 @@
                 showHelp = false;
                 return;
             }
+            // Trait bar toggle (both modes)
+            if (k === 'b' || k === 'B') {
+                e.preventDefault();
+                showTraitBar = !showTraitBar;
+                traitBarOffset = 0;
+                setTimeout(recomputeVisibleTraitSlots, 0);
+                return;
+            }
+            // Purpose class nav (both modes; wrap and skip empty)
+            if (k === 'z' || k === 'Z' || k === 'v' || k === 'V') {
+                e.preventDefault();
+                const dir = (k === 'z' || k === 'Z') ? -1 : 1;
+                const it = currentItem();
+                const list = it?.traits || [];
+                const counts: Record<string, number> = {};
+                for (const t of list) { const key = normalizedPurpose(t.purpose_class); counts[key] = (counts[key]||0) + 1; }
+                let nextIdx = PURPOSE_CLASSES.indexOf(selectedPurpose);
+                for (let i = 0; i < PURPOSE_CLASSES.length; i++) {
+                    nextIdx = (nextIdx + dir + PURPOSE_CLASSES.length) % PURPOSE_CLASSES.length;
+                    const pc = PURPOSE_CLASSES[nextIdx];
+                    if ((counts[pc] ?? 0) > 0) { selectedPurpose = pc; break; }
+                }
+                traitBarOffset = 0;
+                return;
+            }
+            // Trait bar internal nav (no wrap)
+            if (k === 'x' || k === 'X' || k === 'c' || k === 'C') {
+                e.preventDefault();
+                const dir = (k === 'x' || k === 'X') ? -1 : 1;
+                const total = currentFilteredTraits().length;
+                const step = Math.max(1, visibleTraitSlots || 1);
+                if (dir < 0) traitBarOffset = Math.max(0, traitBarOffset - step);
+                else traitBarOffset = Math.min(Math.max(0, total - step), traitBarOffset + step);
+                return;
+            }
             if (exploreIndex !== null) return;
             if (k === "ArrowLeft" || k === "a" || k === "A") {
                 e.preventDefault();
@@ -236,6 +278,141 @@
             };
         }
         return null;
+    }
+
+    // --- Trait bar helpers ---
+    function currentItem(): ListingRow | null {
+        if (exploreIndex !== null && exploreItems) return exploreItems[exploreIndex] || null;
+        return items[activeIndex] || null;
+    }
+    function normalizedPurpose(p: string | null | undefined): Purpose {
+        const v = (p || "").toLowerCase();
+        const m = PURPOSE_CLASSES.find((x) => x === v);
+        return (m ?? "undefined") as Purpose;
+    }
+    function currentFilteredTraits(): ListingTrait[] {
+        const it = currentItem();
+        const list = it?.traits || [];
+        const want = selectedPurpose;
+        return list.filter((t) => normalizedPurpose(t.purpose_class) === want);
+    }
+    let traitsForBar: ListingTrait[] = [];
+    let totalTraits = 0;
+    let startIdx = 0;
+    let endIdx = 0;
+    $: {
+        // explicit deps so Svelte tracks them
+        const _depPurpose = selectedPurpose;
+        const _depShow = showTraitBar;
+        const _depActive = activeIndex;
+        const _depExploreIdx = exploreIndex;
+        const _depExploreItems = exploreItems;
+        const _depItems = items;
+        if (_depShow) {
+            const it = currentItem();
+            const list = it?.traits || [];
+            traitsForBar = list.filter((t) => normalizedPurpose(t.purpose_class) === _depPurpose);
+        } else {
+            traitsForBar = [];
+        }
+        totalTraits = traitsForBar.length;
+        startIdx = traitBarOffset;
+        endIdx = Math.min(totalTraits, startIdx + Math.max(1, visibleTraitSlots || 1));
+    }
+    function recomputeVisibleTraitSlots() {
+        const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+        const ARROWS_W = 100; // 2 * 50px arrow pads
+        const BOX_W = 150; // trait box width
+        const slots = Math.floor(Math.max(0, w - ARROWS_W) / BOX_W);
+        visibleTraitSlots = Math.max(1, slots);
+        // Clamp offset to new bounds
+        traitBarOffset = Math.min(traitBarOffset, Math.max(0, totalTraits - visibleTraitSlots));
+    }
+    if (typeof window !== 'undefined') {
+        addEventListener('resize', () => recomputeVisibleTraitSlots());
+        // initial compute soon after mount
+        setTimeout(recomputeVisibleTraitSlots, 0);
+    }
+
+    // Purpose counts for current token (for pills)
+    let purposeCounts: Record<string, number> = {};
+    $: {
+        // explicit deps to trigger reactivity on token focus changes
+        const _depActive = activeIndex;
+        const _depItems = items;
+        const _depExploreIdx = exploreIndex;
+        const _depExploreItems = exploreItems;
+        const _depShow = showTraitBar;
+        const it = currentItem();
+        const list = it?.traits || [];
+        const m: Record<string, number> = {};
+        for (const t of list) {
+            const key = normalizedPurpose(t.purpose_class);
+            m[key] = (m[key] || 0) + 1;
+        }
+        purposeCounts = m;
+    }
+
+    function isValueSelected(id: number): boolean {
+        return selectedValueIds.has(id);
+    }
+    async function applyValueFilterAndFetch() {
+        loading = true;
+        try {
+            const cur = currentItem();
+            const curMint = cur?.token_mint_addr || null;
+            const res = await fetch(`${API_BASE}/listings/search`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    mode: 'value',
+                    valueIds: Array.from(selectedValueIds),
+                    sort: 'price_asc',
+                    offset: 0,
+                    limit: 100,
+                    includeTraits: true,
+                }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data: ApiResponse = await res.json();
+            const newItems = data.items ?? [];
+            items = newItems;
+            versionId = data.versionId ?? null;
+            // Keep current token in focus if present in new result
+            let idx = Math.min(activeIndex, Math.max(0, newItems.length - 1));
+            if (curMint) {
+                const found = newItems.findIndex((r) => r.token_mint_addr === curMint);
+                if (found >= 0) idx = found;
+            }
+            // Update exploration state if open
+            if (exploreIndex !== null) {
+                exploreItems = newItems.slice();
+                exploreIndex = idx;
+            }
+            // Scroll gallery to same token
+            scrollToIndex(idx, false, true);
+            activeIndex = idx;
+            lastSnapIndex = idx;
+        } catch (e: any) {
+            error = e?.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+    function onClickTraitValue(v: ListingTrait) {
+        if (selectedValueIds.has(v.value_id)) selectedValueIds.delete(v.value_id);
+        else selectedValueIds.add(v.value_id);
+        applyValueFilterAndFetch();
+    }
+    function hasPrevTraitPage(): boolean { return traitBarOffset > 0; }
+    function hasNextTraitPage(): boolean { return traitBarOffset + visibleTraitSlots < totalTraits; }
+    function prevTraitPage() {
+        const step = Math.max(1, visibleTraitSlots || 1);
+        traitBarOffset = Math.max(0, traitBarOffset - step);
+    }
+    function nextTraitPage() {
+        const step = Math.max(1, visibleTraitSlots || 1);
+        traitBarOffset = Math.min(Math.max(0, totalTraits - step), traitBarOffset + step);
     }
 
     // Animation helpers
@@ -398,6 +575,7 @@
         height: 100vh;
         box-sizing: border-box;
     }
+    /* removed dynamic height for scroller; keep native scrollbar at bottom */
     .slide {
         flex: 0 0 100vw;
         display: flex;
@@ -429,7 +607,7 @@
     }
     .price-link:visited { color: inherit; }
     /* Edge click targets for prev/next */
-    .edge { position: fixed; top: 0; height: 1327px; width: 6vw; min-width: 60px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
+    .edge { position: fixed; top: 0; height: 1087px; width: 6vw; min-width: 60px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
     .edge:focus, .edge:focus-visible { outline: none; }
     .edge.left { left: 0; }
     .edge.right { right: 0; }
@@ -462,6 +640,37 @@
     .help-panel ul { margin: 6px 0 10px 18px; padding: 0; }
     .help-panel li { margin: 4px 0; }
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #1b1b1d; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 6px; }
+
+    /* Trait bar overlay */
+    .purpose-dots {
+        position: fixed;
+        left: 0; right: 0; bottom: 82px; /* bar bottom 22 + bar height 50 + ~10px gap */
+        height: 22px;
+        display: flex; align-items: center; justify-content: center;
+        pointer-events: auto;
+        z-index: 9001;
+    }
+    .purpose-dot { cursor: pointer; margin: 0 6px; padding: 3px 8px; font-size: 12px; color: #cfcfd2; background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; }
+    .purpose-dot.active { color: #111; background: #e6e6e6; border-color: #e6e6e6; }
+    .purpose-dot.disabled { opacity: 0.35; cursor: default; }
+    .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
+
+    .trait-bar {
+        position: fixed; left: 0; right: 0; bottom: 22px; height: 50px;
+        background: rgba(0,0,0,0.6);
+        display: flex; align-items: stretch; justify-content: space-between;
+        z-index: 9000;
+        pointer-events: auto;
+    }
+    .trait-arrow { width: 50px; height: 50px; border: 0; background: transparent; color: #e6e6e6; cursor: pointer; align-self: center; }
+    .trait-arrow:hover { background: rgba(255,255,255,0.06); }
+    .trait-arrow:disabled { opacity: 0.25; cursor: default; }
+    .trait-strip { flex: 1; display: flex; overflow: hidden; }
+    .trait-box { width: 150px; height: 50px; padding: 6px 8px; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.06); cursor: pointer; align-self: center; }
+    .trait-box:hover { background: rgba(255,255,255,0.06); }
+    .trait-box.selected { background: rgba(255,255,255,0.12); }
+    .trait-head { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trait-val { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 </style>
 
 <div class="container">
@@ -534,6 +743,39 @@
                     <li>Double‑click — Reset to fit‑by‑width</li>
                 </ul>
             </div>
+        </div>
+    {/if}
+    
+    <!-- Purpose dots (above trait bar) -->
+    {#if showTraitBar}
+        <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation>
+            {#each PURPOSE_CLASSES as pc}
+                {@const cnt = purposeCounts[pc] ?? 0}
+                <button
+                    type="button"
+                    class="purpose-dot {pc === selectedPurpose ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
+                    disabled={cnt === 0}
+                    on:click={() => { if (cnt > 0) { selectedPurpose = pc; traitBarOffset = 0; } }}
+                >
+                    {pc} ({cnt})
+                </button>
+            {/each}
+        </div>
+    {/if}
+
+    <!-- Trait bar at bottom -->
+    {#if showTraitBar}
+    <div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
+            <button type="button" class="trait-arrow" title="Prev traits" on:click={prevTraitPage} disabled={!hasPrevTraitPage()}>&larr;</button>
+            <div class="trait-strip">
+                {#each traitsForBar.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
+                    <div class="trait-box {isValueSelected(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => onClickTraitValue(tr)}>
+                        <div class="trait-head">{(tr.spatial_group ?? 'undf').toLowerCase()}. {tr.type_name}</div>
+                        <div class="trait-val">{tr.value}</div>
+                    </div>
+                {/each}
+            </div>
+            <button type="button" class="trait-arrow" title="Next traits" on:click={nextTraitPage} disabled={!hasNextTraitPage()}>&rarr;</button>
         </div>
     {/if}
 <!-- Full-screen explorer overlay -->

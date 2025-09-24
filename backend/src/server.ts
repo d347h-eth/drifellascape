@@ -84,7 +84,7 @@ function sanitizeIds(arr: any): number[] {
     const out: number[] = [];
     for (const v of arr) {
         const n = Number(v);
-        if (Number.isFinite(n)) out.push(n);
+        if (Number.isFinite(n) && n !== 217) out.push(n);
     }
     return Array.from(new Set(out));
 }
