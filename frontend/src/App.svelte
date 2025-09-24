@@ -66,6 +66,44 @@
     let lastSnapIndex = 0; // last centered slide index
     let blockUntilTs = 0; // timestamp until which wheel is blocked (auto-snap)
     let suppressFinalizeUntilTs = 0; // suppress finalize after programmatic jumps
+    const SCROLLBAR_HIT_PX = 24; // heuristic thickness for native scrollbar hit test
+    let draggingScrollbar = false;
+    let dragStartScrollLeft = -1;
+    let dragStartIndex = -1;
+    let dragStartLastSnapIndex = -1;
+
+    function finalizeDirectionalSnap() {
+        if (!scrollerEl) return;
+        const cw = scrollerEl.clientWidth || 1;
+        const lastCenter = lastSnapIndex * cw;
+        const dx = scrollerEl.scrollLeft - lastCenter;
+        const dist = Math.abs(dx);
+        const thresholdPx = cw * LEAVE_THRESHOLD_FRAC;
+        dbg('[scrollbar] release start', {
+            dragStartScrollLeft,
+            dragStartIndex,
+            dragStartLastSnapIndex,
+            scrollLeft: scrollerEl.scrollLeft,
+            clientWidth: cw,
+            lastSnapIndex,
+            activeIndex,
+            dx,
+            dist,
+            thresholdPx,
+        });
+        if (dist >= thresholdPx) {
+            // On scrollbar release, snap to the nearest slide center rather than only adjacent
+            const idxNear = clamp(Math.round(scrollerEl.scrollLeft / cw), 0, Math.max(0, items.length - 1));
+            const idx = idxNear;
+            scrollToIndex(idx, true);
+            // avoid a double finalize right after snapping
+            suppressFinalizeUntilTs = Date.now() + 300;
+            dbg('[scrollbar] release snapped', { targetIndex: idx, lastSnapIndex, afterScrollLeft: scrollerEl.scrollLeft });
+        } else {
+            dbg('[scrollbar] release no-snap', { lastSnapIndex, activeIndex, scrollLeft: scrollerEl.scrollLeft });
+        }
+        setTimeout(() => dbg('[scrollbar] release post-tick', { scrollLeft: scrollerEl?.scrollLeft ?? -1, activeIndex, lastSnapIndex }), 0);
+    }
 
     // Motion toggle and animator
     const prefersReducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
@@ -150,6 +188,26 @@
     onMount(() => {
         loadListings();
         const id = setInterval(pollForUpdates, Math.max(5000, POLL_MS));
+        const onPointerDown = (e: PointerEvent) => {
+            if (!scrollerEl) return;
+            const r = scrollerEl.getBoundingClientRect();
+            if (e.clientY >= r.bottom - SCROLLBAR_HIT_PX) {
+                draggingScrollbar = true;
+                dragStartScrollLeft = scrollerEl.scrollLeft;
+                dragStartIndex = activeIndex;
+                dragStartLastSnapIndex = lastSnapIndex;
+            }
+        };
+        const onPointerUp = () => {
+            if (draggingScrollbar) {
+                draggingScrollbar = false;
+                // Snap decision on release based on distance moved from last center
+                finalizeDirectionalSnap();
+            }
+        };
+        scrollerEl?.addEventListener('pointerdown', onPointerDown, { passive: true });
+        window.addEventListener('pointerup', onPointerUp);
+        window.addEventListener('pointercancel', onPointerUp);
         const onKey = (e: KeyboardEvent) => {
             const k = e.key;
             // Help overlay toggles (works in both modes)
@@ -225,6 +283,9 @@
         window.addEventListener("keydown", onKey);
         return () => {
             clearInterval(id);
+            scrollerEl?.removeEventListener('pointerdown', onPointerDown as any);
+            window.removeEventListener('pointerup', onPointerUp);
+            window.removeEventListener('pointercancel', onPointerUp);
             window.removeEventListener("keydown", onKey);
         };
     });
@@ -542,6 +603,7 @@
             return; // no automated snap when motion is off or reduced
         }
         if (Date.now() < suppressFinalizeUntilTs) return;
+        if (draggingScrollbar) return; // defer finalize while user drags native scrollbar
         if (scrollEndTimer) clearTimeout(scrollEndTimer);
         scrollEndTimer = setTimeout(() => {
             if (!scrollerEl) return;
@@ -707,6 +769,23 @@
     .purpose-dot.disabled { opacity: 0.35; cursor: default; }
     .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
 
+    /* Centered toggle button that follows the bar state */
+    .trait-toggle-btn {
+        position: fixed;
+        left: 50%; transform: translateX(-50%);
+        width: 200px; height: 14px;
+        z-index: 9002;
+        background: rgba(12,12,14,0.85);
+        color: #e6e6e6;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; line-height: 1;
+    }
+    .trait-toggle-btn:hover { background: rgba(255,255,255,0.10); }
+    .trait-toggle-btn:focus, .trait-toggle-btn:focus-visible { outline: none; box-shadow: none; }
+
     .trait-bar {
         position: fixed; left: 0; right: 0; bottom: 22px; height: 50px;
         background: rgba(0,0,0,0.6);
@@ -800,6 +879,17 @@
         </div>
     {/if}
     
+    <!-- Centered toggle button that follows bar state (always visible) -->
+    <button
+        type="button"
+        class="trait-toggle-btn"
+        title="Toggle traits bar"
+        style={`bottom: ${showTraitBar ? 110 : 22}px;`}
+        on:click={() => { showTraitBar = !showTraitBar; traitBarOffset = 0; setTimeout(recomputeVisibleTraitSlots, 0); }}
+    >
+        {#if showTraitBar}▼{/if}{#if !showTraitBar}▲{/if}
+    </button>
+
     <!-- Purpose dots (above trait bar) -->
     {#if showTraitBar}
         <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation>
@@ -811,7 +901,7 @@
                     disabled={cnt === 0}
                     on:click={() => { if (cnt > 0) { selectedPurpose = pc; traitBarOffset = 0; } }}
                 >
-                    {pc} ({cnt})
+                    {pc}{#if cnt > 0} ({cnt}){/if}
                 </button>
             {/each}
         </div>

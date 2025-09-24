@@ -47,6 +47,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
     - Directional finalize: if you moved at least a threshold (default 50% of viewport width) away from the last centered slide, snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
     - Debounce: `FINALIZE_DELAY_MS` (default 120 ms) waits briefly after the last wheel event.
     - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (default 100 ms) to avoid accidental re‑scrolls right after landing.
+    - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
   - Motion toggle: users can toggle motion with `M`. When motion is off, there is no automated snap at all (pure linear scrolling). With motion on and `prefers‑reduced‑motion`, auto‑snap is also disabled.
 
 - Animation (when motion is on)
