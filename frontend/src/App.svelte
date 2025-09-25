@@ -1,37 +1,14 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
     import ImageExplorer from "./ImageExplorer.svelte";
+    import GalleryScroller from "./components/GalleryScroller.svelte";
+    import HelpOverlay from "./components/HelpOverlay.svelte";
+    import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
+    import TraitBar from "./components/TraitBar/TraitBar.svelte";
+    import { postSearchListings } from "./lib/api";
+    import type { ListingRow, ListingTrait } from "./lib/types";
 
-    type ListingTrait = {
-        type_id: number;
-        type_name: string;
-        spatial_group: string | null;
-        purpose_class: string | null;
-        value_id: number;
-        value: string;
-    };
-
-    type ListingRow = {
-        token_mint_addr: string;
-        token_num: number | null;
-        price: number;
-        seller: string;
-        image_url: string;
-        listing_source: string;
-        // enriched fields from POST /listings/search
-        token_id: number;
-        token_name: string | null;
-        traits?: ListingTrait[];
-    };
-
-    type ApiResponse = {
-        versionId: number;
-        total: number;
-        offset: number;
-        limit: number;
-        sort: string;
-        items: ListingRow[];
-    };
+    // Types moved to lib/types.ts
 
     let items: ListingRow[] = [];
     let versionId: number | null = null;
@@ -47,104 +24,56 @@
     const PURPOSE_CLASSES = ["left", "middle", "right", "decor", "items", "special", "undefined"] as const;
     type Purpose = typeof PURPOSE_CLASSES[number];
     let selectedPurpose: Purpose = "middle";
-    let traitBarOffset = 0; // index within filtered traits for current token
-    let visibleTraitSlots = 0; // computed on resize
-    const selectedValueIds = new Set<number>();
+    // Trait bar paging is encapsulated in TraitBar
+    let selectedValueIds: Set<number> = new Set();
+    let traitsForCurrent: ListingTrait[] = [];
 
-    const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? "http://localhost:3000";
-
-    // Horizontal scroller state
-    let scrollerEl: HTMLDivElement | null = null;
+    // Horizontal scroller state (delegated to GalleryScroller)
     let activeIndex = 0; // nearest item to viewport center
-    // Linear horizontal scroll with JS finalize-to-center
-    const WHEEL_MULTIPLIER = 1.5; // tuned for continuous travel feel
-    const FINALIZE_DELAY_MS = 0; // debounce scroll-end
-    // Snap threshold as a fraction of viewport width (e.g., 0.5 = 50%)
-    const LEAVE_THRESHOLD_FRAC = 0.5;
-    const BLOCK_SCROLL_MS = 150; // post-snap block window (auto-snap mode only)
-    let scrollEndTimer: any = null;
-    let lastSnapIndex = 0; // last centered slide index
-    let blockUntilTs = 0; // timestamp until which wheel is blocked (auto-snap)
-    let suppressFinalizeUntilTs = 0; // suppress finalize after programmatic jumps
-    const SCROLLBAR_HIT_PX = 24; // heuristic thickness for native scrollbar hit test
-    let draggingScrollbar = false;
-    let dragStartScrollLeft = -1;
-    let dragStartIndex = -1;
-    let dragStartLastSnapIndex = -1;
 
-    function finalizeDirectionalSnap() {
-        if (!scrollerEl) return;
-        const cw = scrollerEl.clientWidth || 1;
-        const lastCenter = lastSnapIndex * cw;
-        const dx = scrollerEl.scrollLeft - lastCenter;
-        const dist = Math.abs(dx);
-        const thresholdPx = cw * LEAVE_THRESHOLD_FRAC;
-        dbg('[scrollbar] release start', {
-            dragStartScrollLeft,
-            dragStartIndex,
-            dragStartLastSnapIndex,
-            scrollLeft: scrollerEl.scrollLeft,
-            clientWidth: cw,
-            lastSnapIndex,
-            activeIndex,
-            dx,
-            dist,
-            thresholdPx,
-        });
-        if (dist >= thresholdPx) {
-            // On scrollbar release, snap to the nearest slide center rather than only adjacent
-            const idxNear = clamp(Math.round(scrollerEl.scrollLeft / cw), 0, Math.max(0, items.length - 1));
-            const idx = idxNear;
-            scrollToIndex(idx, true);
-            // avoid a double finalize right after snapping
-            suppressFinalizeUntilTs = Date.now() + 300;
-            dbg('[scrollbar] release snapped', { targetIndex: idx, lastSnapIndex, afterScrollLeft: scrollerEl.scrollLeft });
-        } else {
-            dbg('[scrollbar] release no-snap', { lastSnapIndex, activeIndex, scrollLeft: scrollerEl.scrollLeft });
-        }
-        setTimeout(() => dbg('[scrollbar] release post-tick', { scrollLeft: scrollerEl?.scrollLeft ?? -1, activeIndex, lastSnapIndex }), 0);
-    }
+    // Snap and scrollbar release logic are handled within GalleryScroller
 
-    // Motion toggle and animator
-    const prefersReducedMotion = typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false);
+    // Motion toggle
     let motionEnabled = true;
-    let isAnimating = false;
-    let animReq = 0;
-    let animToken = 0;
+
+    // Keep TraitBar in sync with the token in focus (gallery or exploration)
+    $: {
+        const useExplore = exploreIndex !== null && !!exploreItems;
+        if (useExplore) {
+            const row = exploreItems?.[exploreIndex as number];
+            traitsForCurrent = row?.traits ?? [];
+        } else {
+            const row = items[activeIndex];
+            traitsForCurrent = row?.traits ?? [];
+        }
+    }
 
     async function loadListings() {
         loading = true;
         error = null;
         try {
-            const res = await fetch(`${API_BASE}/listings/search`, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    mode: "value",
-                    valueIds: [],
-                    sort: "price_asc",
-                    offset: 0,
-                    limit: 100,
-                    includeTraits: true,
-                }),
+            const data = await postSearchListings({
+                mode: "value",
+                valueIds: [],
+                sort: "price_asc",
+                offset: 0,
+                limit: 100,
+                includeTraits: true,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data: ApiResponse = await res.json();
             items = data.items ?? [];
             versionId = data.versionId ?? null;
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
             loading = false;
-            lastSnapIndex = 0;
+            activeIndex = 0;
         }
     }
 
     const POLL_MS = Number((import.meta as any).env?.VITE_POLL_MS ?? 30000);
 
     function atStart(): boolean {
-        if (!scrollerEl) return true;
-        return scrollerEl.scrollLeft <= 50; // within 50px from start
+        return activeIndex === 0;
     }
 
     function applyStagedIfAtStart() {
@@ -154,26 +83,20 @@
             versionId = stagedVersionId;
             stagedItems = null;
             stagedVersionId = null;
-            lastSnapIndex = 0;
+            activeIndex = 0;
         }
     }
 
     async function pollForUpdates() {
         try {
-            const res = await fetch(`${API_BASE}/listings/search`, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({
-                    mode: "value",
-                    valueIds: [],
-                    sort: "price_asc",
-                    offset: 0,
-                    limit: 100,
-                    includeTraits: true,
-                }),
+            const data = await postSearchListings({
+                mode: "value",
+                valueIds: [],
+                sort: "price_asc",
+                offset: 0,
+                limit: 100,
+                includeTraits: true,
             });
-            if (!res.ok) return; // silent
-            const data: ApiResponse = await res.json();
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
                 stagedVersionId = data.versionId;
@@ -188,26 +111,6 @@
     onMount(() => {
         loadListings();
         const id = setInterval(pollForUpdates, Math.max(5000, POLL_MS));
-        const onPointerDown = (e: PointerEvent) => {
-            if (!scrollerEl) return;
-            const r = scrollerEl.getBoundingClientRect();
-            if (e.clientY >= r.bottom - SCROLLBAR_HIT_PX) {
-                draggingScrollbar = true;
-                dragStartScrollLeft = scrollerEl.scrollLeft;
-                dragStartIndex = activeIndex;
-                dragStartLastSnapIndex = lastSnapIndex;
-            }
-        };
-        const onPointerUp = () => {
-            if (draggingScrollbar) {
-                draggingScrollbar = false;
-                // Snap decision on release based on distance moved from last center
-                finalizeDirectionalSnap();
-            }
-        };
-        scrollerEl?.addEventListener('pointerdown', onPointerDown, { passive: true });
-        window.addEventListener('pointerup', onPointerUp);
-        window.addEventListener('pointercancel', onPointerUp);
         const onKey = (e: KeyboardEvent) => {
             const k = e.key;
             // Help overlay toggles (works in both modes)
@@ -224,20 +127,17 @@
                 showHelp = false;
                 return;
             }
-            // Trait bar toggle (both modes) — moved to V
+            // Trait bar toggle (both modes) — V
             if (k === 'v' || k === 'V') {
                 e.preventDefault();
                 showTraitBar = !showTraitBar;
-                traitBarOffset = 0;
-                setTimeout(recomputeVisibleTraitSlots, 0);
                 return;
             }
             // Purpose class nav (both modes; wrap and skip empty) — right moved to C
             if (k === 'z' || k === 'Z' || k === 'c' || k === 'C') {
                 e.preventDefault();
                 const dir = (k === 'z' || k === 'Z') ? -1 : 1;
-                const it = currentItem();
-                const list = it?.traits || [];
+                const list = traitsForCurrent || [];
                 const counts: Record<string, number> = {};
                 for (const t of list) { const key = normalizedPurpose(t.purpose_class); counts[key] = (counts[key]||0) + 1; }
                 let nextIdx = PURPOSE_CLASSES.indexOf(selectedPurpose);
@@ -246,13 +146,12 @@
                     const pc = PURPOSE_CLASSES[nextIdx];
                     if ((counts[pc] ?? 0) > 0) { selectedPurpose = pc; break; }
                 }
-                traitBarOffset = 0;
                 return;
             }
-            // Trait bar page next (wrap) — moved to X
+            // Trait bar page next (wrap) — X (notify trait bar component)
             if (k === 'x' || k === 'X') {
                 e.preventDefault();
-                nextTraitPageWrapped();
+                window.dispatchEvent(new CustomEvent('traitbar:pageNext'));
                 return;
             }
             if (exploreIndex !== null) return;
@@ -268,20 +167,17 @@
                 return;
             } else if (k === 'Home') {
                 e.preventDefault();
-                scrollToIndex(0, false, true); // instant jump to start
+                scrollerRef?.scrollToIndexInstant?.(0);
             } else if (k === 'End') {
                 e.preventDefault();
-                scrollToIndex(items.length - 1, false, true); // instant jump to end
+                scrollerRef?.scrollToIndexInstant?.(items.length - 1);
             } else if (k === 'f' || k === 'F') {
                 e.preventDefault();
                 focusCurrent();
             } else if (k === 'm' || k === 'M') {
                 e.preventDefault();
                 motionEnabled = !motionEnabled;
-                if (!motionEnabled) {
-                    if (scrollEndTimer) { clearTimeout(scrollEndTimer); scrollEndTimer = null; }
-                    cancelAnimation();
-                }
+                if (!motionEnabled) scrollerRef?.cancel?.();
             }
         };
         const onKeyUp = (e: KeyboardEvent) => {
@@ -299,9 +195,6 @@
         window.addEventListener("keyup", onKeyUp);
         return () => {
             clearInterval(id);
-            scrollerEl?.removeEventListener('pointerdown', onPointerDown as any);
-            window.removeEventListener('pointerup', onPointerUp);
-            window.removeEventListener('pointercancel', onPointerUp);
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
         };
@@ -309,52 +202,7 @@
 
     // --- Horizontal browsing helpers ---
 
-    function formatSol(raw: number): string {
-        const sol = raw / 1_000_000_000;
-        // Round up to 2 decimals
-        const up = Math.ceil(sol * 100) / 100;
-        return up.toFixed(2);
-    }
-
-    // Integer arithmetic helpers for fees
-    function ceilDiv(n: number, d: number): number {
-        return Math.floor((n + d - 1) / d);
-    }
-
-    // Returns nominal + maker(2%) + royalty(5%), each fee based on nominal price
-    function priceWithFees(nominalLamports: number): number {
-        const maker = ceilDiv(nominalLamports * 2, 100); // 2%
-        const royalty = ceilDiv(nominalLamports * 5, 100); // 5%
-        return nominalLamports + maker + royalty;
-    }
-
-    function marketplaceFor(
-        src: string | undefined,
-        mint: string,
-    ): { href: string; title: string } | null {
-        if (!src) return null;
-        // Magic Eden sources
-        if (src === "M2" || src === "MMM" || src === "M3" || src === "HADESWAP_AMM") {
-            return {
-                href: `https://magiceden.io/item-details/${mint}`,
-                title: "View on Magic Eden",
-            };
-        }
-        // Tensor sources
-        if (
-            src === "TENSOR_LISTING" ||
-            src === "TENSOR_CNFT_LISTING" ||
-            src === "TENSOR_MARKETPLACE_LISTING" ||
-            src === "TENSOR_AMM" ||
-            src === "TENSOR_AMM_V2"
-        ) {
-            return {
-                href: `https://tensor.trade/item/${mint}`,
-                title: "View on Tensor",
-            };
-        }
-        return null;
-    }
+    // Utilities moved inside GalleryScroller
 
     // --- Trait bar helpers ---
     function currentItem(): ListingRow | null {
@@ -366,72 +214,7 @@
         const m = PURPOSE_CLASSES.find((x) => x === v);
         return (m ?? "undefined") as Purpose;
     }
-    function currentFilteredTraits(): ListingTrait[] {
-        const it = currentItem();
-        const list = it?.traits || [];
-        const want = selectedPurpose;
-        return list.filter((t) => normalizedPurpose(t.purpose_class) === want);
-    }
-    let traitsForBar: ListingTrait[] = [];
-    let totalTraits = 0;
-    let startIdx = 0;
-    let endIdx = 0;
-    $: {
-        // explicit deps so Svelte tracks them
-        const _depPurpose = selectedPurpose;
-        const _depShow = showTraitBar;
-        const _depActive = activeIndex;
-        const _depExploreIdx = exploreIndex;
-        const _depExploreItems = exploreItems;
-        const _depItems = items;
-        if (_depShow) {
-            const it = currentItem();
-            const list = it?.traits || [];
-            traitsForBar = list.filter((t) => normalizedPurpose(t.purpose_class) === _depPurpose);
-        } else {
-            traitsForBar = [];
-        }
-        totalTraits = traitsForBar.length;
-        startIdx = traitBarOffset;
-        endIdx = Math.min(totalTraits, startIdx + Math.max(1, visibleTraitSlots || 1));
-    }
-    function recomputeVisibleTraitSlots() {
-        const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
-        const ARROWS_W = 100; // 2 * 50px arrow pads
-        const BOX_W = 150; // trait box width
-        const slots = Math.floor(Math.max(0, w - ARROWS_W) / BOX_W);
-        visibleTraitSlots = Math.max(1, slots);
-        // Clamp offset to new bounds
-        traitBarOffset = Math.min(traitBarOffset, Math.max(0, totalTraits - visibleTraitSlots));
-    }
-    if (typeof window !== 'undefined') {
-        addEventListener('resize', () => recomputeVisibleTraitSlots());
-        // initial compute soon after mount
-        setTimeout(recomputeVisibleTraitSlots, 0);
-    }
-
-    // Purpose counts for current token (for pills)
-    let purposeCounts: Record<string, number> = {};
-    $: {
-        // explicit deps to trigger reactivity on token focus changes
-        const _depActive = activeIndex;
-        const _depItems = items;
-        const _depExploreIdx = exploreIndex;
-        const _depExploreItems = exploreItems;
-        const _depShow = showTraitBar;
-        const it = currentItem();
-        const list = it?.traits || [];
-        const m: Record<string, number> = {};
-        for (const t of list) {
-            const key = normalizedPurpose(t.purpose_class);
-            m[key] = (m[key] || 0) + 1;
-        }
-        purposeCounts = m;
-    }
-
-    function isValueSelected(id: number): boolean {
-        return selectedValueIds.has(id);
-    }
+    // Trait bar sizing, paging, and counts are implemented inside TraitBar
     import { dbg } from "./debug";
 
     async function applyValueFilterAndFetch() {
@@ -439,33 +222,26 @@
         try {
             const cur = currentItem();
             const curMint = cur?.token_mint_addr || null;
-            const beforeScrollLeft = scrollerEl?.scrollLeft ?? -1;
-            const beforeClientWidth = scrollerEl?.clientWidth ?? -1;
+            const beforeScrollLeft = -1;
+            const beforeClientWidth = -1;
             dbg('[traits] apply start', {
                 selectedValueIds: Array.from(selectedValueIds),
                 curMint,
                 curTokenNum: cur?.token_num ?? null,
                 activeIndex,
-                lastSnapIndex,
                 exploreIndex,
                 itemsLen: items.length,
                 beforeScrollLeft,
                 beforeClientWidth,
             });
-            const res = await fetch(`${API_BASE}/listings/search`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({
-                    mode: 'value',
-                    valueIds: Array.from(selectedValueIds),
-                    sort: 'price_asc',
-                    offset: 0,
-                    limit: 100,
-                    includeTraits: true,
-                }),
+            const data = await postSearchListings({
+                mode: 'value',
+                valueIds: Array.from(selectedValueIds),
+                sort: 'price_asc',
+                offset: 0,
+                limit: 100,
+                includeTraits: true,
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data: ApiResponse = await res.json();
             const newItems = data.items ?? [];
             items = newItems;
             versionId = data.versionId ?? null;
@@ -485,31 +261,27 @@
             await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
             if (found >= 0) {
                 // Scroll gallery to the same token explicitly
-                scrollToIndex(found, false, true);
+                scrollerRef?.scrollToIndexInstant?.(found);
                 activeIndex = found;
-                lastSnapIndex = found;
             } else {
                 // Do not jump; keep visual position and recompute nearest index
-                const nIdx = nearestIndex();
+                const nIdx = activeIndex; // keep current
                 activeIndex = nIdx;
-                lastSnapIndex = nIdx;
             }
-            const afterScrollLeft = scrollerEl?.scrollLeft ?? -1;
+            const afterScrollLeft = -1;
             dbg('[traits] apply end (pre-tick)', {
                 newTotal: data.total,
                 newItemsLen: newItems.length,
                 found,
                 decidedIndex: activeIndex,
-                lastSnapIndex,
                 afterScrollLeft,
             });
             // Extra: log a tick later for post-layout verification
             setTimeout(() => {
                 dbg('[traits] post-tick', {
-                    scrollLeft: scrollerEl?.scrollLeft ?? -1,
-                    clientWidth: scrollerEl?.clientWidth ?? -1,
+                    scrollLeft: -1,
+                    clientWidth: -1,
                     activeIndex,
-                    lastSnapIndex,
                 });
             }, 0);
         } catch (e: any) {
@@ -518,148 +290,30 @@
             loading = false;
         }
     }
-    function onClickTraitValue(v: ListingTrait) {
-        if (selectedValueIds.has(v.value_id)) selectedValueIds.delete(v.value_id);
-        else selectedValueIds.add(v.value_id);
+    // Handlers for TraitBar component events (avoid TS in template expressions)
+    function handleToggleValue(e: CustomEvent<number>) {
+        const id = e.detail;
+        const next = new Set<number>(selectedValueIds);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        selectedValueIds = next; // reassign to trigger reactivity in TraitBar
         applyValueFilterAndFetch();
     }
-    function hasPrevTraitPage(): boolean { return traitBarOffset > 0; }
-    function hasNextTraitPage(): boolean { return traitBarOffset + visibleTraitSlots < totalTraits; }
-    function prevTraitPage() {
-        const step = Math.max(1, visibleTraitSlots || 1);
-        traitBarOffset = Math.max(0, traitBarOffset - step);
+    function handlePurposeChange(e: CustomEvent<string>) {
+        selectedPurpose = (e.detail as any as Purpose);
     }
-    function nextTraitPage() {
-        const step = Math.max(1, visibleTraitSlots || 1);
-        traitBarOffset = Math.min(Math.max(0, totalTraits - step), traitBarOffset + step);
-    }
-    function nextTraitPageWrapped() {
-        const step = Math.max(1, visibleTraitSlots || 1);
-        if (totalTraits <= 0) return;
-        const next = traitBarOffset + step;
-        traitBarOffset = next >= totalTraits ? 0 : next;
-    }
+    // Trait value clicks and paging handled within TraitBar component
 
-    // Animation helpers
-    function cancelAnimation() {
-        if (animReq) cancelAnimationFrame(animReq);
-        animReq = 0;
-        isAnimating = false;
-        animToken++;
-    }
-    function easeInOutCubic(t: number) {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
-    function computeDuration(distancePx: number) {
-        // ~1.5x faster: reduce slope and caps
-        const perPx = 0.35 / 1.5; // ≈ 0.233 ms/px
-        const minMs = 80;  // was 120
-        const maxMs = 160; // was 240
-        return Math.round(Math.min(maxMs, Math.max(minMs, distancePx * perPx)));
-    }
-    function animateScrollTo(left: number, idxToSet: number, autoSnap: boolean) {
-        if (!scrollerEl) return;
-        const start = scrollerEl.scrollLeft;
-        const distance = Math.abs(left - start);
-        const duration = computeDuration(distance);
-        const token = ++animToken;
-        isAnimating = true;
-        let startTs = 0;
-        const step = (ts: number) => {
-            if (token !== animToken || !scrollerEl) return; // canceled
-            if (!startTs) startTs = ts;
-            const t = Math.min(1, (ts - startTs) / duration);
-            const eased = easeInOutCubic(t);
-            scrollerEl.scrollLeft = start + (left - start) * eased;
-            if (t < 1) {
-                animReq = requestAnimationFrame(step);
-            } else {
-                isAnimating = false;
-                lastSnapIndex = idxToSet;
-                activeIndex = idxToSet;
-                if (autoSnap && motionEnabled) {
-                    blockUntilTs = Date.now() + BLOCK_SCROLL_MS;
-                }
-            }
-        };
-        animReq = requestAnimationFrame(step);
-    }
-
-    function clamp(n: number, min: number, max: number) {
-        return Math.max(min, Math.min(max, n));
-    }
-    function nearestIndex(): number {
-        if (!scrollerEl) return 0;
-        const cw = scrollerEl.clientWidth || 1;
-        return clamp(Math.round(scrollerEl.scrollLeft / cw), 0, Math.max(0, items.length - 1));
-    }
-    function scrollToIndex(i: number, autoSnap = false, forceInstant = false) {
-        if (!scrollerEl) return;
-        const cw = scrollerEl.clientWidth;
-        const idx = clamp(i, 0, Math.max(0, items.length - 1));
-        const target = idx * cw;
-        if (motionEnabled && !prefersReducedMotion && !forceInstant) {
-            animateScrollTo(target, idx, autoSnap);
-        } else {
-            scrollerEl.scrollLeft = target;
-            lastSnapIndex = idx;
-            activeIndex = idx;
-            if (autoSnap && motionEnabled) {
-                blockUntilTs = Date.now() + BLOCK_SCROLL_MS;
-            }
-            if (forceInstant) {
-                suppressFinalizeUntilTs = Date.now() + 200;
-            }
-        }
-    }
-    function handleScroll() {
-        if (isAnimating) return; // ignore scrolls during animation to avoid bounce
-        activeIndex = nearestIndex();
-        applyStagedIfAtStart();
-        if (!motionEnabled || prefersReducedMotion) {
-            return; // no automated snap when motion is off or reduced
-        }
-        if (Date.now() < suppressFinalizeUntilTs) return;
-        if (draggingScrollbar) return; // defer finalize while user drags native scrollbar
-        if (scrollEndTimer) clearTimeout(scrollEndTimer);
-        scrollEndTimer = setTimeout(() => {
-            if (!scrollerEl) return;
-            const cw = scrollerEl.clientWidth || 1;
-            const lastCenter = lastSnapIndex * cw;
-            const dx = scrollerEl.scrollLeft - lastCenter;
-            const dist = Math.abs(dx);
-            // Only snap if user moved sufficiently away from the last center;
-            // and always snap to the adjacent slide in the direction of travel
-            const thresholdPx = cw * LEAVE_THRESHOLD_FRAC;
-            if (dist >= thresholdPx) {
-                const dir = dx > 0 ? 1 : -1;
-                const idx = clamp(lastSnapIndex + dir, 0, Math.max(0, items.length - 1));
-                scrollToIndex(idx, true);
-            }
-        }, FINALIZE_DELAY_MS);
-    }
+    // Scroller animation and snap helpers exist in GalleryScroller
     function handleWheel(e: WheelEvent) {
-        if (!scrollerEl) return;
-        const ax = Math.abs(e.deltaX);
-        const ay = Math.abs(e.deltaY);
-        // When an animation is in progress, ignore wheel to avoid canceling or fighting the tween
-        if (isAnimating) {
-            e.preventDefault();
-            return;
-        }
-        // Post-snap block window (auto-snap only)
-        if (motionEnabled && Date.now() < blockUntilTs) {
-            e.preventDefault();
-            return;
-        }
-        if (ay > ax) {
-            e.preventDefault();
-            scrollerEl.scrollLeft += e.deltaY * WHEEL_MULTIPLIER;
-        }
+        // Forward Y->X wheel mapping to GalleryScroller
+        scrollerRef?.wheelY?.(e.deltaY);
+        e.preventDefault();
     }
-    function prevSlide() { scrollToIndex(activeIndex - 1); }
-    function nextSlide() { scrollToIndex(activeIndex + 1); }
-    function focusCurrent() { scrollToIndex(nearestIndex()); }
+    // Methods now provided by GalleryScroller via scrollerRef
+    let scrollerRef: any = null;
+    function prevSlide() { scrollerRef?.prev?.(); }
+    function nextSlide() { scrollerRef?.next?.(); }
+    function focusCurrent() { scrollerRef?.focusCurrent?.(); }
 
     function openExploreByMint(mint: string) {
         exploreItems = items.slice(); // freeze current page order
@@ -685,6 +339,22 @@
             }
         }
     }
+
+    // Edge overlays should match the visible image height
+    let edgeHeight = 0;
+    function recomputeEdgeHeight() {
+        const rect = scrollerRef?.getCurrentImageClientRect?.();
+        if (rect && rect.height) {
+            edgeHeight = Math.round(rect.height);
+        } else if (typeof window !== 'undefined') {
+            edgeHeight = Math.round(window.innerHeight);
+        }
+    }
+    $: activeIndex, recomputeEdgeHeight();
+    if (typeof window !== 'undefined') {
+        window.addEventListener('resize', recomputeEdgeHeight);
+        setTimeout(recomputeEdgeHeight, 0);
+    }
 </script>
 
 <style>
@@ -695,50 +365,9 @@
     }
     .status { opacity: 0.8; font-size: 14px; padding: 8px 0 16px; }
     .error { color: #ff6b6b; }
-    /* Horizontal scroller */
-    .scroller {
-        display: flex;
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
-        /* No CSS snap; JS finalize on scroll-end */
-        scroll-behavior: auto;
-        height: 100vh;
-        box-sizing: border-box;
-    }
-    /* removed dynamic height for scroller; keep native scrollbar at bottom */
-    .slide {
-        flex: 0 0 100vw;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-start; /* top-align content, no gap at top */
-        padding: 0;
-        box-sizing: border-box;
-    }
-    .img-wrap { width: 100%; overflow: hidden; }
-    .img-button { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: transparent; cursor: zoom-in; outline: none; }
-    .img-button:focus, .img-button:focus-visible { outline: none; }
-    img.token {
-        display: block;
-        width: 100%;
-        max-width: 2560px;
-        height: auto;
-        margin: 0 auto;
-        object-fit: contain;
-    }
-    .meta { display: flex; align-items: center; justify-content: center; padding: 8px 0; font-size: 14px; }
-    .price,
-    .price-link {
-        font-variant-numeric: tabular-nums;
-    }
-    .price-link {
-        text-decoration: none; /* no underline */
-        color: inherit;       /* no visited color change */
-    }
-    .price-link:visited { color: inherit; }
+    /* Scroller styles moved into GalleryScroller.svelte */
     /* Edge click targets for prev/next */
-    .edge { position: fixed; top: 0; height: 1087px; width: 6vw; min-width: 60px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
+    .edge { position: fixed; top: 0; height: 1087px; width: 25px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
     .edge:focus, .edge:focus-visible { outline: none; }
     .edge.left { left: 0; }
     .edge.right { right: 0; }
@@ -746,199 +375,45 @@
     .edge.right:hover { background: linear-gradient(to left, rgba(255,255,255,0.04), transparent); }
 
     /* Help overlay */
-    .help-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-    }
-    .help-panel {
-        background: rgba(12,12,14,0.98);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 8px;
-        width: min(90vw, 820px);
-        max-height: 80vh;
-        overflow: auto;
-        padding: 16px 20px;
-        color: #e6e6e6;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    }
-    .help-panel h2 { margin: 6px 0 8px; font-size: 18px; }
-    .help-panel h3 { margin: 12px 0 6px; font-size: 15px; opacity: 0.9; }
-    .help-panel ul { margin: 6px 0 10px 18px; padding: 0; }
-    .help-panel li { margin: 4px 0; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #1b1b1d; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 6px; }
+    /* help overlay styles moved to components/HelpOverlay.svelte */
 
-    /* Trait bar overlay */
-    .purpose-dots {
-        position: fixed;
-        left: 0; right: 0; bottom: 82px; /* bar bottom 22 + bar height 50 + ~10px gap */
-        height: 22px;
-        display: flex; align-items: center; justify-content: center;
-        pointer-events: auto;
-        z-index: 9001;
-    }
-    .purpose-dot { cursor: pointer; margin: 0 6px; padding: 3px 8px; font-size: 12px; color: #cfcfd2; background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; }
-    .purpose-dot.active { color: #111; background: #e6e6e6; border-color: #e6e6e6; }
-    .purpose-dot.disabled { opacity: 0.35; cursor: default; }
-    .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
-
-    /* Centered toggle button that follows the bar state */
-    .trait-toggle-btn {
-        position: fixed;
-        left: 50%; transform: translateX(-50%);
-        width: 200px; height: 14px;
-        z-index: 9002;
-        background: rgba(12,12,14,0.85);
-        color: #e6e6e6;
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 6px;
-        cursor: pointer;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 11px; line-height: 1;
-    }
-    .trait-toggle-btn:hover { background: rgba(255,255,255,0.10); }
-    .trait-toggle-btn:focus, .trait-toggle-btn:focus-visible { outline: none; box-shadow: none; }
-
-    .trait-bar {
-        position: fixed; left: 0; right: 0; bottom: 22px; height: 50px;
-        background: rgba(0,0,0,0.6);
-        display: flex; align-items: stretch; justify-content: space-between;
-        z-index: 9000;
-        pointer-events: auto;
-    }
-    .trait-arrow { width: 50px; height: 50px; border: 0; background: transparent; color: #e6e6e6; cursor: pointer; align-self: center; }
-    .trait-arrow:hover { background: rgba(255,255,255,0.06); }
-    .trait-arrow:disabled { opacity: 0.25; cursor: default; }
-    .trait-strip { flex: 1; display: flex; overflow: hidden; }
-    .trait-box { width: 150px; height: 50px; padding: 6px 8px; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.06); cursor: pointer; align-self: center; }
-    .trait-box:hover { background: rgba(255,255,255,0.06); }
-    .trait-box.selected { background: rgba(255,255,255,0.12); }
-    .trait-head { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .trait-val { font-size: 13px; font-weight: 600; white-space: normal; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+    /* Trait bar styles are scoped in TraitBar.svelte */
+    /* Trait bar styles live within TraitBar component */
 </style>
 
 <div class="container">
     
 
     <!-- Horizontal scroller -->
-    <div bind:this={scrollerEl} class="scroller" on:scroll={handleScroll} on:wheel={handleWheel}>
-        {#each items as it, idx (it.token_mint_addr)}
-            {@const m = marketplaceFor(it.listing_source, it.token_mint_addr)}
-            <section class="slide" aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
-                <div class="img-wrap">
-                    <button
-                        type="button"
-                        class="img-button"
-                        aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`}
-                        on:click={() => openExploreByMint(it.token_mint_addr)}
-                    >
-                        <img
-                            class="token"
-                            src={`/2560/${it.token_mint_addr}.jpg`}
-                            alt={`Token ${it.token_num ?? it.token_mint_addr}`}
-                            loading="lazy"
-                            decoding="async"
-                        />
-                    </button>
-                </div>
-                <div class="meta">
-                    {#if m}
-                        <a class="price-link" href={m.href} target="_blank" rel="noopener noreferrer" title={m.title}>
-                            {formatSol(priceWithFees(it.price))} SOL
-                        </a>
-                    {:else}
-                        <span class="price">{formatSol(priceWithFees(it.price))} SOL</span>
-                    {/if}
-                </div>
-            </section>
-        {/each}
-    </div>
+    <!-- Gallery Scroller (extracted) -->
+    <GalleryScroller
+        bind:activeIndex
+        items={items}
+        motionEnabled={motionEnabled}
+        on:enterExplore={(e) => openExploreByMint(e.detail)}
+        on:imageLoad={recomputeEdgeHeight}
+        bind:this={scrollerRef}
+    />
 
     <!-- Edge click targets for mouse-only navigation -->
-    <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel={handleWheel}></button>
-    <button type="button" class="edge right" title="Next" aria-label="Next" on:click={nextSlide} on:wheel={handleWheel}></button>
+    <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+    <button type="button" class="edge right" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
 
     <!-- Hotkeys help overlay -->
-    {#if showHelp}
-        <div class="help-backdrop" on:click={() => (showHelp = false)}>
-            <div class="help-panel" role="dialog" aria-modal="true" on:click|stopPropagation>
-                <h2>Keyboard Shortcuts</h2>
-                <div class="status" style="padding:0 0 8px; opacity:0.75;">Press <span class="kbd">H</span> or <span class="kbd">F1</span> to close</div>
-
-                <h3>Gallery (Horizontal Scroll)</h3>
-                <ul>
-                    <li>Previous/Next image — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
-                    <li>Focus current — <span class="kbd">F</span></li>
-                    <li>Enter exploration — <span class="kbd">W</span></li>
-                    <li>Toggle motion — <span class="kbd">M</span></li>
-                    <li>Toggle trait bar — <span class="kbd">V</span></li>
-                    <li>Purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
-                    <li>Next trait page (wrap) — <span class="kbd">X</span></li>
-                    <li>Jump to first/last — <span class="kbd">Home</span> / <span class="kbd">End</span></li>
-                    <li>Horizontal travel — mouse wheel; Click screen edges to prev/next</li>
-                    <li>Toggle help — <span class="kbd">H</span> / <span class="kbd">F1</span></li>
-                </ul>
-
-                <h3>Exploration Mode</h3>
-                <ul>
-                    <li>Previous/Next — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
-                    <li>Close exploration — <span class="kbd">Esc</span></li>
-                    <li>Fit‑by‑width centered — <span class="kbd">S</span></li>
-                    <li>Fit entire height (middle/left/right) — <span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span></li>
-                    <li>Fit 1006px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>
-                    <li>Reset to fit‑by‑width — Double‑click</li>
-                    <li>Toggle debug overlay — <span class="kbd">G</span></li>
-                </ul>
-            </div>
-        </div>
-    {/if}
+    <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
     
     <!-- Centered toggle button that follows bar state (always visible) -->
-    <button
-        type="button"
-        class="trait-toggle-btn"
-        title="Toggle traits bar"
-        style={`bottom: ${showTraitBar ? 110 : 22}px;`}
-        on:click={() => { showTraitBar = !showTraitBar; traitBarOffset = 0; setTimeout(recomputeVisibleTraitSlots, 0); }}
-    >
-        {#if showTraitBar}▼{/if}{#if !showTraitBar}▲{/if}
-    </button>
+    <ToggleButton show={showTraitBar} on:toggle={() => { showTraitBar = !showTraitBar; }} />
 
-    <!-- Purpose dots (above trait bar) -->
+    <!-- Trait bar (extracted) -->
     {#if showTraitBar}
-        <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation>
-            {#each PURPOSE_CLASSES as pc}
-                {@const cnt = purposeCounts[pc] ?? 0}
-                <button
-                    type="button"
-                    class="purpose-dot {pc === selectedPurpose ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
-                    disabled={cnt === 0}
-                    on:click={() => { if (cnt > 0) { selectedPurpose = pc; traitBarOffset = 0; } }}
-                >
-                    {pc}{#if cnt > 0} ({cnt}){/if}
-                </button>
-            {/each}
-        </div>
-    {/if}
-
-    <!-- Trait bar at bottom -->
-    {#if showTraitBar}
-    <div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
-            <button type="button" class="trait-arrow" title="Prev traits" on:click={prevTraitPage} disabled={!hasPrevTraitPage()}>&larr;</button>
-            <div class="trait-strip">
-                {#each traitsForBar.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
-                    <div class="trait-box {isValueSelected(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => onClickTraitValue(tr)}>
-                        <div class="trait-head">{(tr.spatial_group ?? 'undf').toUpperCase()}. {tr.type_name}</div>
-                        <div class="trait-val">{tr.value}</div>
-                    </div>
-                {/each}
-            </div>
-            <button type="button" class="trait-arrow" title="Next traits" on:click={nextTraitPage} disabled={!hasNextTraitPage()}>&rarr;</button>
-        </div>
+        <TraitBar
+            traits={traitsForCurrent}
+            bind:selectedPurpose
+            {selectedValueIds}
+            on:toggleValue={handleToggleValue}
+            on:purposeChange={handlePurposeChange}
+        />
     {/if}
 <!-- Full-screen explorer overlay -->
 {#if exploreIndex !== null && exploreItems}

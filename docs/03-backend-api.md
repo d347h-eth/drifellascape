@@ -50,6 +50,19 @@ To avoid a race between reading the active version id and its rows while the wor
   - Errors (500): `{ "error": "message" }`.
   - CORS: `Access-Control-Allow-Origin: *`.
 
+- `POST /listings/search`
+  - Server‑side filtering over the active snapshot; returns enriched listings (token + traits) by default.
+  - Body:
+    - `mode`: `"value" | "trait"`
+    - `valueIds`: number[] (AND semantics in value mode)
+    - `traits`: `{ typeId: number, valueIds: number[] }[]` (AND across types, OR within values)
+    - `offset`, `limit` (default 0/100; max 200), `sort` (`price_asc` | `price_desc`), `includeTraits` (default true)
+  - Notes:
+    - Consistent read: results are anchored to the active snapshot id.
+    - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
+  - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
+  - See also: API details and sample payloads in `docs/06-api-reference.md`.
+
 Notes:
 
 - Sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced; add secondary sort if needed.

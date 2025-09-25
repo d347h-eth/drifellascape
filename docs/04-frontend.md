@@ -13,7 +13,11 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/index.html` — Vite entry
 - `frontend/vite.config.ts` — Vite + Svelte configuration (with svelte‑preprocess)
 - `frontend/src/main.ts` — mounts the Svelte app
-- `frontend/src/App.svelte` — main UI (listings + exploration overlay)
+- `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components)
+- `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap
+- `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
+- `frontend/src/components/TraitBar/TraitBar.svelte` — purpose pills + trait strip (fixed paging)
+- `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
 - `frontend/public/` — static assets
   - `2560/{token_mint_addr}.jpg` — locally hosted 2560‑wide images per token mint
@@ -38,15 +42,15 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
   - One slide per viewport: a flex row scroller with `overflow-x: auto`, each slide `flex: 0 0 100vw`.
   - Images: `width: 100%`, `max-width: 2560px`, `height: auto`, centered horizontally, top‑aligned vertically.
-  - Edge navigation bands: fixed left/right buttons (height 1087px, width 6vw, min 60px) to jump ±1.
+  - Edge navigation bands: fixed left/right buttons (25px wide) to jump ±1; height equals current image height, anchored to the top (recomputed on image load).
 
 - Scrolling & Snap Logic
 
-  - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned with `WHEEL_MULTIPLIER` (default 1.5).
-  - No CSS scroll‑snap. Instead, a small JS “finalize to center” runs on scroll‑end when motion is on:
+  - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned internally (default multiplier 1.5).
+  - No CSS scroll‑snap. Instead, a small JS “finalize to center” runs on scroll‑idle when motion is on:
     - Directional finalize: if you moved at least a threshold (default 50% of viewport width) away from the last centered slide, snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
-    - Debounce: `FINALIZE_DELAY_MS` (default 120 ms) waits briefly after the last wheel event.
-    - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (default 100 ms) to avoid accidental re‑scrolls right after landing.
+    - Debounce: `FINALIZE_DELAY_MS` (0 ms) — finalize immediately once scrolling idles.
+    - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (150 ms) to avoid accidental re‑scrolls right after landing.
     - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
   - Motion toggle: users can toggle motion with `M`. When motion is off, there is no automated snap at all (pure linear scrolling). With motion on and `prefers‑reduced‑motion`, auto‑snap is also disabled.
 
@@ -74,16 +78,15 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 ## Trait Bar (Bottom Overlay)
 
-- Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible).
+  - Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
 - Purpose classes (pills) centered above the bar: `left`, `middle`, `right`, `decor`, `items`, `special`, `undefined`.
   - Default selected: `middle`.
   - Pills show counts for the current token (e.g., `middle (5)`); empty pills are disabled and skipped by keyboard nav.
-  - Hotkeys: `Z` / `V` cycle purpose left/right (wrap; skip empties).
+  - Hotkeys: `Z` / `C` cycle purpose left/right (wrap; skip empties).
 - Trait boxes strip within the bar:
   - Shows only traits for the selected purpose class of the current token in focus.
   - Box size 150×50; head: `spatial_group. type_name`; value wraps to two lines as needed.
-  - Fixed page size: arrow pads (50×50) navigate pages at a constant offset; no overlap between pages. Hotkey `X` jumps to the next page and wraps to the start.
-  - Hotkeys: `X` / `C` page left/right (no wrap).
+  - Fixed page size: a single right arrow (50×50) advances to the next page; hotkey `X` performs the same action. Pagination wraps to the start.
 - Clicking a box toggles value‑based filtering (adds/removes that `value_id`) and immediately refreshes listings via `POST /listings/search`.
   - The frontend keeps the same token in focus across filter changes (by mint), including when removing the last/only filter.
 
@@ -102,6 +105,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
   - Tensor for sources `TENSOR_LISTING`, `TENSOR_CNFT_LISTING`, `TENSOR_MARKETPLACE_LISTING`, `TENSOR_AMM`, `TENSOR_AMM_V2`.
 - Accessibility:
   - The image is wrapped in a `<button>` (not a naked clickable `<img>`) to satisfy Svelte a11y constraints.
+  - Edge navigation bands recompute height on image `load` and are anchored to the top.
 
 ## Exploration Mode (Leaflet)
 

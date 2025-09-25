@@ -53,5 +53,5 @@
 
 ## ADR-010: Trait Bar UX & Token Focus
 
-- Decision: Show a bottom trait bar toggled by `B` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
+- Decision: Show a bottom trait bar toggled by `V` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
 - Rationale: Provide fast, bottom‑up value discovery while preserving user context; avoid disorientation when list size changes.
