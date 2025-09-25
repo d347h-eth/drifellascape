@@ -47,27 +47,25 @@
   $: startIdx = traitBarOffset;
   $: endIdx = Math.min(totalTraits, startIdx + Math.max(1, visibleTraitSlots || 1));
 
-  // Paging
-  function hasPrevTraitPage() { return traitBarOffset > 0; }
-  function hasNextTraitPage() { return traitBarOffset + visibleTraitSlots < totalTraits; }
-  function prevTraitPage() { const step = Math.max(1, visibleTraitSlots || 1); traitBarOffset = Math.max(0, traitBarOffset - step); }
-  function nextTraitPage() { const step = Math.max(1, visibleTraitSlots || 1); traitBarOffset = Math.min(Math.max(0, totalTraits - step), traitBarOffset + step); }
-  function nextTraitPageWrapped() { const step = Math.max(1, visibleTraitSlots || 1); const next = traitBarOffset + step; traitBarOffset = next >= totalTraits ? 0 : next; }
-
-  // Hotkeys inside bar: X wraps next, Z/C purpose switch (skip empties)
-  function onKeyDown(e: KeyboardEvent) {
-    const k = e.key;
-    if (k === 'z' || k === 'Z' || k === 'c' || k === 'C') {
-      e.preventDefault();
-      const dir = (k === 'z' || k === 'Z') ? -1 : 1;
-      let idx = PURPOSES.indexOf(normalizedPurpose(selectedPurpose));
-      for (let i = 0; i < PURPOSES.length; i++) {
-        idx = (idx + dir + PURPOSES.length) % PURPOSES.length;
-        const pc = PURPOSES[idx];
-        if ((purposeCounts[pc] ?? 0) > 0) { selectedPurpose = pc; traitBarOffset = 0; break; }
-      }
+  // Reset paging whenever the selected purpose changes (including when parent updates it)
+  let lastPurpose: Purpose | null = null;
+  $: {
+    const sp = normalizedPurpose(selectedPurpose);
+    if (sp !== lastPurpose) {
+      lastPurpose = sp;
+      traitBarOffset = 0;
     }
   }
+
+  // Paging (wrap-around on next; fixed step size)
+  function nextTraitPageWrapped() {
+    const step = Math.max(1, visibleTraitSlots || 1);
+    if (totalTraits <= 0) return;
+    const next = traitBarOffset + step;
+    traitBarOffset = next >= totalTraits ? 0 : next;
+  }
+
+  // Keyboard hotkeys (Z/C, X) are handled at App level globally.
 
   // Listen for global pageNext notification from App for X key
   function onGlobalPageNext() { nextTraitPageWrapped(); }
@@ -86,12 +84,17 @@
     if (cnt === 0) return;
     selectedPurpose = pc; traitBarOffset = 0; dispatch('purposeChange', pc);
   }
+  function handleNextArrowClick(e: MouseEvent) {
+    nextTraitPageWrapped();
+    const target = e.currentTarget as HTMLButtonElement | null;
+    target?.blur?.();
+  }
 
-  function isSelectedValue(id: number) { return selectedValueIds?.has(id); }
+  // Directly reference selectedValueIds in markup so Svelte tracks dependency
 </script>
 
 <!-- Purpose pills -->
-<div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation on:keydown={onKeyDown} tabindex="-1">
+  <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1">
   {#each PURPOSES as pc}
     {@const cnt = purposeCounts[pc] ?? 0}
     <button type="button" class="purpose-dot {pc === normalizedPurpose(selectedPurpose) ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
@@ -105,18 +108,16 @@
 
 <!-- Trait bar at bottom -->
 <div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
-  <button type="button" class="trait-arrow" title="Prev traits" on:click={prevTraitPage} disabled={!hasPrevTraitPage()}>&larr;</button>
   <div class="trait-strip">
     {#each filtered.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
-      <div class="trait-box {isSelectedValue(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => emitToggleValue(tr.value_id)}>
+      <div class="trait-box {selectedValueIds?.has(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => emitToggleValue(tr.value_id)}>
         <div class="trait-head">{(tr.spatial_group ?? 'UNDF').toUpperCase()}. {tr.type_name}</div>
         <div class="trait-val">{tr.value}</div>
       </div>
     {/each}
   </div>
-  <button type="button" class="trait-arrow" title="Next traits" on:click={nextTraitPage} disabled={!hasNextTraitPage()}>&rarr;</button>
-  <!-- hidden focus catcher to keep keydown working -->
-  <input style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;" aria-hidden="true" on:keydown={onKeyDown} />
+  <button type="button" class="trait-arrow" title="Next traits page (wrap)" on:mousedown|preventDefault on:click={handleNextArrowClick} disabled={totalTraits === 0}>&rarr;</button>
+  <!-- keys handled globally in App; no hidden focus catcher needed -->
 </div>
 
 <style>
@@ -143,6 +144,7 @@
   .trait-arrow { width: 50px; height: 50px; border: 0; background: transparent; color: #e6e6e6; cursor: pointer; align-self: center; }
   .trait-arrow:hover { background: rgba(255,255,255,0.06); }
   .trait-arrow:disabled { opacity: 0.25; cursor: default; }
+  .trait-arrow:focus, .trait-arrow:focus-visible { outline: none; box-shadow: none; }
   .trait-strip { flex: 1; display: flex; overflow: hidden; }
   .trait-box { width: 150px; height: 50px; padding: 6px 8px; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.06); cursor: pointer; align-self: center; }
   .trait-box:hover { background: rgba(255,255,255,0.06); }

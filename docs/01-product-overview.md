@@ -30,9 +30,9 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Concurrency: WAL enables concurrent reads while the worker writes short transactions.
 - Backend API (Node)
   - Loads and keeps the active snapshot in memory; background loop reloads if version changes.
-  - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc`.
+  - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc` and `POST /listings/search` (value/trait modes) over the active snapshot.
 - Frontend (Vite + Svelte)
-  - Lists the current snapshot with fast pagination and price display.
+  - Lists the current snapshot with fast pagination and price display. Trait Bar enables trait/value filtering and purpose‑based browsing with fixed paging.
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
 
 ### Data Flow (Conceptual)
@@ -58,15 +58,15 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 ## Local Data Model
 
-- Listings (normalized current state)
+  - Listings (normalized current state)
   - `listing_versions`
     - `id`, `created_at`, `total`, `active` (unique partial index to enforce a single active version).
   - `listings_current`
     - `(version_id, token_mint_addr)` as PK; columns: `token_num?`, `price`, `seller`, `image_url`, `listing_source`, `created_at`.
     - Indexes for the active version: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_num)`.
-- Token metadata (downloaded offline)
-  - Current state: all token metadata JSON fetched and stored locally (IDs 0..1332) under `./metadata/{id}.json`.
-  - Future state (TBD): normalize tokens and traits into relational tables for fast filtering (tokens, traits, token_traits), including distributions and indexes.
+- Token metadata & traits
+  - Current: normalized tables for tokens and traits exist (`tokens`, `trait_types` with `spatial_group` and `purpose_class`, `trait_values`, `trait_types_values`, `token_traits`). A helper script updates type groupings/classes from CSV.
+  - Ingestion: raw metadata ingested “as is”; counts maintained per type/value; special `trait_values.id=217` (None) is excluded from filters/attachments in API.
 
 ## Synchronization Strategy (Worker)
 

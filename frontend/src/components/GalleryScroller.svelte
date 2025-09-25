@@ -6,6 +6,7 @@
   export let items: ListingRow[] = [];
   export let motionEnabled: boolean = true;
   export let leaveThresholdFrac: number = 0.5;
+  export let wheelMultiplier: number = 1.5;
   export let activeIndex: number = 0; // bindable
 
   const dispatch = createEventDispatcher();
@@ -45,6 +46,8 @@
   }
   let isAnimating = false; let animReq = 0; let animToken = 0;
   function cancelAnimation() { if (animReq) cancelAnimationFrame(animReq); animReq = 0; isAnimating = false; animToken++; }
+  // Allow parent to cancel any in-flight animation when toggling motion
+  export function cancel() { cancelAnimation(); }
 
   export function prev() { scrollToIndex(activeIndex - 1); }
   export function next() { scrollToIndex(activeIndex + 1); }
@@ -59,7 +62,7 @@
     if (motionEnabled && !forceInstant) { animateScrollTo(target, idx); }
     else {
       scrollerEl.scrollLeft = target; lastSnapIndex = idx; activeIndex = idx;
-      if (autoSnap && motionEnabled) blockUntilTs = Date.now() + 100;
+      if (autoSnap && motionEnabled) blockUntilTs = Date.now() + 150;
       if (forceInstant) suppressFinalizeUntilTs = Date.now() + 200;
     }
   }
@@ -69,10 +72,11 @@
     if (isAnimating) { e.preventDefault(); return; }
     const ax = Math.abs(e.deltaX); const ay = Math.abs(e.deltaY);
     if (motionEnabled && Date.now() < blockUntilTs) { e.preventDefault(); return; }
-    if (ay > ax) { e.preventDefault(); scrollerEl.scrollLeft += e.deltaY * 1.5; }
+    if (ay > ax) { e.preventDefault(); scrollerEl.scrollLeft += e.deltaY * wheelMultiplier; }
   }
   function finalizeDirectionalSnapIdle() {
     if (!scrollerEl) return;
+    if (isAnimating) return;
     const cw = scrollerEl.clientWidth || 1;
     const lastCenter = lastSnapIndex * cw;
     const dx = scrollerEl.scrollLeft - lastCenter;
@@ -98,13 +102,16 @@
       dbg('[scrollbar] release snapped (scroller)', { targetIndex: idxNear });
     } else dbg('[scrollbar] release no-snap (scroller)');
   }
+  // Match ADR-008: finalize immediately on idle
+  const FINALIZE_DELAY_MS = 0;
   let scrollEndTimer: any = null;
   function handleScroll() {
     dispatch('indexChange', activeIndex = nearestIndex());
+    if (isAnimating) return; // avoid fighting the tween
     if (Date.now() < suppressFinalizeUntilTs) return;
     if (draggingScrollbar) return;
     if (scrollEndTimer) clearTimeout(scrollEndTimer);
-    scrollEndTimer = setTimeout(() => finalizeDirectionalSnapIdle(), 0);
+    scrollEndTimer = setTimeout(() => finalizeDirectionalSnapIdle(), FINALIZE_DELAY_MS);
   }
   function onPointerDown(e: PointerEvent) {
     if (!scrollerEl) return;
@@ -112,6 +119,24 @@
     if (e.clientY >= r.bottom - SCROLLBAR_HIT_PX) draggingScrollbar = true;
   }
   function onPointerUp() { if (draggingScrollbar) { draggingScrollbar = false; finalizeSnapOnRelease(); } }
+
+  // Expose helpers to parent
+  export function getCurrentImageClientRect(): DOMRect | null {
+    if (!scrollerEl) return null;
+    const idx = nearestIndex();
+    const slides = scrollerEl.querySelectorAll<HTMLElement>('section.slide');
+    const slide = slides[idx];
+    if (!slide) return null;
+    const img = slide.querySelector<HTMLImageElement>('img.token');
+    if (!img) return null;
+    return img.getBoundingClientRect();
+  }
+  export function wheelY(deltaY: number) {
+    if (!scrollerEl) return;
+    if (isAnimating) return;
+    if (motionEnabled && Date.now() < blockUntilTs) return;
+    scrollerEl.scrollLeft += deltaY * wheelMultiplier;
+  }
 
   function marketplaceFor(src: string | undefined, mint: string): { href: string; title: string } | null {
     if (!src) return null;
@@ -136,7 +161,7 @@
     <section class="slide" aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
       <div class="img-wrap">
         <button type="button" class="img-button" aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`} on:click={() => dispatch('enterExplore', it.token_mint_addr)}>
-          <img class="token" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" />
+          <img class="token" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
         </button>
       </div>
       <div class="meta">

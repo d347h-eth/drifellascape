@@ -7,7 +7,7 @@ This document captures the plan to decompose `frontend/src/App.svelte` into focu
 - Goals
   - Extract large concerns (gallery scroller, trait bar, help) into components.
   - Centralize shared types, API access, and (optionally) state in a predictable place.
-  - Isolate DOM-heavy logic (snap/finalize/scrollbar drag) in a utility or action.
+  - Isolate DOM-heavy logic (snap/finalize/scrollbar drag) in a dedicated component.
   - Preserve existing behavior and hotkeys; no visual changes.
 
 - Non-Goals (for this refactor)
@@ -29,11 +29,9 @@ frontend/src/
     api.ts              # POST /listings/search client
     types.ts            # UI-facing types: ListingRow, ListingTrait, ApiResponse, ...
     stores.ts           # (Optional, stepwise adoption) writable stores for UI/Gallery/Filters
-    scrollSnap.ts       # Snap/finalize logic, wheel mapping, scrollbar drag helpers (action/utility)
-    ui-constants.ts     # Shared UI constants (sizes, offsets) — optional
+    ui-constants.ts     # Shared UI constants (sizes, offsets)
   components/
-    GalleryScroller.svelte        # Slides, wheel mapping, finalize/release-snap, gallery hotkeys
-    GalleryEdgeNav.svelte         # Left/right edge pads
+    GalleryScroller.svelte        # Slides, wheel mapping, finalize/release-snap, gallery methods
     HelpOverlay.svelte            # Keyboard help
     TraitBar/
       TraitBar.svelte            # Container & coordination
@@ -49,16 +47,16 @@ frontend/src/
 
 - Gallery
   - Mouse wheel maps Y→X (desktop), no CSS snap.
-  - Finalize snap on scroll-end (directional next/prev from last center) with threshold = 50% viewport width.
+  - Finalize snap on scroll idle (directional next/prev from last center) with threshold = 50% viewport width (immediate finalize, no debounce).
   - Native scrollbar drag disables snap; on release, snap to nearest slide center (threshold-based).
   - Prev/Next hotkeys (A/D, ←/→) act on keyup to avoid key-repeat flood.
   - Other keys: F (focus), M (motion), V (toggle trait bar), Z/C (purpose), X (trait page next wrap), Home/End.
   - W: enter exploration for current in-focus token.
 
 - Trait Bar
-  - Toggle via V (and centered ▲/▼ button near bottom), stays above native scrollbar (gap ~22 px).
+  - Toggle via V (and centered ▲/▼ button near bottom), stays above native scrollbar (gap ~22 px). Toggle strip is fully transparent by default; only the arrow is visible; lights up subtly on hover.
   - Purpose pills with counts; disabled/greyed if zero; Z/C wrap and skip empty.
-  - Trait boxes 150×50; 2-line wrapped value; fixed paging with arrows (50×50); X wraps next page.
+  - Trait boxes 150×50; 2-line wrapped value; fixed paging with a single right arrow (wraps on next). `X` performs the same action.
   - Clicking a trait toggles value-based filtering; the current token remains in focus across filter changes (by mint), even when the list grows back.
 
 - Help Overlay
@@ -83,14 +81,8 @@ frontend/src/
   - Extract `TraitBar.svelte`, `PurposePills.svelte`, `TraitStrip.svelte`.
   - Move counts and fixed paging inside; emit `toggleValue` and `purposeChange`; App forwards to API/stores.
 
-- [ ] PR3: GalleryScroller + snap utility
-  - Extract `GalleryScroller.svelte` and move wheel mapping, finalize snap, scrollbar release snap, and gallery hotkeys.
-  - Add `lib/scrollSnap.ts` as a Svelte action or plain util to encapsulate snap logic.
-  - App listens to `indexChange` and `enterExplore`.
-
-- [ ] PR4: Cleanup & constants
-  - Tidy constants (sizes/z-index) into `ui-constants.ts`.
-  - Ensure CSS scoping and remove dead code from App.
+- [x] PR3: GalleryScroller — finalized component with wheel mapping, finalize snap, scrollbar release snap, and methods for App.
+- [x] PR4: Cleanup & constants — constants centralized; unused code removed; CSS scoped in components.
 
 ## Step Details
 
@@ -126,15 +118,14 @@ frontend/src/
 - PurposePills.svelte: counts/disabled logic, click => purposeChange.
 - TraitStrip.svelte: fixed paging (non-overlap), arrows, box rendering, X wrap; click => toggleValue.
 
-### PR3 — GalleryScroller + snap utility
+### PR3 — GalleryScroller
 
-- GalleryScroller.svelte: slides, wheel mapping, finalize snap on idle, release snap on scrollbar, nav keys on keyup.
-- `useSnap` action (or util): holds thresholds, suppression windows, drag detect; accepts `motionEnabled` and `leaveFrac`.
+- `GalleryScroller.svelte`: slides, wheel mapping, finalize snap on idle, release snap on scrollbar, methods for `prev/next/focus/scrollToIndexInstant`, and `imageLoad` event for edge height recompute.
+  - Parameters default internally: wheel multiplier 1.5, threshold 0.5, finalize delay 0 ms, block 150 ms, ease‑in‑out cubic, duration ≈ 0.233 ms/px (80–160 caps).
 
 ### PR4 — Cleanup & constants
 
-- Extract magic numbers to `ui-constants.ts`.
-- Confirm layering (z-index) and focus styles.
+- Extracted magic numbers to `ui-constants.ts`; confirmed layering (z-index) and focus styles; removed legacy App scroller/trait pagination code.
 
 ## Acceptance Criteria
 
