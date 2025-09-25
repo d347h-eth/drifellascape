@@ -71,13 +71,13 @@ frontend/src/
 
 ## Milestones & Progress
 
-- [ ] PR1: Types/API/Stores + HelpOverlay + ToggleButton
+- [x] PR1: Types/API/Stores + HelpOverlay + ToggleButton
   - Add `lib/types.ts` and migrate UI types out of App.
   - Add `lib/api.ts` with `postSearchListings()` and adopt in App for fetch + polling + filter apply.
   - Add `lib/stores.ts` skeleton (UI/Gallery/Filters) for gradual adoption.
   - Extract `HelpOverlay.svelte` and `TraitBar/ToggleButton.svelte`; wire props/events; remove inline CSS.
 
-- [ ] PR2: TraitBar split
+- [x] PR2: TraitBar split
   - Extract `TraitBar.svelte`, `PurposePills.svelte`, `TraitStrip.svelte`.
   - Move counts and fixed paging inside; emit `toggleValue` and `purposeChange`; App forwards to API/stores.
 
@@ -145,4 +145,3 @@ frontend/src/
 
 - Keybinding hygiene: prev/next on keyup both in Gallery and Exploration; other keys on keydown for responsiveness.
 - Debug: use global `dbg()` from `debug.ts` guarded by `DEBUG` for targeted logs.
-

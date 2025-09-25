@@ -3,6 +3,7 @@
     import ImageExplorer from "./ImageExplorer.svelte";
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
+    import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import { postSearchListings } from "./lib/api";
     import type { ListingRow, ListingTrait, ApiResponse } from "./lib/types";
 
@@ -210,10 +211,10 @@
                 traitBarOffset = 0;
                 return;
             }
-            // Trait bar page next (wrap) — moved to X
+            // Trait bar page next (wrap) — X (notify trait bar component)
             if (k === 'x' || k === 'X') {
                 e.preventDefault();
-                nextTraitPageWrapped();
+                window.dispatchEvent(new CustomEvent('traitbar:pageNext'));
                 return;
             }
             if (exploreIndex !== null) return;
@@ -785,37 +786,15 @@
     <!-- Centered toggle button that follows bar state (always visible) -->
     <ToggleButton show={showTraitBar} on:toggle={() => { showTraitBar = !showTraitBar; traitBarOffset = 0; setTimeout(recomputeVisibleTraitSlots, 0); }} />
 
-    <!-- Purpose dots (above trait bar) -->
+    <!-- Trait bar (extracted) -->
     {#if showTraitBar}
-        <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation>
-            {#each PURPOSE_CLASSES as pc}
-                {@const cnt = purposeCounts[pc] ?? 0}
-                <button
-                    type="button"
-                    class="purpose-dot {pc === selectedPurpose ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
-                    disabled={cnt === 0}
-                    on:click={() => { if (cnt > 0) { selectedPurpose = pc; traitBarOffset = 0; } }}
-                >
-                    {pc}{#if cnt > 0} ({cnt}){/if}
-                </button>
-            {/each}
-        </div>
-    {/if}
-
-    <!-- Trait bar at bottom -->
-    {#if showTraitBar}
-    <div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
-            <button type="button" class="trait-arrow" title="Prev traits" on:click={prevTraitPage} disabled={!hasPrevTraitPage()}>&larr;</button>
-            <div class="trait-strip">
-                {#each traitsForBar.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
-                    <div class="trait-box {isValueSelected(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => onClickTraitValue(tr)}>
-                        <div class="trait-head">{(tr.spatial_group ?? 'undf').toUpperCase()}. {tr.type_name}</div>
-                        <div class="trait-val">{tr.value}</div>
-                    </div>
-                {/each}
-            </div>
-            <button type="button" class="trait-arrow" title="Next traits" on:click={nextTraitPage} disabled={!hasNextTraitPage()}>&rarr;</button>
-        </div>
+        <TraitBar
+            traits={currentItem()?.traits ?? []}
+            bind:selectedPurpose
+            {selectedValueIds}
+            on:toggleValue={(e) => { const id = e.detail as number; if (selectedValueIds.has(id)) selectedValueIds.delete(id); else selectedValueIds.add(id); applyValueFilterAndFetch(); }}
+            on:purposeChange={(e) => { selectedPurpose = e.detail as string; }}
+        />
     {/if}
 <!-- Full-screen explorer overlay -->
 {#if exploreIndex !== null && exploreItems}
