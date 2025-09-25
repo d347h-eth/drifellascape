@@ -653,48 +653,7 @@
     }
     .status { opacity: 0.8; font-size: 14px; padding: 8px 0 16px; }
     .error { color: #ff6b6b; }
-    /* Horizontal scroller */
-    .scroller {
-        display: flex;
-        flex-direction: row;
-        overflow-x: auto;
-        overflow-y: hidden;
-        /* No CSS snap; JS finalize on scroll-end */
-        scroll-behavior: auto;
-        height: 100vh;
-        box-sizing: border-box;
-    }
-    /* removed dynamic height for scroller; keep native scrollbar at bottom */
-    .slide {
-        flex: 0 0 100vw;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-start; /* top-align content, no gap at top */
-        padding: 0;
-        box-sizing: border-box;
-    }
-    .img-wrap { width: 100%; overflow: hidden; }
-    .img-button { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: transparent; cursor: zoom-in; outline: none; }
-    .img-button:focus, .img-button:focus-visible { outline: none; }
-    img.token {
-        display: block;
-        width: 100%;
-        max-width: 2560px;
-        height: auto;
-        margin: 0 auto;
-        object-fit: contain;
-    }
-    .meta { display: flex; align-items: center; justify-content: center; padding: 8px 0; font-size: 14px; }
-    .price,
-    .price-link {
-        font-variant-numeric: tabular-nums;
-    }
-    .price-link {
-        text-decoration: none; /* no underline */
-        color: inherit;       /* no visited color change */
-    }
-    .price-link:visited { color: inherit; }
+    /* Scroller styles moved into GalleryScroller.svelte */
     /* Edge click targets for prev/next */
     .edge { position: fixed; top: 0; height: 1087px; width: 6vw; min-width: 60px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
     .edge:focus, .edge:focus-visible { outline: none; }
@@ -706,18 +665,7 @@
     /* Help overlay */
     /* help overlay styles moved to components/HelpOverlay.svelte */
 
-    /* Trait bar overlay */
-    .purpose-dots {
-        position: fixed;
-        left: 0; right: 0; bottom: 82px; /* bar bottom 22 + bar height 50 + ~10px gap */
-        height: 22px;
-        display: flex; align-items: center; justify-content: center;
-        pointer-events: auto;
-        z-index: 9001;
-    }
-    .purpose-dot { cursor: pointer; margin: 0 6px; padding: 3px 8px; font-size: 12px; color: #cfcfd2; background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; }
-    .purpose-dot.active { color: #111; background: #e6e6e6; border-color: #e6e6e6; }
-    .purpose-dot.disabled { opacity: 0.35; cursor: default; }
+    /* Trait bar styles are scoped in TraitBar.svelte */
     .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
 
     /* Centered toggle button that follows the bar state */

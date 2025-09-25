@@ -151,6 +151,37 @@
 </div>
 
 <style>
-  /* Uses existing App styles for scroller/slide/img/meta classes */
+  .scroller {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: auto;
+    height: 100vh;
+    box-sizing: border-box;
+  }
+  .slide {
+    flex: 0 0 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  .img-wrap { width: 100%; overflow: hidden; }
+  .img-button { display: block; width: 100%; padding: 0; margin: 0; border: 0; background: transparent; cursor: zoom-in; outline: none; }
+  .img-button:focus, .img-button:focus-visible { outline: none; }
+  img.token {
+    display: block;
+    width: 100%;
+    max-width: 2560px;
+    height: auto;
+    margin: 0 auto;
+    object-fit: contain;
+  }
+  .meta { display: flex; align-items: center; justify-content: center; padding: 8px 0; font-size: 14px; }
+  .price, .price-link { font-variant-numeric: tabular-nums; }
+  .price-link { text-decoration: none; color: inherit; }
+  .price-link:visited { color: inherit; }
 </style>
-
