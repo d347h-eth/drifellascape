@@ -2,6 +2,7 @@
     import { onMount, tick } from "svelte";
     import ImageExplorer from "./ImageExplorer.svelte";
     import GalleryScroller from "./components/GalleryScroller.svelte";
+    import GridView from "./components/GridView.svelte";
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
@@ -27,6 +28,9 @@
     // Trait bar paging is encapsulated in TraitBar
     let selectedValueIds: Set<number> = new Set();
     let traitsForCurrent: ListingTrait[] = [];
+    // Grid mode state
+    let gridMode = false;
+    let gridTargetMint: string | null = null;
 
     // Horizontal scroller state (delegated to GalleryScroller)
     let activeIndex = 0; // nearest item to viewport center
@@ -127,6 +131,28 @@
                 showHelp = false;
                 return;
             }
+            // ESC in Gallery enters Grid (same as G)
+            if (!showHelp && (k === 'Escape' || k === 'Esc')) {
+                if (exploreIndex === null && !gridMode) {
+                    e.preventDefault();
+                    const it = currentItem();
+                    gridTargetMint = it?.token_mint_addr ?? null;
+                    gridMode = true;
+                    return;
+                }
+            }
+            // Enter grid mode from any mode — G
+            if (k === 'g' || k === 'G') {
+                e.preventDefault();
+                const it = currentItem();
+                gridTargetMint = it?.token_mint_addr ?? null;
+                if (exploreIndex !== null) {
+                    // Close exploration overlay before switching to grid
+                    closeExplore();
+                }
+                gridMode = true;
+                return;
+            }
             // Trait bar toggle (both modes) — V
             if (k === 'v' || k === 'V') {
                 e.preventDefault();
@@ -154,7 +180,7 @@
                 window.dispatchEvent(new CustomEvent('traitbar:pageNext'));
                 return;
             }
-            if (exploreIndex !== null) return;
+            if (exploreIndex !== null || gridMode) return;
             // Enter exploration for current token (gallery)
             if (k === 'w' || k === 'W') {
                 e.preventDefault();
@@ -181,7 +207,7 @@
             }
         };
         const onKeyUp = (e: KeyboardEvent) => {
-            if (exploreIndex !== null) return; // gallery only
+            if (exploreIndex !== null || gridMode) return; // gallery only
             const k = e.key;
             if (k === "ArrowLeft" || k === "a" || k === "A") {
                 e.preventDefault();
@@ -314,6 +340,16 @@
     function prevSlide() { scrollerRef?.prev?.(); }
     function nextSlide() { scrollerRef?.next?.(); }
     function focusCurrent() { scrollerRef?.focusCurrent?.(); }
+    async function openGalleryByMint(mint: string) {
+        const idx = items.findIndex((r) => r.token_mint_addr === mint);
+        const i = idx >= 0 ? idx : 0;
+        gridMode = false;
+        // Wait for gallery to mount and bind scrollerRef
+        await tick();
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        scrollerRef?.scrollToIndexInstant?.(i);
+        activeIndex = i;
+    }
 
     function openExploreByMint(mint: string) {
         exploreItems = items.slice(); // freeze current page order
@@ -401,22 +437,25 @@
 </style>
 
 <div class="container">
-    
+    {#if !gridMode}
+        <!-- Horizontal scroller -->
+        <!-- Gallery Scroller (extracted) -->
+        <GalleryScroller
+            bind:activeIndex
+            items={items}
+            motionEnabled={motionEnabled}
+            on:enterExplore={(e) => openExploreByMint(e.detail)}
+            on:imageLoad={recomputeEdgeHeight}
+            bind:this={scrollerRef}
+        />
 
-    <!-- Horizontal scroller -->
-    <!-- Gallery Scroller (extracted) -->
-    <GalleryScroller
-        bind:activeIndex
-        items={items}
-        motionEnabled={motionEnabled}
-        on:enterExplore={(e) => openExploreByMint(e.detail)}
-        on:imageLoad={recomputeEdgeHeight}
-        bind:this={scrollerRef}
-    />
-
-    <!-- Edge click targets for mouse-only navigation -->
-    <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-    <button type="button" class="edge right" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <!-- Edge click targets for mouse-only navigation -->
+        <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <button type="button" class="edge right" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+    {:else}
+        <!-- Grid mode (vertical) -->
+        <GridView items={items} targetMint={gridTargetMint} on:openGallery={(e) => openGalleryByMint(e.detail)} />
+    {/if}
 
     <!-- Hotkeys help overlay -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />

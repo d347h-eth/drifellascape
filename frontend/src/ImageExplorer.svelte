@@ -188,7 +188,7 @@
                 setViewRegionHeightAt(IMG_WIDTH / 2 + 980, REGION_TOP, REGION_HEIGHT, true);
                 return;
             }
-            if (k === "g" || k === "G") {
+            if (k === "o" || k === "O") {
                 e.preventDefault();
                 debug = !debug;
                 // Reuse on-mount helper to toggle debug rectangle

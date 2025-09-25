@@ -137,7 +137,14 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Fit 1006 px band (left/middle/right) — `1` / `2` / `3`
   - Region math: `IMG_WIDTH = 3125`, `IMG_HEIGHT = 1327`, `REGION_HEIGHT = 1006`, `REGION_TOP = (IMG_HEIGHT − 1006)/2 + 36`
   - Region zoom: `log2(containerHeight / REGION_HEIGHT) - epsilon`
-- Toggle debug overlay — `G` (cyan rectangle for the 1006 px band)
+- Toggle debug overlay — `O` (cyan rectangle for the 1006 px band)
+
+### Grid Mode
+
+- Activation — `G` from any mode.
+- Layout — 4 columns (25% width each), vertical scroll.
+- Click any image to return to the horizontal gallery centered on that token.
+- On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
 
 ### Image Swapping & Flicker Control
 

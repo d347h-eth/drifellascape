@@ -2,6 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import type { ListingRow } from '../lib/types';
   import { dbg } from '../debug';
+  import PriceTag from './PriceTag.svelte';
 
   export let items: ListingRow[] = [];
   export let motionEnabled: boolean = true;
@@ -138,15 +139,7 @@
     scrollerEl.scrollLeft += deltaY * wheelMultiplier;
   }
 
-  function marketplaceFor(src: string | undefined, mint: string): { href: string; title: string } | null {
-    if (!src) return null;
-    if (src === 'M2' || src === 'MMM' || src === 'M3' || src === 'HADESWAP_AMM') return { href: `https://magiceden.io/item-details/${mint}`, title: 'View on Magic Eden' };
-    if (src === 'TENSOR_LISTING' || src === 'TENSOR_CNFT_LISTING' || src === 'TENSOR_MARKETPLACE_LISTING' || src === 'TENSOR_AMM' || src === 'TENSOR_AMM_V2') return { href: `https://tensor.trade/item/${mint}`, title: 'View on Tensor' };
-    return null;
-  }
-  function ceilDiv(n: number, d: number) { return Math.floor((n + d - 1) / d); }
-  function priceWithFees(nominalLamports: number): number { const maker = ceilDiv(nominalLamports * 2, 100); const royalty = ceilDiv(nominalLamports * 5, 100); return nominalLamports + maker + royalty; }
-  function formatSol(raw: number): string { const sol = raw / 1_000_000_000; const up = Math.ceil(sol * 100) / 100; return up.toFixed(2); }
+  // pricing/link logic moved into PriceTag component
 
   onMount(() => {
     scrollerEl?.addEventListener('pointerdown', onPointerDown, { passive: true });
@@ -157,7 +150,6 @@
 
 <div bind:this={scrollerEl} class="scroller" on:scroll={handleScroll} on:wheel={handleWheel}>
   {#each items as it (it.token_mint_addr)}
-    {@const m = marketplaceFor(it.listing_source, it.token_mint_addr)}
     <section class="slide" aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
       <div class="img-wrap">
         <button type="button" class="img-button" aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`} on:click={() => dispatch('enterExplore', it.token_mint_addr)}>
@@ -165,11 +157,7 @@
         </button>
       </div>
       <div class="meta">
-        {#if m}
-          <a class="price-link" href={m.href} target="_blank" rel="noopener noreferrer" title={m.title}>{formatSol(priceWithFees(it.price))} SOL</a>
-        {:else}
-          <span class="price">{formatSol(priceWithFees(it.price))} SOL</span>
-        {/if}
+        <PriceTag price={it.price} listingSource={it.listing_source} mint={it.token_mint_addr} />
       </div>
     </section>
   {/each}

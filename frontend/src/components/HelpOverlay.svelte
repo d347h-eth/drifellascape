@@ -14,6 +14,7 @@
         <li>Previous/Next image — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
         <li>Focus current — <span class="kbd">F</span></li>
         <li>Enter exploration — <span class="kbd">W</span></li>
+        <li>Enter grid view — <span class="kbd">G</span> or <span class="kbd">Esc</span></li>
         <li>Toggle motion — <span class="kbd">M</span></li>
         <li>Toggle trait bar — <span class="kbd">V</span></li>
         <li>Purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
@@ -31,7 +32,7 @@
         <li>Fit entire height (middle/left/right) — <span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span></li>
         <li>Fit 1006px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>
         <li>Reset to fit‑by‑width — Double‑click</li>
-        <li>Toggle debug overlay — <span class="kbd">G</span></li>
+        <li>Toggle debug overlay — <span class="kbd">O</span></li>
       </ul>
     </div>
   </div>
@@ -64,4 +65,3 @@
   .help-panel li { margin: 4px 0; }
   .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #1b1b1d; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 6px; }
 </style>
-

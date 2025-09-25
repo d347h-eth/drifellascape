@@ -40,6 +40,7 @@
 - Previous/Next image — Left/Right or `A`/`D`
 - Focus current — `F`
 - Enter exploration — `W`
+- Enter grid view — `G` or `Esc`
 - Toggle motion — `M`
 - Toggle trait bar — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
@@ -56,7 +57,7 @@
 - Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
 - Fit 1006 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1006)/2 + 36`)
 - Reset to fit‑by‑width — Double‑click
-- Toggle debug overlay — `G`
+- Toggle debug overlay — `O`
 
 ## Env Vars
 
