@@ -271,52 +271,7 @@
 
     // --- Horizontal browsing helpers ---
 
-    function formatSol(raw: number): string {
-        const sol = raw / 1_000_000_000;
-        // Round up to 2 decimals
-        const up = Math.ceil(sol * 100) / 100;
-        return up.toFixed(2);
-    }
-
-    // Integer arithmetic helpers for fees
-    function ceilDiv(n: number, d: number): number {
-        return Math.floor((n + d - 1) / d);
-    }
-
-    // Returns nominal + maker(2%) + royalty(5%), each fee based on nominal price
-    function priceWithFees(nominalLamports: number): number {
-        const maker = ceilDiv(nominalLamports * 2, 100); // 2%
-        const royalty = ceilDiv(nominalLamports * 5, 100); // 5%
-        return nominalLamports + maker + royalty;
-    }
-
-    function marketplaceFor(
-        src: string | undefined,
-        mint: string,
-    ): { href: string; title: string } | null {
-        if (!src) return null;
-        // Magic Eden sources
-        if (src === "M2" || src === "MMM" || src === "M3" || src === "HADESWAP_AMM") {
-            return {
-                href: `https://magiceden.io/item-details/${mint}`,
-                title: "View on Magic Eden",
-            };
-        }
-        // Tensor sources
-        if (
-            src === "TENSOR_LISTING" ||
-            src === "TENSOR_CNFT_LISTING" ||
-            src === "TENSOR_MARKETPLACE_LISTING" ||
-            src === "TENSOR_AMM" ||
-            src === "TENSOR_AMM_V2"
-        ) {
-            return {
-                href: `https://tensor.trade/item/${mint}`,
-                title: "View on Tensor",
-            };
-        }
-        return null;
-    }
+    // Utilities moved inside GalleryScroller
 
     // --- Trait bar helpers ---
     function currentItem(): ListingRow | null {

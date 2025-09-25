@@ -1,8 +1,9 @@
 <script lang="ts">
   export let show = false;
   export let onToggle: (() => void) | undefined;
-  // Bottom offset: 22 when hidden (above native scrollbar), ~110 when bar is shown (above pills)
-  $: bottom = show ? 110 : 22;
+  import { SCROLLBAR_GAP, PURPOSE_DOTS_BOTTOM, TOGGLE_OVER_DOTS_OFFSET } from '../../lib/ui-constants';
+  // Bottom offset: SCROLLBAR_GAP when hidden; over pills when bar is shown
+  $: bottom = show ? (PURPOSE_DOTS_BOTTOM + TOGGLE_OVER_DOTS_OFFSET) : SCROLLBAR_GAP;
 </script>
 
 <button
@@ -32,4 +33,3 @@
   .trait-toggle-btn:hover { background: rgba(255,255,255,0.10); }
   .trait-toggle-btn:focus, .trait-toggle-btn:focus-visible { outline: none; box-shadow: none; }
 </style>
-

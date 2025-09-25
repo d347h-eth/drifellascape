@@ -78,7 +78,8 @@ frontend/src/
   - Extract `HelpOverlay.svelte` and `TraitBar/ToggleButton.svelte`; wire props/events; remove inline CSS.
 
 - [x] PR2: TraitBar split
-- [x] PR3: GalleryScroller extraction (initial) — scroller logic/component extracted; scroller CSS moved; methods exposed; next: optional scrollSnap action
+- [x] PR3: GalleryScroller extraction — scroller logic/component extracted; scroller CSS moved; methods exposed. Optional: extract snap logic to a `useSnap` action (defer if not needed).
+- [x] PR4: Cleanup & constants — added `lib/ui-constants.ts`; removed dead helpers from App; moved scroller CSS; formalized trait bar numbers in code.
   - Extract `TraitBar.svelte`, `PurposePills.svelte`, `TraitStrip.svelte`.
   - Move counts and fixed paging inside; emit `toggleValue` and `purposeChange`; App forwards to API/stores.
 

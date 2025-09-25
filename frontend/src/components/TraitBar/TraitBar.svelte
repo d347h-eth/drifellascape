@@ -27,8 +27,7 @@
   // Paging state (fixed page size)
   let visibleTraitSlots = 0;
   let traitBarOffset = 0;
-  const BOX_W = 150;
-  const ARROWS_W = 100; // two 50px pads
+  import { TRAIT_BOX_WIDTH as BOX_W, TRAIT_ARROW_PAD_TOTAL as ARROWS_W } from '../../lib/ui-constants';
 
   function recomputeVisibleTraitSlots() {
     const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
