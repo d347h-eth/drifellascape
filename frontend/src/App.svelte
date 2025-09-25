@@ -613,9 +613,11 @@
             scrollerEl.scrollLeft += e.deltaY * WHEEL_MULTIPLIER;
         }
     }
-    function prevSlide() { scrollToIndex(activeIndex - 1); }
-    function nextSlide() { scrollToIndex(activeIndex + 1); }
-    function focusCurrent() { scrollToIndex(nearestIndex()); }
+    // Methods now provided by GalleryScroller via scrollerRef
+    let scrollerRef: any = null;
+    function prevSlide() { scrollerRef?.prev?.(); }
+    function nextSlide() { scrollerRef?.next?.(); }
+    function focusCurrent() { scrollerRef?.focusCurrent?.(); }
 
     function openExploreByMint(mint: string) {
         exploreItems = items.slice(); // freeze current page order
@@ -743,38 +745,14 @@
     
 
     <!-- Horizontal scroller -->
-    <div bind:this={scrollerEl} class="scroller" on:scroll={handleScroll} on:wheel={handleWheel}>
-        {#each items as it, idx (it.token_mint_addr)}
-            {@const m = marketplaceFor(it.listing_source, it.token_mint_addr)}
-            <section class="slide" aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
-                <div class="img-wrap">
-                    <button
-                        type="button"
-                        class="img-button"
-                        aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`}
-                        on:click={() => openExploreByMint(it.token_mint_addr)}
-                    >
-                        <img
-                            class="token"
-                            src={`/2560/${it.token_mint_addr}.jpg`}
-                            alt={`Token ${it.token_num ?? it.token_mint_addr}`}
-                            loading="lazy"
-                            decoding="async"
-                        />
-                    </button>
-                </div>
-                <div class="meta">
-                    {#if m}
-                        <a class="price-link" href={m.href} target="_blank" rel="noopener noreferrer" title={m.title}>
-                            {formatSol(priceWithFees(it.price))} SOL
-                        </a>
-                    {:else}
-                        <span class="price">{formatSol(priceWithFees(it.price))} SOL</span>
-                    {/if}
-                </div>
-            </section>
-        {/each}
-    </div>
+    <!-- Gallery Scroller (extracted) -->
+    <GalleryScroller
+        bind:activeIndex
+        items={items}
+        motionEnabled={motionEnabled}
+        on:enterExplore={(e) => openExploreByMint(e.detail)}
+        bind:this={scrollerRef}
+    />
 
     <!-- Edge click targets for mouse-only navigation -->
     <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel={handleWheel}></button>
