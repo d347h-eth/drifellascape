@@ -7,6 +7,9 @@
     export let onPrev: (() => void) | undefined;
     export let onNext: (() => void) | undefined;
     export let maxZoomFactor: number = 8; // 8x over fit-to-view (one more step from previous)
+    // When entering from gallery, keep the gallery visible (no black backdrop)
+    // until the full-res image finishes first load. Spinner shows meanwhile.
+    export let transparentUntilFirstLoad: boolean = true;
 
     const IMG_WIDTH = 3125;
     const IMG_HEIGHT = 1327;
@@ -26,6 +29,8 @@
     let resizeHandler: (() => void) | null = null;
     let debug = false;
     let debugRect: any = null;
+    let firstLoadDone = false;
+    let swapToken = 0;
 
     function lockScroll(lock: boolean) {
         if (typeof document === "undefined") return;
@@ -124,13 +129,18 @@
             wheelDebounceTime: 0,
             wheelPxPerZoomLevel: 480,
         });
+        // Backdrop: keep transparent before first image load (spinner over gallery)
         if (mapEl) {
-            mapEl.style.background = "#000";
+            mapEl.style.background = transparentUntilFirstLoad ? "transparent" : "#000";
         }
-        overlay = L.imageOverlay(url, bounds, { interactive: false }).addTo(map);
+        // Start with hidden overlay; fade in on 'load'
+        overlay = L.imageOverlay(url, bounds, { interactive: false, opacity: 0 }).addTo(map);
         overlay.on("load", () => {
             loading = false;
+            firstLoadDone = true;
             try { overlay.setOpacity(1); } catch {}
+            // After first load, ensure backdrop is solid for subsequent swaps
+            if (mapEl) mapEl.style.background = "#000";
         });
         map.invalidateSize(false);
         // Fit-by-width and snap to integer zoom levels
@@ -255,15 +265,43 @@
     });
 
     // Swap image URL when prop changes; reset to fit-by-width centered.
-    // To avoid flicker, hide current overlay (opacity 0) before repositioning and swapping URL.
+    // For first entry: keep overlay hidden (spinner over gallery) until first load completes.
+    // For next/prev: preload the new image first while keeping the current image visible, then swap instantly.
     $: if (overlay && url && url !== currentUrl) {
         loading = true;
         currentUrl = url;
         try {
-            if (map) setViewFitWidthCentered(false);
-            try { overlay.setOpacity(0); } catch {}
-            overlay.setUrl(url);
+            if (!firstLoadDone) {
+                // Initial entry: overlay starts hidden; swap URL and let on('load') reveal it
+                if (map) setViewFitWidthCentered(false);
+                overlay.setUrl(url);
+            } else {
+                // Subsequent swaps: preload image, keep showing current image with spinner, then swap instantly
+                const token = ++swapToken;
+                const img = new Image();
+                // Hint to decode off-main-thread when possible
+                try { (img as any).decoding = 'async'; } catch {}
+                img.onload = () => {
+                    if (token !== swapToken) return; // superseded by a newer navigation
+                    try { if (map) setViewFitWidthCentered(false); } catch {}
+                    try { overlay.setUrl(url); } catch {}
+                    // overlay 'load' handler will clear spinner
+                };
+                img.onerror = () => {
+                    if (token !== swapToken) return;
+                    // Fallback: swap immediately if preload fails
+                    try { if (map) setViewFitWidthCentered(false); } catch {}
+                    try { overlay.setUrl(url); } catch {}
+                };
+                img.src = url;
+            }
         } catch {}
+    }
+
+    // Keep backdrop transparent only before the first image is loaded when configured
+    $: if (mapEl) {
+        const preload = transparentUntilFirstLoad && !firstLoadDone && loading;
+        mapEl.style.background = preload ? "transparent" : "#000";
     }
 </script>
 
@@ -272,7 +310,7 @@
         position: fixed;
         inset: 0;
         z-index: 1000;
-        background: #000; /* pure full-screen canvas */
+        background: #000; /* becomes transparent during initial preload */
     }
     .map {
         position: absolute;
@@ -281,6 +319,9 @@
     :global(.leaflet-container) {
         background: #000;
     }
+    /* While preloading the first image, keep backdrop transparent to reveal gallery */
+    .overlay.preload { background: transparent; }
+    .overlay.preload :global(.leaflet-container) { background: transparent !important; }
     /* Prefer sharp sampling to reduce blur during scaling */
     :global(.leaflet-image-layer) {
         image-rendering: -webkit-optimize-contrast; /* Chrome */
@@ -365,7 +406,7 @@
     }
 </style>
 
-<div class="overlay" role="dialog" aria-modal="true">
+<div class="overlay" class:preload={(transparentUntilFirstLoad && !firstLoadDone && loading)} role="dialog" aria-modal="true">
     <div bind:this={mapEl} class="map" />
     <button class="close" title="Close (Esc)" on:click={() => onClose?.()}>✕</button>
     {#if onPrev}

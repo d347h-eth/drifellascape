@@ -319,8 +319,19 @@
         exploreItems = items.slice(); // freeze current page order
         const idx = exploreItems.findIndex((r) => r.token_mint_addr === mint);
         exploreIndex = idx >= 0 ? idx : 0;
+        // Keep gallery in sync with the entered token so exiting lands on it
+        if (idx >= 0) {
+            scrollerRef?.scrollToIndexInstant?.(idx);
+            activeIndex = idx;
+        }
     }
     function closeExplore() {
+        // On exit, land the gallery on the last explored token
+        if (exploreIndex !== null) {
+            const idx = exploreIndex;
+            scrollerRef?.scrollToIndexInstant?.(idx);
+            activeIndex = idx;
+        }
         exploreIndex = null;
         exploreItems = null;
     }
@@ -328,14 +339,22 @@
     function navigatePrev() {
         if (exploreItems && exploreIndex !== null) {
             if (exploreIndex > 0) {
-                exploreIndex = exploreIndex - 1;
+                const nextIdx = exploreIndex - 1;
+                exploreIndex = nextIdx;
+                // Keep gallery position synchronized behind the overlay
+                scrollerRef?.scrollToIndexInstant?.(nextIdx);
+                activeIndex = nextIdx;
             }
         }
     }
     function navigateNext() {
         if (exploreItems && exploreIndex !== null) {
             if (exploreIndex < exploreItems.length - 1) {
-                exploreIndex = exploreIndex + 1;
+                const nextIdx = exploreIndex + 1;
+                exploreIndex = nextIdx;
+                // Keep gallery position synchronized behind the overlay
+                scrollerRef?.scrollToIndexInstant?.(nextIdx);
+                activeIndex = nextIdx;
             }
         }
     }
