@@ -10,6 +10,9 @@ import {
     searchListingsByTraits,
     searchListingsByValues,
     attachTraits,
+    searchTokensByTraits,
+    searchTokensByValues,
+    attachTraitsGeneric,
 } from "./repo.js";
 
 function getEnvPort(): number {
@@ -156,6 +159,67 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
+function normalizeTokenSort(raw: string | undefined): string {
+    const s = (raw || "token_asc").toLowerCase();
+    if (s === "token_desc") return "token_desc";
+    return "token_asc"; // default, and fallback for price_* etc.
+}
+
+async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
+    try {
+        const raw = await readBody(req);
+        let body: ListingsSearchBody;
+        try {
+            body = raw ? (JSON.parse(raw) as ListingsSearchBody) : ({} as any);
+        } catch {
+            return sendJson(res, 400, { error: "Invalid JSON" });
+        }
+        const sort = normalizeTokenSort(body.sort);
+        const offset = clamp(Number(body.offset) || 0, 0, 1_000_000);
+        // Tokens endpoint is capped at 100 to keep payload reasonable
+        const limit = clamp(Number(body.limit) || 100, 1, 100);
+        const mode = (body.mode || "value").toLowerCase();
+        const includeTraits = body.includeTraits !== false; // default true
+
+        if (mode === "trait") {
+            const groups = sanitizeGroups(body.traits);
+            const { total, items } = searchTokensByTraits(
+                groups,
+                sort,
+                offset,
+                limit,
+            );
+            const enriched = includeTraits ? attachTraitsGeneric(items) : items;
+            return sendJson(res, 200, {
+                versionId: null,
+                total,
+                offset,
+                limit,
+                sort,
+                items: enriched,
+            });
+        }
+        const valueIds = sanitizeIds(body.valueIds);
+        const { total, items } = searchTokensByValues(
+            valueIds,
+            sort,
+            offset,
+            limit,
+        );
+        const enriched = includeTraits ? attachTraitsGeneric(items) : items;
+        return sendJson(res, 200, {
+            versionId: null,
+            total,
+            offset,
+            limit,
+            sort,
+            items: enriched,
+        });
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
 function route(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
@@ -163,6 +227,8 @@ function route(req: IncomingMessage, res: ServerResponse) {
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))
         return void handleListingsSearch(req, res);
+    if (req.method === "POST" && url.startsWith("/tokens/search"))
+        return void handleTokensSearch(req, res);
     // minimal not-found
     sendJson(res, 404, { error: "Not found" });
 }
