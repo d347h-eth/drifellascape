@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import type { ListingRow } from '../lib/types';
+  import type { Row } from '../lib/types';
   import PriceTag from './PriceTag.svelte';
 
-  export let items: ListingRow[] = [];
+  export let items: Row[] = [];
   export let targetMint: string | null = null;
   // Beat 3 times; 1.25s → 1.875s per beat → total ≈ 5625ms
   export let flashDurationMs: number = 5625;
@@ -34,6 +34,11 @@
   function handleClick(mint: string) {
     dispatch('openGallery', mint);
   }
+
+  // Helpers for union Row type
+  function getPrice(r: Row): number | undefined { return (r as any)?.price; }
+  function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
+  function hasPrice(r: Row): boolean { const p = (r as any)?.price; return typeof p === 'number' && Number.isFinite(p); }
 </script>
 
 <style>
@@ -105,9 +110,11 @@
       <button type="button" aria-label={`Open ${it.token_num ?? it.token_mint_addr} in gallery`} on:click={() => handleClick(it.token_mint_addr)}>
         <img class="img" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" />
       </button>
-      <div class="price-tab">
-        <PriceTag price={it.price} listingSource={it.listing_source} mint={it.token_mint_addr} />
-      </div>
+      {#if hasPrice(it)}
+        <div class="price-tab">
+          <PriceTag price={getPrice(it)} listingSource={getSource(it)} mint={it.token_mint_addr} />
+        </div>
+      {/if}
     </div>
   {/each}
   {#if items.length === 0}

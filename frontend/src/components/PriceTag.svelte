@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let price: number; // raw lamports (SOL 9dp)
+  export let price: number | undefined; // raw lamports (SOL 9dp)
   export let listingSource: string | undefined;
   export let mint: string;
 
@@ -21,13 +21,16 @@
     return up.toFixed(2);
   }
   $: m = marketplaceFor(listingSource, mint);
-  $: label = `${formatSol(priceWithFees(price))} SOL`;
+  $: show = typeof price === 'number' && Number.isFinite(price as any);
+  $: label = show ? `${formatSol(priceWithFees(price as number))} SOL` : '';
 </script>
 
-{#if m}
-  <a class="price-link" href={m.href} target="_blank" rel="noopener noreferrer" title={m.title}>{label}</a>
-{:else}
-  <span class="price">{label}</span>
+{#if show}
+  {#if m}
+    <a class="price-link" href={m.href} target="_blank" rel="noopener noreferrer" title={m.title}>{label}</a>
+  {:else}
+    <span class="price">{label}</span>
+  {/if}
 {/if}
 
 <style>
@@ -36,4 +39,3 @@
   .price-link:visited { color: inherit; }
   .price { opacity: 0.9; }
 </style>
-

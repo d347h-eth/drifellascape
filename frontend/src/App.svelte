@@ -6,20 +6,20 @@
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearchListings } from "./lib/api";
-    import type { ListingRow, ListingTrait } from "./lib/types";
+    import { postSearchListings, postSearchTokens } from "./lib/api";
+    import type { Row, ListingTrait } from "./lib/types";
 
     // Types moved to lib/types.ts
 
-    let items: ListingRow[] = [];
+    let items: Row[] = [];
     let versionId: number | null = null;
     // Staged data waiting for user to scroll to top
-    let stagedItems: ListingRow[] | null = null;
+    let stagedItems: Row[] | null = null;
     let stagedVersionId: number | null = null;
     let loading = true;
     let error: string | null = null;
     let exploreIndex: number | null = null;
-    let exploreItems: ListingRow[] | null = null;
+    let exploreItems: Row[] | null = null;
     let showHelp = false;
     let showTraitBar = false;
     const PURPOSE_CLASSES = ["left", "middle", "right", "decor", "items", "special", "undefined"] as const;
@@ -29,7 +29,7 @@
     let selectedValueIds: Set<number> = new Set();
     let traitsForCurrent: ListingTrait[] = [];
     // Grid mode state
-    let gridMode = false;
+    let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
 
     // Horizontal scroller state (delegated to GalleryScroller)
@@ -52,18 +52,17 @@
         }
     }
 
-    async function loadListings() {
+    type DataSource = 'listings' | 'tokens';
+    let dataSource: DataSource = 'listings';
+
+    async function loadListings() { // existing name kept, behavior depends on dataSource
         loading = true;
         error = null;
         try {
-            const data = await postSearchListings({
-                mode: "value",
-                valueIds: [],
-                sort: "price_asc",
-                offset: 0,
-                limit: 100,
-                includeTraits: true,
-            });
+            const common = { mode: "value" as const, valueIds: [], offset: 0, limit: 100, includeTraits: true };
+            const data = dataSource === 'listings'
+                ? await postSearchListings({ ...common, sort: 'price_asc' })
+                : await postSearchTokens({ ...common, sort: 'token_asc' });
             items = data.items ?? [];
             versionId = data.versionId ?? null;
         } catch (e: any) {
@@ -93,14 +92,8 @@
 
     async function pollForUpdates() {
         try {
-            const data = await postSearchListings({
-                mode: "value",
-                valueIds: [],
-                sort: "price_asc",
-                offset: 0,
-                limit: 100,
-                includeTraits: true,
-            });
+            if (dataSource !== 'listings') return; // tokens are static; skip polling
+            const data = await postSearchListings({ mode: "value", valueIds: [], sort: "price_asc", offset: 0, limit: 100, includeTraits: true });
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
                 stagedVersionId = data.versionId;
@@ -151,6 +144,16 @@
                     closeExplore();
                 }
                 gridMode = true;
+                return;
+            }
+            // Toggle data source — T (listings <-> tokens)
+            if (k === 't' || k === 'T') {
+                e.preventDefault();
+                const cur = currentItem();
+                gridTargetMint = cur?.token_mint_addr ?? null;
+                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+                // Reload with current filters and try to keep focus by mint
+                applyValueFilterAndFetch();
                 return;
             }
             // Trait bar toggle (both modes) — V
@@ -231,7 +234,7 @@
     // Utilities moved inside GalleryScroller
 
     // --- Trait bar helpers ---
-    function currentItem(): ListingRow | null {
+    function currentItem(): Row | null {
         if (exploreIndex !== null && exploreItems) return exploreItems[exploreIndex] || null;
         return items[activeIndex] || null;
     }
@@ -260,14 +263,10 @@
                 beforeScrollLeft,
                 beforeClientWidth,
             });
-            const data = await postSearchListings({
-                mode: 'value',
-                valueIds: Array.from(selectedValueIds),
-                sort: 'price_asc',
-                offset: 0,
-                limit: 100,
-                includeTraits: true,
-            });
+            const body = { mode: 'value' as const, valueIds: Array.from(selectedValueIds), offset: 0, limit: 100, includeTraits: true };
+            const data = dataSource === 'listings'
+                ? await postSearchListings({ ...body, sort: 'price_asc' })
+                : await postSearchTokens({ ...body, sort: 'token_asc' });
             const newItems = data.items ?? [];
             items = newItems;
             versionId = data.versionId ?? null;
@@ -443,6 +442,7 @@
         <GalleryScroller
             bind:activeIndex
             items={items}
+            showMeta={dataSource === 'listings'}
             motionEnabled={motionEnabled}
             on:enterExplore={(e) => openExploreByMint(e.detail)}
             on:imageLoad={recomputeEdgeHeight}
