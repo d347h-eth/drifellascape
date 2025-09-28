@@ -47,8 +47,9 @@ function parseCsvLine(line: string): [string, string] | null {
     return [left, right];
 }
 
-async function loadMintToImageMap(): Promise<Map<string, string>> {
-    const map = new Map<string, string>(); // image_url -> token_mint_addr
+// Build a mapping from image_url -> queue of mints (to handle duplicate images)
+async function loadImageToMintsMap(): Promise<Map<string, string[]>> {
+    const map = new Map<string, string[]>(); // image_url -> [token_mint_addr]
     const buf = await fs.readFile(CSV_PATH, "utf8");
     const lines = buf.split(/\r?\n/);
     for (const line of lines) {
@@ -56,7 +57,9 @@ async function loadMintToImageMap(): Promise<Map<string, string>> {
         if (!parsed) continue;
         const [mint, image] = parsed;
         if (mint && image) {
-            map.set(image, mint);
+            const arr = map.get(image) || [];
+            arr.push(mint);
+            map.set(image, arr);
         }
     }
     return map;
@@ -72,7 +75,7 @@ async function readJson(filePath: string): Promise<any | null> {
     }
 }
 
-async function collectTokens(mapImageToMint: Map<string, string>): Promise<{
+async function collectTokens(mapImageToMints: Map<string, string[]>): Promise<{
     tokens: TokenTraits[];
     missingMap: number;
     missingFiles: number;
@@ -100,7 +103,12 @@ async function collectTokens(mapImageToMint: Map<string, string>): Promise<{
             await logLine(`No image URL in metadata ${id}.json`);
             continue;
         }
-        const mint = mapImageToMint.get(image);
+        const mints = mapImageToMints.get(image) || [];
+        const mint = mints.shift();
+        if (mint) {
+            // Persist the shift so the next identical image maps to the next mint
+            mapImageToMints.set(image, mints);
+        }
         if (!mint) {
             missingMap++;
             await logLine(
@@ -261,8 +269,8 @@ async function main() {
     await initializeDatabase();
     await logLine("Traits ingest started");
 
-    const map = await loadMintToImageMap();
-    await logLine(`Loaded CSV mappings: ${map.size}`);
+    const map = await loadImageToMintsMap();
+    await logLine(`Loaded CSV mappings (images -> mints): ${map.size}`);
 
     const { tokens, missingMap, missingFiles } = await collectTokens(map);
     await logLine(
