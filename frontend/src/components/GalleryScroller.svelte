@@ -10,6 +10,11 @@
   export let leaveThresholdFrac: number = 0.5;
   export let wheelMultiplier: number = 1.5;
   export let activeIndex: number = 0; // bindable
+  // Gallery infinite scroll (near-edge prefetch)
+  export let galleryPagingEnabled: boolean = false;
+  export let edgePrefetchThreshold: number = 3;
+  const PREFETCH_COOLDOWN_MS = 600;
+  let lastPrefetchAt = 0;
 
   const dispatch = createEventDispatcher();
 
@@ -42,7 +47,7 @@
       const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       scrollerEl.scrollLeft = start + (left - start) * eased;
       if (t < 1) animReq = requestAnimationFrame(step);
-      else { isAnimating = false; lastSnapIndex = idxToSet; activeIndex = idxToSet; }
+      else { isAnimating = false; lastSnapIndex = idxToSet; activeIndex = idxToSet; maybeEdgePrefetch(); }
     };
     animReq = requestAnimationFrame(step);
   }
@@ -55,6 +60,36 @@
   export function next() { scrollToIndex(activeIndex + 1); }
   export function focusCurrent() { scrollToIndex(nearestIndex()); }
   export function scrollToIndexInstant(i: number) { scrollToIndex(i, false, true); }
+  // Shift viewport by whole-slide widths to preserve the centered slide
+  export function shiftBySlides(n: number) {
+    if (!scrollerEl || !Number.isFinite(n) || n === 0) return;
+    const cw = scrollerEl.clientWidth || 1;
+    scrollerEl.scrollLeft += n * cw;
+    lastSnapIndex = Math.max(0, Math.min(items.length - 1, lastSnapIndex + n));
+    activeIndex = Math.max(0, Math.min(items.length - 1, activeIndex + n));
+    // Suppress finalize/snap briefly to avoid fighting the programmatic shift
+    suppressFinalizeUntilTs = Date.now() + 300;
+    blockUntilTs = Date.now() + 150;
+  }
+  export function getSlideRectByMint(mint: string): DOMRect | null {
+    if (!scrollerEl || !mint) return null;
+    const el = scrollerEl.querySelector<HTMLElement>(`#slide-${mint}`);
+    return el?.getBoundingClientRect() ?? null;
+  }
+  export function scrollByPixels(dx: number) {
+    if (!scrollerEl || !Number.isFinite(dx) || dx === 0) return;
+    scrollerEl.scrollLeft += dx;
+    suppressFinalizeUntilTs = Date.now() + 300;
+    blockUntilTs = Date.now() + 150;
+  }
+  // Rebase internal indices after items were prepended externally
+  export function rebaseAfterPrepend(added: number) {
+    if (!Number.isFinite(added) || added <= 0) return;
+    lastSnapIndex = clamp(lastSnapIndex + added, 0, Math.max(0, items.length - 1));
+    activeIndex = clamp(activeIndex + added, 0, Math.max(0, items.length - 1));
+    suppressFinalizeUntilTs = Date.now() + 300;
+    blockUntilTs = Date.now() + 150;
+  }
 
   function scrollToIndex(i: number, autoSnap = false, forceInstant = false) {
     if (!scrollerEl) return;
@@ -114,6 +149,7 @@
     if (draggingScrollbar) return;
     if (scrollEndTimer) clearTimeout(scrollEndTimer);
     scrollEndTimer = setTimeout(() => finalizeDirectionalSnapIdle(), FINALIZE_DELAY_MS);
+    maybeEdgePrefetch();
   }
   function onPointerDown(e: PointerEvent) {
     if (!scrollerEl) return;
@@ -150,11 +186,23 @@
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
   });
+
+  function maybeEdgePrefetch() {
+    if (!galleryPagingEnabled) return;
+    if (!items || items.length === 0) return;
+    const now = Date.now();
+    if (now - lastPrefetchAt < PREFETCH_COOLDOWN_MS) return;
+    if (isAnimating || draggingScrollbar) return;
+    const leftRem = activeIndex;
+    const rightRem = Math.max(0, items.length - 1 - activeIndex);
+    if (leftRem <= edgePrefetchThreshold) { lastPrefetchAt = now; dispatch('loadPrev'); return; }
+    if (rightRem <= edgePrefetchThreshold) { lastPrefetchAt = now; dispatch('loadMore'); return; }
+  }
 </script>
 
 <div bind:this={scrollerEl} class="scroller" on:scroll={handleScroll} on:wheel={handleWheel}>
   {#each items as it (it.token_mint_addr)}
-    <section class="slide" aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
+    <section class="slide" id={`slide-${it.token_mint_addr}`} aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
       <div class="img-wrap">
         <button type="button" class="img-button" aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`} on:click={() => dispatch('enterExplore', it.token_mint_addr)}>
           <img class="token" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />

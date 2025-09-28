@@ -292,6 +292,8 @@
             // Determine when to use anchor: in Gallery/Explore always; in Grid only if armed
             const inExploreOrGallery = (exploreIndex !== null) || (!gridMode);
             const anchorMintToUse: string | undefined = selectAnchorMint(gridMode, inExploreOrGallery, curMint);
+            // Disarm gallery paging around filter transitions to avoid immediate edge prefetch
+            galleryPagingArmed = false;
             const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: anchorMintToUse, offset: 0 });
             const data = await postSearch(dataSource, body);
             let newItems = data.items ?? [];
@@ -398,10 +400,29 @@
         }
         _prevGridMode = gridMode;
     }
+    // Gallery paging arming (separate from Grid)
+    let galleryPagingArmed = false;
+    let _prevExploreIndex: number | null = exploreIndex;
+    let _prevGalleryMode = !gridMode && exploreIndex === null;
+    $: {
+        const isGallery = !gridMode && exploreIndex === null;
+        if (isGallery !== _prevGalleryMode) {
+            if (isGallery) galleryPagingArmed = false; // entering gallery: require user interaction
+            _prevGalleryMode = isGallery;
+        }
+        if (exploreIndex !== _prevExploreIndex) {
+            if (exploreIndex !== null) galleryPagingArmed = false; // disarm when entering explore
+            _prevExploreIndex = exploreIndex;
+        }
+    }
     if (typeof window !== 'undefined') {
-        window.addEventListener('wheel', () => { pagingArmed = true; }, { passive: true });
-        window.addEventListener('pointerdown', () => { pagingArmed = true; }, { passive: true });
-        window.addEventListener('keydown', () => { pagingArmed = true; });
+        const arm = () => {
+            if (gridMode) pagingArmed = true;
+            else if (!gridMode && exploreIndex === null) galleryPagingArmed = true;
+        };
+        window.addEventListener('wheel', arm, { passive: true });
+        window.addEventListener('pointerdown', arm, { passive: true });
+        window.addEventListener('keydown', arm);
     }
     async function loadMoreGrid() {
         if (!gridMode) return;
@@ -453,6 +474,51 @@
             }
         } catch (e) {
             // ignore
+        } finally {
+            isLoadingPrev = false;
+        }
+    }
+
+    // --- Gallery near-edge paging ---
+    async function handleLoadMoreGallery() {
+        if (gridMode || exploreIndex !== null) return;
+        if (isLoadingMore) return;
+        const mint = items[activeIndex]?.token_mint_addr;
+        if (!mint) return;
+        isLoadingMore = true;
+        const session = pagingSession;
+        try {
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const data = await postSearch(dataSource, body);
+            if (session !== pagingSession || gridMode || exploreIndex !== null) return;
+            items = data.items ?? [];
+            baseOffset = Number(data.offset || 0);
+            total = Number(data.total || 0);
+            const found = items.findIndex(r => r.token_mint_addr === mint);
+            if (found >= 0) scrollerRef?.scrollToIndexInstant?.(found);
+        } finally {
+            isLoadingMore = false;
+        }
+    }
+
+    async function handleLoadPrevGallery() {
+        if (gridMode || exploreIndex !== null) return;
+        if (isLoadingPrev) return;
+        const newOffset = Math.max(0, baseOffset - 100);
+        if (newOffset === baseOffset) return;
+        isLoadingPrev = true;
+        const session = pagingSession;
+        try {
+            const mint = items[activeIndex]?.token_mint_addr;
+            if (!mint) return;
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const data = await postSearch(dataSource, body);
+            if (session !== pagingSession || gridMode || exploreIndex !== null) return;
+            items = data.items ?? [];
+            baseOffset = Number(data.offset || 0);
+            total = Number(data.total || 0);
+            const found = items.findIndex(r => r.token_mint_addr === mint);
+            if (found >= 0) scrollerRef?.scrollToIndexInstant?.(found);
         } finally {
             isLoadingPrev = false;
         }
@@ -574,6 +640,9 @@
             items={items}
             showMeta={dataSource === 'listings'}
             motionEnabled={motionEnabled}
+            galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
+            on:loadMore={() => handleLoadMoreGallery()}
+            on:loadPrev={() => handleLoadPrevGallery()}
             on:enterExplore={(e) => openExploreByMint(e.detail)}
             on:imageLoad={recomputeEdgeHeight}
             bind:this={scrollerRef}

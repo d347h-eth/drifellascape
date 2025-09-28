@@ -168,6 +168,8 @@ Operational note:
 
 Ingestion script (`scripts/ingest-traits.ts`) populates these tables from the local metadata dump and a CSV mapping of mint ↔ image URL. All strings are ingested exactly as they appear in metadata (no normalization). The script recomputes counts for types, values, and type/value pairs.
 
+Duplicate images (expected): In this collection, multiple mints can reference the same `image_url`. The ingest script handles this by treating the CSV mapping as `image_url → queue of mints` and assigns each occurrence of the same image to the next mint in FIFO order. This guarantees all 1,333 mints are inserted into `tokens` even when only ~1,263 unique image URLs exist. The schema enforces uniqueness only on `token_mint_addr` and `token_num`, not on `image_url`.
+
 ## Future Work
 
 - Additional indices for server‑side filtering (price ranges, sources, compound trait filters)

@@ -9,6 +9,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Keep it simple: prefer small, explicit TypeScript modules and raw SQL over frameworks/ORMs.
 - Respect rate limits: worker must stay ≤ 2 RPS and ≤ 120 RPM; retries only for 429/5xx.
 - Consistent reads: any backend load of the active snapshot must be transactionally consistent (see `loadActiveSnapshotConsistent`).
+- Gallery paging: near‑edge pagination recenters around the current mint using `anchorMint` (no offset math). Grid paging remains offset‑based up/down.
 - Tests first when changing diff logic or normalization. Use temp DB paths via `setDbPath()` and run migrations per test.
 
 ## Conventions
@@ -18,6 +19,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Database: better‑sqlite3 with pragmas (`WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`). Migrations live in `database/migrations`.
 - Listings schema: primary key is `(version_id, token_mint_addr)`. Ignore price deltas < 0.01 SOL (`PRICE_EPSILON`).
 - Frontend: preserve hard‑pixel rendering and hotkeys contract in the exploration mode.
+ - Hotkeys: `T` toggles data source (Listings/Tokens); `G`/`Esc` enter Grid; `F` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
 
 ## How to Work
 
@@ -32,6 +34,12 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - DO ensure one writer (the worker) and short transactions. DON’T hold long transactions in the backend.
 - DO align any new endpoints with `docs/06-api-reference.md`. DON’T change response shapes silently.
 - DO keep public images under `frontend/public/2560/`. DON’T add heavy asset pipelines.
+ - DO use `anchorMint` or `offset` exclusively in search calls; `anchorMint` takes precedence and the server returns the effective `offset`.
+
+## Ingestion Notes
+
+- `scripts/ingest-traits.ts` consumes `logs/mint_to_image.csv` and `metadata/`.
+- Duplicate images are expected: the script maps `image_url → [mints...]` and assigns in FIFO order so all 1,333 mints are inserted (uniqueness enforced on mint/num, not image_url).
 
 ## Quick Commands
 

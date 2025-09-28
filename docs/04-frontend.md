@@ -77,6 +77,12 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
   - Opaque modal with grouped shortcuts for Gallery and Exploration.
   - Open/close with `H` or `F1`; `ESC` closes; clicking backdrop closes.
 
+### Near‑edge Paging (Gallery)
+
+- After user interaction (wheel/keys/click), when the centered slide moves near the left/right end (small threshold), the Gallery fetches the next/prev page by recentring around the current mint (`anchorMint`) — no offset math, no jumps.
+- Works for both wheel and `A`/`D` hotkeys (trigger runs when an animation finishes or scroll idles).
+- The focused token remains in view after the fetch; the response includes the effective `offset` for subsequent paging symmetry with Grid.
+
 ## Trait Bar (Bottom Overlay)
 
   - Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
