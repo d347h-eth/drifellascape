@@ -5,6 +5,9 @@
   export let traits: ListingTrait[] = [];
   export let selectedPurpose: string = 'middle';
   export let selectedValueIds: Set<number> = new Set();
+  // When true (Gallery), leave a bottom offset so the native scrollbar is visible.
+  // When false (Exploration/Grid), the bar is flush with the bottom.
+  export let galleryMode: boolean = true;
 
   const PURPOSES = ["left","middle","right","decor","items","special","undefined"] as const;
   type Purpose = typeof PURPOSES[number];
@@ -94,7 +97,7 @@
 </script>
 
 <!-- Purpose pills -->
-  <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1">
+  <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1" style={`--dots-bottom:${galleryMode ? 82 : 60}px`}>
   {#each PURPOSES as pc}
     {@const cnt = purposeCounts[pc] ?? 0}
     <button type="button" class="purpose-dot {pc === normalizedPurpose(selectedPurpose) ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
@@ -107,7 +110,7 @@
 </div>
 
 <!-- Trait bar at bottom -->
-<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
+<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation style={`--bar-bottom:${galleryMode ? 22 : 0}px`}>
   <div class="trait-strip">
     {#each filtered.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
       <div class="trait-box {selectedValueIds?.has(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => emitToggleValue(tr.value_id)}>
@@ -123,7 +126,7 @@
 <style>
   .purpose-dots {
     position: fixed;
-    left: 0; right: 0; bottom: 82px; /* gap above bar */
+    left: 0; right: 0; bottom: var(--dots-bottom, 82px); /* gap above bar */
     height: 22px;
     display: flex; align-items: center; justify-content: center;
     pointer-events: auto;
@@ -135,7 +138,7 @@
   .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
 
   .trait-bar {
-    position: fixed; left: 0; right: 0; bottom: 22px; height: 50px;
+    position: fixed; left: 0; right: 0; bottom: var(--bar-bottom, 22px); height: 50px;
     background: rgba(0,0,0,0.6);
     display: flex; align-items: stretch; justify-content: space-between;
     z-index: 9000;

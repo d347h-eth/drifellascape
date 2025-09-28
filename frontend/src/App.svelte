@@ -607,6 +607,7 @@
             traits={traitsForCurrent}
             bind:selectedPurpose
             {selectedValueIds}
+            galleryMode={!gridMode && exploreIndex === null}
             on:toggleValue={handleToggleValue}
             on:purposeChange={handlePurposeChange}
         />
