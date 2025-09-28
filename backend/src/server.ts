@@ -10,6 +10,9 @@ import {
     searchListingsByTraits,
     searchListingsByValues,
     attachTraits,
+    searchTokensByTraits,
+    searchTokensByValues,
+    attachTraitsGeneric,
 } from "./repo.js";
 
 function getEnvPort(): number {
@@ -115,41 +118,128 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 200);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
-            const { versionId, total, items } = searchListingsByTraits(
+            const { versionId, total, usedOffset, items } = searchListingsByTraits(
                 groups,
                 sort,
                 offset,
                 limit,
+                anchorMint,
             );
             const enriched = includeTraits ? attachTraits(items) : items;
             return sendJson(res, 200, {
                 versionId,
                 total,
-                offset,
+                offset: usedOffset,
                 limit,
                 sort,
                 items: enriched,
+                anchorDebug: {
+                    anchorMint: anchorMint ?? null,
+                    effectiveOffset: usedOffset,
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+                },
             });
         }
         // default: value-based
         const valueIds = sanitizeIds(body.valueIds);
-        const { versionId, total, items } = searchListingsByValues(
+        const { versionId, total, usedOffset, items } = searchListingsByValues(
             valueIds,
             sort,
             offset,
             limit,
+            anchorMint,
         );
         const enriched = includeTraits ? attachTraits(items) : items;
         return sendJson(res, 200, {
             versionId,
             total,
-            offset,
+            offset: usedOffset,
             limit,
             sort,
             items: enriched,
+            anchorDebug: {
+                anchorMint: anchorMint ?? null,
+                effectiveOffset: usedOffset,
+                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+            },
+        });
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
+function normalizeTokenSort(raw: string | undefined): string {
+    const s = (raw || "token_asc").toLowerCase();
+    if (s === "token_desc") return "token_desc";
+    return "token_asc"; // default, and fallback for price_* etc.
+}
+
+async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
+    try {
+        const raw = await readBody(req);
+        let body: ListingsSearchBody;
+        try {
+            body = raw ? (JSON.parse(raw) as ListingsSearchBody) : ({} as any);
+        } catch {
+            return sendJson(res, 400, { error: "Invalid JSON" });
+        }
+        const sort = normalizeTokenSort(body.sort);
+        const offset = clamp(Number(body.offset) || 0, 0, 1_000_000);
+        // Tokens endpoint is capped at 100 to keep payload reasonable
+        const limit = clamp(Number(body.limit) || 100, 1, 100);
+        const mode = (body.mode || "value").toLowerCase();
+        const includeTraits = body.includeTraits !== false; // default true
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
+
+        if (mode === "trait") {
+            const groups = sanitizeGroups(body.traits);
+            const { total, usedOffset, items } = searchTokensByTraits(
+                groups,
+                sort,
+                offset,
+                limit,
+                anchorMint,
+            );
+            const enriched = includeTraits ? attachTraitsGeneric(items) : items;
+            return sendJson(res, 200, {
+                versionId: null,
+                total,
+                offset: usedOffset,
+                limit,
+                sort,
+                items: enriched,
+                anchorDebug: {
+                    anchorMint: anchorMint ?? null,
+                    effectiveOffset: usedOffset,
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+                },
+            });
+        }
+        const valueIds = sanitizeIds(body.valueIds);
+        const { total, usedOffset, items } = searchTokensByValues(
+            valueIds,
+            sort,
+            offset,
+            limit,
+            anchorMint,
+        );
+        const enriched = includeTraits ? attachTraitsGeneric(items) : items;
+        return sendJson(res, 200, {
+            versionId: null,
+            total,
+            offset: usedOffset,
+            limit,
+            sort,
+            items: enriched,
+            anchorDebug: {
+                anchorMint: anchorMint ?? null,
+                effectiveOffset: usedOffset,
+                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+            },
         });
     } catch (e: any) {
         return sendJson(res, 500, { error: String(e?.message || e) });
@@ -163,6 +253,8 @@ function route(req: IncomingMessage, res: ServerResponse) {
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))
         return void handleListingsSearch(req, res);
+    if (req.method === "POST" && url.startsWith("/tokens/search"))
+        return void handleTokensSearch(req, res);
     // minimal not-found
     sendJson(res, 404, { error: "Not found" });
 }

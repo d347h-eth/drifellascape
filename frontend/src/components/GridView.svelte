@@ -1,12 +1,14 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import type { ListingRow } from '../lib/types';
+  import type { Row } from '../lib/types';
   import PriceTag from './PriceTag.svelte';
 
-  export let items: ListingRow[] = [];
+  export let items: Row[] = [];
   export let targetMint: string | null = null;
   // Beat 3 times; 1.25s → 1.875s per beat → total ≈ 5625ms
   export let flashDurationMs: number = 5625;
+  export let enablePaging: boolean = false;
+  export let loadingMore: boolean = false;
 
   const dispatch = createEventDispatcher();
 
@@ -34,6 +36,40 @@
   function handleClick(mint: string) {
     dispatch('openGallery', mint);
   }
+
+  // Helpers for union Row type
+  function getPrice(r: Row): number | undefined { return (r as any)?.price; }
+  function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
+  function hasPrice(r: Row): boolean { const p = (r as any)?.price; return typeof p === 'number' && Number.isFinite(p); }
+  // Paging sentinel
+  let bottomSentinelEl: HTMLDivElement | null = null;
+  let topSentinelEl: HTMLDivElement | null = null;
+  let io: IntersectionObserver | null = null;
+  function setupObserver() {
+    if (!enablePaging) return;
+    if (io) return;
+    io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        if (bottomSentinelEl && e.target === bottomSentinelEl) {
+          dispatch('loadMore');
+        } else if (topSentinelEl && e.target === topSentinelEl) {
+          dispatch('loadPrev');
+        }
+      }
+    }, { root: null, rootMargin: '0px', threshold: 0.0 });
+    if (bottomSentinelEl) io.observe(bottomSentinelEl);
+    if (topSentinelEl) io.observe(topSentinelEl);
+  }
+  function teardownObserver() {
+    if (io) { try { io.disconnect(); } catch {} io = null; }
+  }
+  onMount(() => { setupObserver(); return () => teardownObserver(); });
+  $: if (enablePaging && !io) { setupObserver(); }
+  $: if (enablePaging && io) {
+    try { if (bottomSentinelEl) io.observe(bottomSentinelEl); } catch {}
+    try { if (topSentinelEl) io.observe(topSentinelEl); } catch {}
+  }
 </script>
 
 <style>
@@ -44,6 +80,16 @@
     padding: 12px;
     box-sizing: border-box;
   }
+  .sentinel {
+    grid-column: 1 / -1;
+    height: 24px;
+  }
+  .sentinel-top { grid-column: 1 / -1; height: 1px; }
+  .more-spinner { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; padding: 8px 0; opacity: 0.75; font-size: 12px; }
+  .dot { width: 6px; height: 6px; margin: 0 3px; background: rgba(255,255,255,0.6); border-radius: 50%; animation: pulse 0.9s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay: 0.15s; }
+  .dot:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { transform: scale(0.85); opacity: 0.6; } 50% { transform: scale(1); opacity: 1; } }
   .cell {
     position: relative;
     background: #0c0c0e;
@@ -100,20 +146,27 @@
 </style>
 
 <div class="grid" role="list">
+  <div class="sentinel-top" bind:this={topSentinelEl} />
   {#each items as it (it.token_mint_addr)}
     <div id={`cell-${it.token_mint_addr}`} class="cell" role="listitem" class:flash={flashMint === it.token_mint_addr}>
       <button type="button" aria-label={`Open ${it.token_num ?? it.token_mint_addr} in gallery`} on:click={() => handleClick(it.token_mint_addr)}>
         <img class="img" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" />
       </button>
-      <div class="price-tab">
-        <PriceTag price={it.price} listingSource={it.listing_source} mint={it.token_mint_addr} />
-      </div>
+      {#if hasPrice(it)}
+        <div class="price-tab">
+          <PriceTag price={getPrice(it)} listingSource={getSource(it)} mint={it.token_mint_addr} />
+        </div>
+      {/if}
     </div>
   {/each}
   {#if items.length === 0}
     <div style="grid-column: 1 / -1; opacity: 0.7; padding: 24px;">No items to display.</div>
   {/if}
   <!-- Spacer to ease centering with scrollIntoView -->
-  <div style="height: 12px; grid-column: 1 / -1;" />
-  <div style="height: 12px; grid-column: 1 / -1;" />
+  <div class="sentinel" bind:this={bottomSentinelEl} />
+  {#if loadingMore}
+    <div class="more-spinner" aria-live="polite" title="Loading more">
+      <div class="dot" /><div class="dot" /><div class="dot" />
+    </div>
+  {/if}
 </div>

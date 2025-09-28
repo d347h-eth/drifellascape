@@ -1,10 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
-  import type { ListingRow } from '../lib/types';
+  import type { Row } from '../lib/types';
   import { dbg } from '../debug';
   import PriceTag from './PriceTag.svelte';
 
-  export let items: ListingRow[] = [];
+  export let items: Row[] = [];
+  export let showMeta: boolean = true;
   export let motionEnabled: boolean = true;
   export let leaveThresholdFrac: number = 0.5;
   export let wheelMultiplier: number = 1.5;
@@ -140,6 +141,9 @@
   }
 
   // pricing/link logic moved into PriceTag component
+  // Helper accessors for union Row type
+  function getPrice(r: Row): number | undefined { return (r as any)?.price; }
+  function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
 
   onMount(() => {
     scrollerEl?.addEventListener('pointerdown', onPointerDown, { passive: true });
@@ -156,9 +160,11 @@
           <img class="token" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
         </button>
       </div>
-      <div class="meta">
-        <PriceTag price={it.price} listingSource={it.listing_source} mint={it.token_mint_addr} />
-      </div>
+      {#if showMeta}
+        <div class="meta">
+          <PriceTag price={getPrice(it)} listingSource={getSource(it)} mint={it.token_mint_addr} />
+        </div>
+      {/if}
     </section>
   {/each}
 </div>

@@ -15,6 +15,7 @@
         <li>Focus current — <span class="kbd">F</span></li>
         <li>Enter exploration — <span class="kbd">W</span></li>
         <li>Enter grid view — <span class="kbd">G</span> or <span class="kbd">Esc</span></li>
+        <li>Toggle data source (Listings/Tokens) — <span class="kbd">T</span></li>
         <li>Toggle motion — <span class="kbd">M</span></li>
         <li>Toggle trait bar — <span class="kbd">V</span></li>
         <li>Purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>

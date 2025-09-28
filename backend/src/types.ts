@@ -22,6 +22,7 @@ export type ListingsSearchBody = {
     offset?: number;
     limit?: number;
     includeTraits?: boolean;
+    anchorMint?: string;
 };
 
 export type ListingTrait = {
@@ -34,6 +35,19 @@ export type ListingTrait = {
 };
 
 export type EnrichedListingRow = ListingRow & {
+    token_id: number;
+    token_name: string | null;
+    traits?: ListingTrait[];
+};
+
+// Tokens (static canon dataset — no price/seller/source/version)
+export type TokenRow = {
+    token_mint_addr: string;
+    token_num: number;
+    image_url: string;
+};
+
+export type EnrichedTokenRow = TokenRow & {
     token_id: number;
     token_name: string | null;
     traits?: ListingTrait[];

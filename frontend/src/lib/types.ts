@@ -7,25 +7,32 @@ export type ListingTrait = {
   value: string;
 };
 
-export type ListingRow = {
+export type BaseRow = {
   token_mint_addr: string;
   token_num: number | null;
-  price: number;
-  seller: string;
   image_url: string;
-  listing_source: string;
   token_id: number;
   token_name: string | null;
   traits?: ListingTrait[];
 };
 
-export type ApiResponse = {
-  versionId: number;
+export type ListingRow = BaseRow & {
+  price: number;
+  seller: string;
+  listing_source: string;
+};
+
+export type TokenRow = BaseRow;
+
+export type Row = ListingRow | TokenRow;
+
+export type ApiResponse<T> = {
+  versionId: number | null;
   total: number;
   offset: number;
   limit: number;
   sort: string;
-  items: ListingRow[];
+  items: T[];
 };
 
 export type TraitFilterGroup = { typeId: number; valueIds: number[] };
@@ -38,5 +45,5 @@ export type ListingsSearchBody = {
   offset?: number;
   limit?: number;
   includeTraits?: boolean;
+  anchorMint?: string;
 };
-
