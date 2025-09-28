@@ -22,6 +22,7 @@ export type ListingsSearchBody = {
     offset?: number;
     limit?: number;
     includeTraits?: boolean;
+    anchorMint?: string;
 };
 
 export type ListingTrait = {

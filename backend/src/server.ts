@@ -118,41 +118,54 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 200);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
-            const { versionId, total, items } = searchListingsByTraits(
+            const { versionId, total, usedOffset, items } = searchListingsByTraits(
                 groups,
                 sort,
                 offset,
                 limit,
+                anchorMint,
             );
             const enriched = includeTraits ? attachTraits(items) : items;
             return sendJson(res, 200, {
                 versionId,
                 total,
-                offset,
+                offset: usedOffset,
                 limit,
                 sort,
                 items: enriched,
+                anchorDebug: {
+                    anchorMint: anchorMint ?? null,
+                    effectiveOffset: usedOffset,
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+                },
             });
         }
         // default: value-based
         const valueIds = sanitizeIds(body.valueIds);
-        const { versionId, total, items } = searchListingsByValues(
+        const { versionId, total, usedOffset, items } = searchListingsByValues(
             valueIds,
             sort,
             offset,
             limit,
+            anchorMint,
         );
         const enriched = includeTraits ? attachTraits(items) : items;
         return sendJson(res, 200, {
             versionId,
             total,
-            offset,
+            offset: usedOffset,
             limit,
             sort,
             items: enriched,
+            anchorDebug: {
+                anchorMint: anchorMint ?? null,
+                effectiveOffset: usedOffset,
+                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+            },
         });
     } catch (e: any) {
         return sendJson(res, 500, { error: String(e?.message || e) });
@@ -180,40 +193,53 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 100);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
-            const { total, items } = searchTokensByTraits(
+            const { total, usedOffset, items } = searchTokensByTraits(
                 groups,
                 sort,
                 offset,
                 limit,
+                anchorMint,
             );
             const enriched = includeTraits ? attachTraitsGeneric(items) : items;
             return sendJson(res, 200, {
                 versionId: null,
                 total,
-                offset,
+                offset: usedOffset,
                 limit,
                 sort,
                 items: enriched,
+                anchorDebug: {
+                    anchorMint: anchorMint ?? null,
+                    effectiveOffset: usedOffset,
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+                },
             });
         }
         const valueIds = sanitizeIds(body.valueIds);
-        const { total, items } = searchTokensByValues(
+        const { total, usedOffset, items } = searchTokensByValues(
             valueIds,
             sort,
             offset,
             limit,
+            anchorMint,
         );
         const enriched = includeTraits ? attachTraitsGeneric(items) : items;
         return sendJson(res, 200, {
             versionId: null,
             total,
-            offset,
+            offset: usedOffset,
             limit,
             sort,
             items: enriched,
+            anchorDebug: {
+                anchorMint: anchorMint ?? null,
+                effectiveOffset: usedOffset,
+                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
+            },
         });
     } catch (e: any) {
         return sendJson(res, 500, { error: String(e?.message || e) });
