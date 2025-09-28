@@ -143,7 +143,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 ### Grid Mode
 
 - Activation — `G` from any mode.
-- Layout — 4 columns (25% width each), vertical scroll.
+- Layout — 3 columns (33% width each), vertical scroll.
 - Click any image to return to the horizontal gallery centered on that token.
 - On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
 - Paging — Infinite scroll up/down with real‑interaction arming. Observers attach only after user wheel/click/keydown to avoid surprise requests on entry. Paging uses server‑returned effective `offset`.
