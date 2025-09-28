@@ -30,9 +30,10 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Data Flow
 
-- On mount, the app requests `POST {VITE_API_BASE}/listings/search` with `{ mode: "value", valueIds: [], sort: "price_asc", limit: 100, includeTraits: true }` and stores `items`, `versionId`.
-- A periodic poll (default 30s) posts again; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
+- On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 100, includeTraits: true }` and stores `items`, `versionId`.
+- A periodic poll (default 30s) posts again for listings; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
 - Price shown is fee‑inclusive (see below). Clicking the price opens the marketplace listing in a new tab.
+- Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -145,6 +146,9 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Layout — 4 columns (25% width each), vertical scroll.
 - Click any image to return to the horizontal gallery centered on that token.
 - On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
+- Paging — Infinite scroll up/down with real‑interaction arming. Observers attach only after user wheel/click/keydown to avoid surprise requests on entry. Paging uses server‑returned effective `offset`.
+- Refocus — Press `F` in Grid to refocus the last anchored token (from Gallery/Explore).
+- Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
 
 ### Image Swapping & Flicker Control
 

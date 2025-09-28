@@ -61,6 +61,7 @@ Body (application/json):
 - `sort` (string, default `price_asc`): `price_asc` | `price_desc`
 - `offset` (int, default 0), `limit` (int, default 100; max 200)
 - `includeTraits` (bool, default true): include full traits per token
+- `anchorMint` (string, optional): exclusive with `offset`. When provided, the server computes the page so that this mint appears (centered when possible) and returns the effective `offset` used in the response.
 
 Response 200 (application/json):
 
@@ -101,6 +102,26 @@ Notes:
 - Unknown IDs are ignored (no results error).
 - The backend excludes the special `None` value (`trait_values.id = 217`) from filtering and traits to reduce noise.
 - Consistent read: results are anchored to the active snapshot.
+- Exclusive params: provide either `anchorMint` or `offset`. When `anchorMint` is present, `offset` is ignored and the response `offset` reflects the computed effective offset.
+
+## POST /tokens/search
+
+Search tokens with DB‑side filtering. Returns enriched items (token + traits) by default.
+
+Body (application/json):
+
+- `mode` (string, required): `"value" | "trait"`
+- `valueIds` (number[], optional)
+- `traits` (array, optional): `{ typeId, valueIds[] }[]`
+- `sort` (string, default `token_asc`): `token_asc` | `token_desc`
+- `offset` (int, default 0), `limit` (int, default 100; max 100)
+- `includeTraits` (bool, default true)
+- `anchorMint` (string, optional): exclusive with `offset`. When provided, the server computes the page so that this mint appears (centered when possible) and returns the effective `offset` used in the response.
+
+Notes:
+
+- `tokens` represents the canon dataset; server still returns an effective `offset` and honors `anchorMint`.
+- Exclusive params: provide either `anchorMint` or `offset`.
 
 Errors:
 

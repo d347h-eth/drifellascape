@@ -6,8 +6,10 @@
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearchListings, postSearchTokens } from "./lib/api";
-    import type { Row, ListingTrait } from "./lib/types";
+    import { postSearch, buildSearchBody } from "./lib/search";
+    import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
+    import { preserveTopAnchor } from './lib/viewport';
+    import type { Row, ListingTrait, DataSource } from "./lib/types";
 
     // Types moved to lib/types.ts
 
@@ -16,9 +18,9 @@
     let total: number | null = null;
     // For tokens paging, track the base offset of the first item in `items`
     let baseOffset: number = 0;
-    // Anchor control: only arm after entering Gallery/Explore
-    let anchorArmed: boolean = false;
-    let lastAnchorMint: string | null = null;
+    // Anchor control centralised in anchor store
+    import { arm as anchorArm, updateFromFocused as anchorUpdateFromFocused, selectAnchorMint, lastMint as anchorLastMint } from './lib/anchor';
+    import { get as getStore } from 'svelte/store';
     // Staged data waiting for user to scroll to top
     let stagedItems: Row[] | null = null;
     let stagedVersionId: number | null = null;
@@ -59,7 +61,6 @@
         }
     }
 
-    type DataSource = 'listings' | 'tokens';
     let dataSource: DataSource = 'listings';
 
     let pagingSession = 0;
@@ -70,14 +71,11 @@
         pagingSession++;
         isLoadingMore = false;
         try {
-            const common = { mode: "value" as const, valueIds: [], offset: 0, limit: 100, includeTraits: true };
-            const data = dataSource === 'listings'
-                ? await postSearchListings({ ...common, sort: 'price_asc' })
-                : await postSearchTokens({ ...common, sort: 'token_asc' });
-            items = data.items ?? [];
-            versionId = data.versionId ?? null;
-            total = typeof data.total === 'number' ? data.total : null;
-            baseOffset = typeof data.offset === 'number' ? data.offset : 0;
+            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            items = res.items;
+            total = res.total;
+            baseOffset = res.baseOffset;
+            versionId = res.versionId;
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
@@ -109,7 +107,8 @@
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
-            const data = await postSearchListings({ mode: "value", valueIds: [], sort: "price_asc", offset: 0, limit: 100, includeTraits: true });
+            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            const data = await postSearch('listings', body);
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
                 stagedVersionId = data.versionId;
@@ -145,31 +144,29 @@
             if (!showHelp && (k === 'Escape' || k === 'Esc')) {
                 if (exploreIndex === null && !gridMode) {
                     e.preventDefault();
-                    const it = currentItem();
-                    gridTargetMint = it?.token_mint_addr ?? null;
-                    gridMode = true;
+                    enterGrid();
                     return;
                 }
+            }
+            // Focus anchor mint in Grid — F
+            if (gridMode && (k === 'f' || k === 'F')) {
+                e.preventDefault();
+                const m = getStore(anchorLastMint);
+                if (m) {
+                    // Force re-trigger by clearing then setting
+                    gridTargetMint = null;
+                    setTimeout(() => { gridTargetMint = m; }, 0);
+                }
+                return;
             }
             // Grid/Gallery toggle — G
             if (k === 'g' || k === 'G') {
                 e.preventDefault();
                 if (gridMode) {
                     // Return to gallery centered at the last focused token
-                    const target = gridTargetMint ?? items[activeIndex]?.token_mint_addr ?? items[0]?.token_mint_addr ?? null;
-                    if (target) {
-                        openGalleryByMint(target);
-                    } else {
-                        gridMode = false;
-                    }
+                    exitToGallery();
                 } else {
-                    const it = currentItem();
-                    gridTargetMint = it?.token_mint_addr ?? null;
-                    if (exploreIndex !== null) {
-                        // Close exploration overlay before switching to grid
-                        closeExplore();
-                    }
-                    gridMode = true;
+                    enterGrid();
                 }
                 return;
             }
@@ -293,14 +290,10 @@
                 beforeClientWidth,
             });
             // Determine when to use anchor: in Gallery/Explore always; in Grid only if armed
-            let anchorMintToUse: string | undefined = undefined;
-            if (exploreIndex !== null || !gridMode) anchorMintToUse = curMint || undefined;
-            else if (anchorArmed && lastAnchorMint) anchorMintToUse = lastAnchorMint;
-            const baseReq: any = { mode: 'value' as const, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true };
-            if (anchorMintToUse) baseReq.anchorMint = anchorMintToUse; else baseReq.offset = 0;
-            const data = dataSource === 'listings'
-                ? await postSearchListings({ ...baseReq, sort: 'price_asc' })
-                : await postSearchTokens({ ...baseReq, sort: 'token_asc' });
+            const inExploreOrGallery = (exploreIndex !== null) || (!gridMode);
+            const anchorMintToUse: string | undefined = selectAnchorMint(gridMode, inExploreOrGallery, curMint);
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: anchorMintToUse, offset: 0 });
+            const data = await postSearch(dataSource, body);
             let newItems = data.items ?? [];
             items = newItems;
             versionId = data.versionId ?? null;
@@ -376,14 +369,39 @@
     function nextSlide() { scrollerRef?.next?.(); }
     function focusCurrent() { scrollerRef?.focusCurrent?.(); }
 
+    // --- Mode toggles (helpers) ---
+    function enterGrid() {
+        const it = currentItem();
+        gridTargetMint = it?.token_mint_addr ?? null;
+        if (exploreIndex !== null) closeExplore();
+        gridMode = true;
+        pagingArmed = false; // avoid immediate paging on entry
+    }
+    function exitToGallery() {
+        const target = gridTargetMint ?? items[activeIndex]?.token_mint_addr ?? items[0]?.token_mint_addr ?? null;
+        if (target) {
+            openGalleryByMint(target);
+        } else {
+            gridMode = false;
+        }
+    }
+
     // --- Infinite scroll for Grid (listings & tokens) ---
     let isLoadingMore = false;
     let isLoadingPrev = false;
     let pagingArmed = false;
+    let _prevGridMode = gridMode;
+    $: if (gridMode !== _prevGridMode) {
+        if (gridMode) {
+            // Entering grid: require a fresh user scroll before paging can arm
+            pagingArmed = false;
+        }
+        _prevGridMode = gridMode;
+    }
     if (typeof window !== 'undefined') {
-        window.addEventListener('scroll', () => {
-            if (!pagingArmed && window.scrollY > 4) pagingArmed = true;
-        }, { passive: true });
+        window.addEventListener('wheel', () => { pagingArmed = true; }, { passive: true });
+        window.addEventListener('pointerdown', () => { pagingArmed = true; }, { passive: true });
+        window.addEventListener('keydown', () => { pagingArmed = true; });
     }
     async function loadMoreGrid() {
         if (!gridMode) return;
@@ -394,17 +412,11 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const body = { mode: 'value' as const, valueIds: Array.from(selectedValueIds), offset, limit: 100, includeTraits: true };
-            const data = dataSource === 'tokens'
-                ? await postSearchTokens({ ...body, sort: 'token_asc' })
-                : await postSearchListings({ ...body, sort: 'price_asc' });
-            const newItems = data.items ?? [];
+            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset, currentLength: items.length });
             if (session !== pagingSession || !gridMode) return;
-            const newTotal = typeof data.total === 'number' ? data.total : total;
             total = newTotal;
             if (newItems.length > 0) {
-                const existing = new Set(items.map((r) => r.token_mint_addr));
-                const deduped = newItems.filter((r) => !existing.has(r.token_mint_addr));
+                const deduped = dedupeAppend(items, newItems);
                 if (deduped.length > 0) items = items.concat(deduped);
             }
         } catch (e) {
@@ -426,25 +438,17 @@
         const anchorMint = items[0]?.token_mint_addr;
         const beforeTop = anchorMint ? (document.getElementById(`cell-${anchorMint}`)?.getBoundingClientRect()?.top ?? 0) : 0;
         try {
-            const body = { mode: 'value' as const, valueIds: Array.from(selectedValueIds), offset: newOffset, limit: 100, includeTraits: true };
-            const data = dataSource === 'tokens'
-                ? await postSearchTokens({ ...body, sort: 'token_asc' })
-                : await postSearchListings({ ...body, sort: 'price_asc' });
-            const newItems = data.items ?? [];
+            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset });
+            if (!prev) { isLoadingPrev = false; return; }
+            const newItems = prev.newItems;
             if (session !== pagingSession || !gridMode) return;
             if (newItems.length > 0) {
-                const existing = new Set(items.map((r) => r.token_mint_addr));
-                const deduped = newItems.filter((r) => !existing.has(r.token_mint_addr));
+                const deduped = dedupePrepend(items, newItems);
                 if (deduped.length > 0) {
-                    items = deduped.concat(items);
-                    baseOffset = newOffset;
-                    await tick();
-                    await new Promise((r) => requestAnimationFrame(() => r(null)));
-                    if (anchorMint) {
-                        const afterTop = document.getElementById(`cell-${anchorMint}`)?.getBoundingClientRect()?.top ?? 0;
-                        const delta = afterTop - beforeTop;
-                        if (Math.abs(delta) > 1) window.scrollBy(0, delta);
-                    }
+                    await preserveTopAnchor(anchorMint, () => {
+                        items = deduped.concat(items);
+                        baseOffset = prev.newBaseOffset;
+                    });
                 }
             }
         } catch (e) {
@@ -457,8 +461,7 @@
         const idx = items.findIndex((r) => r.token_mint_addr === mint);
         const i = idx >= 0 ? idx : 0;
         gridMode = false;
-        anchorArmed = true;
-        lastAnchorMint = mint;
+        anchorArm(mint);
         // Wait for gallery to mount and bind scrollerRef
         await tick();
         await new Promise((r) => requestAnimationFrame(() => r(null)));
@@ -475,8 +478,7 @@
             scrollerRef?.scrollToIndexInstant?.(idx);
             activeIndex = idx;
         }
-        anchorArmed = true;
-        lastAnchorMint = mint;
+        anchorArm(mint);
     }
     function closeExplore() {
         // On exit, land the gallery on the last explored token
@@ -498,7 +500,7 @@
                 scrollerRef?.scrollToIndexInstant?.(nextIdx);
                 activeIndex = nextIdx;
                 const row = exploreItems[nextIdx];
-                if (row) lastAnchorMint = row.token_mint_addr;
+                if (row) anchorUpdateFromFocused(row.token_mint_addr);
             }
         }
     }
@@ -511,7 +513,7 @@
                 scrollerRef?.scrollToIndexInstant?.(nextIdx);
                 activeIndex = nextIdx;
                 const row = exploreItems[nextIdx];
-                if (row) lastAnchorMint = row.token_mint_addr;
+                if (row) anchorUpdateFromFocused(row.token_mint_addr);
             }
         }
     }
@@ -519,7 +521,7 @@
     // Update anchor mint while in Gallery (not exploring) as the focused token changes
     $: if (!gridMode && exploreIndex === null) {
         const row = items[activeIndex];
-        if (row) { anchorArmed = true; lastAnchorMint = row.token_mint_addr; }
+        if (row) anchorUpdateFromFocused(row.token_mint_addr);
     }
 
     // Edge overlays should match the visible image height

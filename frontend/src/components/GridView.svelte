@@ -46,8 +46,7 @@
   let topSentinelEl: HTMLDivElement | null = null;
   let io: IntersectionObserver | null = null;
   function setupObserver() {
-    if (!enablePaging) return;
-    if (io) return;
+    if (io || !enablePaging) return;
     io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         if (!e.isIntersecting) continue;
@@ -58,18 +57,15 @@
         }
       }
     }, { root: null, rootMargin: '0px', threshold: 0.0 });
-    if (bottomSentinelEl) io.observe(bottomSentinelEl);
-    if (topSentinelEl) io.observe(topSentinelEl);
+    try { if (bottomSentinelEl) io.observe(bottomSentinelEl); } catch {}
+    try { if (topSentinelEl) io.observe(topSentinelEl); } catch {}
   }
   function teardownObserver() {
     if (io) { try { io.disconnect(); } catch {} io = null; }
   }
-  onMount(() => { setupObserver(); return () => teardownObserver(); });
+  onMount(() => { return () => teardownObserver(); });
   $: if (enablePaging && !io) { setupObserver(); }
-  $: if (enablePaging && io) {
-    try { if (bottomSentinelEl) io.observe(bottomSentinelEl); } catch {}
-    try { if (topSentinelEl) io.observe(topSentinelEl); } catch {}
-  }
+  $: if (!enablePaging && io) { teardownObserver(); }
 </script>
 
 <style>

@@ -106,6 +106,11 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
     - 1/2/3: fit a 1006px‑tall band (vertically aligned by tuned offset) to viewport height (no 1:1 cap)
     - G: toggle debug overlay (cyan rectangle) for the 1006px band
   - Pixel‑accurate swapping between images; double‑click resets view; ESC closes.
+  
+- Grid mode (default homepage)
+  - Vertical 4‑column grid; press `G` or `Esc` to enter from Gallery/Explore; click any image to return to Gallery centered on that token.
+  - Infinite scroll up/down with user‑interaction arming for paging; press `F` in Grid to refocus the last anchored token.
+  - Data source toggle `T` switches between current Listings and canon Tokens; both sources support identical filtering, anchoring, and paging.
 
 ## Operating Characteristics
 

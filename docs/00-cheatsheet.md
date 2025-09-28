@@ -41,6 +41,7 @@
 - Focus current — `F`
 - Enter exploration — `W`
 - Enter grid view — `G` or `Esc`
+- Toggle data source (Listings/Tokens) — `T`
 - Toggle motion — `M`
 - Toggle trait bar — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
@@ -58,6 +59,12 @@
 - Fit 1006 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1006)/2 + 36`)
 - Reset to fit‑by‑width — Double‑click
 - Toggle debug overlay — `O`
+
+## Frontend Hotkeys (Grid)
+
+- Refocus last anchored token — `F`
+- Enter gallery — `G`
+- Toggle data source (Listings/Tokens) — `T`
 
 ## Env Vars
 

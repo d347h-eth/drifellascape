@@ -57,11 +57,22 @@ To avoid a race between reading the active version id and its rows while the wor
     - `valueIds`: number[] (AND semantics in value mode)
     - `traits`: `{ typeId: number, valueIds: number[] }[]` (AND across types, OR within values)
     - `offset`, `limit` (default 0/100; max 200), `sort` (`price_asc` | `price_desc`), `includeTraits` (default true)
+    - `anchorMint` (optional): exclusive with `offset`. When present, the server computes the page so this mint appears (centered when possible) and returns the effective `offset` used.
   - Notes:
     - Consistent read: results are anchored to the active snapshot id.
     - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
   - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
   - See also: API details and sample payloads in `docs/06-api-reference.md`.
+
+- `POST /tokens/search`
+  - Server‑side filtering over the canon tokens dataset; returns enriched tokens by default.
+  - Body:
+    - `mode`, `valueIds`, `traits`, `includeTraits` same as listings.
+    - `offset`, `limit` (default 0/100; max 100), `sort` (`token_asc` | `token_desc`).
+    - `anchorMint` (optional): exclusive with `offset`. Behavior mirrors listings search; response `offset` is the effective offset used.
+  - Notes:
+    - Tokens are static; there is no `versionId` in the response.
+    - Excludes `trait_values.id = 217` ("None").
 
 Notes:
 

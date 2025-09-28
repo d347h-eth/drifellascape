@@ -114,11 +114,13 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
             return sendJson(res, 400, { error: "Invalid JSON" });
         }
         const sort = (body.sort || "price_asc").toLowerCase();
-        const offset = clamp(Number(body.offset) || 0, 0, 1_000_000);
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
+        // Exclusive params: when anchorMint is present, ignore client-provided offset.
+        // The repo computes an effective offset which is returned back in the response.
+        const offset = anchorMint ? 0 : clamp(Number(body.offset) || 0, 0, 1_000_000);
         const limit = clamp(Number(body.limit) || 100, 1, 200);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
-        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
@@ -130,19 +132,22 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
                 anchorMint,
             );
             const enriched = includeTraits ? attachTraits(items) : items;
-            return sendJson(res, 200, {
+            const respBody: any = {
                 versionId,
                 total,
                 offset: usedOffset,
                 limit,
                 sort,
                 items: enriched,
-                anchorDebug: {
+            };
+            if (process.env.DRIFELLASCAPE_DEBUG) {
+                respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
-                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
-                },
-            });
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x: any) => x.token_mint_addr === anchorMint)),
+                };
+            }
+            return sendJson(res, 200, respBody);
         }
         // default: value-based
         const valueIds = sanitizeIds(body.valueIds);
@@ -154,19 +159,24 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
             anchorMint,
         );
         const enriched = includeTraits ? attachTraits(items) : items;
-        return sendJson(res, 200, {
+        {
+            const respBody: any = {
             versionId,
             total,
             offset: usedOffset,
             limit,
             sort,
             items: enriched,
-            anchorDebug: {
+        };
+        if (process.env.DRIFELLASCAPE_DEBUG) {
+            respBody.anchorDebug = {
                 anchorMint: anchorMint ?? null,
                 effectiveOffset: usedOffset,
-                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
-            },
-        });
+                pageContainsAnchor: !!(anchorMint && enriched.some((x: any) => x.token_mint_addr === anchorMint)),
+            };
+        }
+        return sendJson(res, 200, respBody);
+        }
     } catch (e: any) {
         return sendJson(res, 500, { error: String(e?.message || e) });
     }
@@ -188,12 +198,14 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
             return sendJson(res, 400, { error: "Invalid JSON" });
         }
         const sort = normalizeTokenSort(body.sort);
-        const offset = clamp(Number(body.offset) || 0, 0, 1_000_000);
+        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
+        // Exclusive params: when anchorMint is present, ignore client-provided offset.
+        // The repo computes an effective offset which is returned back in the response.
+        const offset = anchorMint ? 0 : clamp(Number(body.offset) || 0, 0, 1_000_000);
         // Tokens endpoint is capped at 100 to keep payload reasonable
         const limit = clamp(Number(body.limit) || 100, 1, 100);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
-        const anchorMint = typeof (body as any).anchorMint === 'string' ? (body as any).anchorMint : undefined;
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
@@ -205,19 +217,22 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 anchorMint,
             );
             const enriched = includeTraits ? attachTraitsGeneric(items) : items;
-            return sendJson(res, 200, {
+            const respBody: any = {
                 versionId: null,
                 total,
                 offset: usedOffset,
                 limit,
                 sort,
                 items: enriched,
-                anchorDebug: {
+            };
+            if (process.env.DRIFELLASCAPE_DEBUG) {
+                respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
-                    pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
-                },
-            });
+                    pageContainsAnchor: !!(anchorMint && enriched.some((x: any) => x.token_mint_addr === anchorMint)),
+                };
+            }
+            return sendJson(res, 200, respBody);
         }
         const valueIds = sanitizeIds(body.valueIds);
         const { total, usedOffset, items } = searchTokensByValues(
@@ -228,19 +243,24 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
             anchorMint,
         );
         const enriched = includeTraits ? attachTraitsGeneric(items) : items;
-        return sendJson(res, 200, {
+        {
+            const respBody: any = {
             versionId: null,
             total,
             offset: usedOffset,
             limit,
             sort,
             items: enriched,
-            anchorDebug: {
+        };
+        if (process.env.DRIFELLASCAPE_DEBUG) {
+            respBody.anchorDebug = {
                 anchorMint: anchorMint ?? null,
                 effectiveOffset: usedOffset,
-                pageContainsAnchor: !!(anchorMint && enriched.some((x) => x.token_mint_addr === anchorMint)),
-            },
-        });
+                pageContainsAnchor: !!(anchorMint && enriched.some((x: any) => x.token_mint_addr === anchorMint)),
+            };
+        }
+        return sendJson(res, 200, respBody);
+        }
     } catch (e: any) {
         return sendJson(res, 500, { error: String(e?.message || e) });
     }

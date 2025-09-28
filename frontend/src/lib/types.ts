@@ -26,6 +26,8 @@ export type TokenRow = BaseRow;
 
 export type Row = ListingRow | TokenRow;
 
+export type DataSource = 'listings' | 'tokens';
+
 export type ApiResponse<T> = {
   versionId: number | null;
   total: number;

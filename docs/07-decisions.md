@@ -55,3 +55,9 @@
 
 - Decision: Show a bottom trait bar toggled by `V` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
 - Rationale: Provide fast, bottom‑up value discovery while preserving user context; avoid disorientation when list size changes.
+
+## ADR-011: Anchor-based Pagination & Exclusive Params
+
+- Decision: Use anchor‑by‑mint for deterministic pagination across Listings and Tokens. Requests provide either `anchorMint` or `offset` (exclusive). When `anchorMint` is present, the server computes an effective `offset` so the mint appears (centered when possible) and returns it in the response.
+- Rationale: Preserve focus across filter and mode transitions without client heuristics. Avoid surprise jumps and extra requests.
+- Notes: Grid paging uses the server‑returned `offset` for up/down requests; observers arm only after user interaction (wheel/pointer/keydown) to avoid accidental requests on entry.

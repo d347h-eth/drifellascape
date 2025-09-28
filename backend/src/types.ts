@@ -22,6 +22,10 @@ export type ListingsSearchBody = {
     offset?: number;
     limit?: number;
     includeTraits?: boolean;
+    // Exclusive with `offset`: when provided, the server computes the page
+    // so that this mint appears (centered when possible) and returns the
+    // effective `offset` in the response. If both are provided, `anchorMint`
+    // takes precedence and `offset` is ignored.
     anchorMint?: string;
 };
 

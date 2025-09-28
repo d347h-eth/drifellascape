@@ -34,6 +34,12 @@ function sortTokensSql(sort: string | undefined): string {
     return sort === "token_desc" ? "ORDER BY t.token_num DESC" : "ORDER BY t.token_num ASC";
 }
 
+function centerOffset(total: number, rank: number, limit: number): number {
+    const maxStart = Math.max(0, total - limit);
+    const start = rank - Math.floor(limit / 2);
+    return Math.max(0, Math.min(maxStart, start));
+}
+
 export function searchListingsByValues(
     valueIds: number[],
     sort: string,
@@ -66,7 +72,7 @@ export function searchListingsByValues(
                         .prepare(`SELECT COUNT(*) AS c FROM listings_current lc WHERE lc.version_id = ? AND (${cmp})`)
                         .get(vid, ap, ap, anchorMint) as { c: number };
                     const anchorIdx = idxRow.c;
-                    pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                    pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
             }
             const items = db.raw
@@ -122,7 +128,7 @@ export function searchListingsByValues(
                   WHERE lc.version_id = ? AND (${cmp})`;
                 const idxRow = db.raw.prepare(idxSql).get(...valueIds, vid, ap, ap, anchorMint) as { c: number };
                 const anchorIdx = idxRow.c;
-                pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                pageOffset = centerOffset(countRow.c, anchorIdx, limit);
             }
         }
 
@@ -186,7 +192,7 @@ export function searchListingsByTraits(
                         .prepare(`SELECT COUNT(*) AS c FROM listings_current lc WHERE lc.version_id = ? AND (${cmp})`)
                         .get(vid, ap, ap, anchorMint) as { c: number };
                     const anchorIdx = idxRow.c;
-                    pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                    pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
             }
             const items = db.raw
@@ -250,7 +256,7 @@ export function searchListingsByTraits(
                   WHERE lc.version_id = ? AND (${cmp})`;
                 const idxRow = db.raw.prepare(idxSql).get(...paramsCore, vid, ap, ap, anchorMint) as { c: number };
                 const anchorIdx = idxRow.c;
-                pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                pageOffset = centerOffset(countRow.c, anchorIdx, limit);
             }
         }
 
@@ -337,7 +343,7 @@ export function searchTokensByValues(
                         : `t.token_num < ? OR (t.token_num = ? AND t.token_mint_addr < ?)`;
                     const idxRow = db.raw.prepare(`SELECT COUNT(*) AS c FROM tokens t WHERE ${cmp}`).get(an, an, anchorMint) as { c: number };
                     const anchorIdx = idxRow.c;
-                    pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                    pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
             }
             const items = db.raw
@@ -387,7 +393,7 @@ export function searchTokensByValues(
                   WHERE ${cmp}`;
                 const idxRow = db.raw.prepare(idxSql).get(...paramsBase, an, an, anchorMint) as { c: number };
                 const anchorIdx = idxRow.c;
-                pageOffset = Math.max(0, Math.min(Math.max(0, countRow.c - limit), anchorIdx - Math.floor(limit / 2)));
+                pageOffset = centerOffset(countRow.c, anchorIdx, limit);
             }
         }
 
