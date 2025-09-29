@@ -45,6 +45,7 @@
   $: totalTraits = filtered.length;
   $: startIdx = traitBarOffset;
   $: endIdx = Math.min(totalTraits, startIdx + Math.max(1, visibleTraitSlots || 1));
+  $: hasPagination = totalTraits > Math.max(1, visibleTraitSlots || 1);
 
   // Reset paging whenever the selected purpose changes (including when parent updates it)
   let lastPurpose: Purpose | null = null;
@@ -115,7 +116,9 @@
       </div>
     {/each}
   </div>
-  <button type="button" class="trait-arrow" title="Next traits page (wrap)" on:mousedown|preventDefault on:click={handleNextArrowClick} disabled={totalTraits === 0}>&rarr;</button>
+  {#if hasPagination}
+    <button type="button" class="trait-arrow" title="Next traits page (wrap)" on:mousedown|preventDefault on:click={handleNextArrowClick}>&rarr;</button>
+  {/if}
   <!-- keys handled globally in App; no hidden focus catcher needed -->
 </div>
 
@@ -140,8 +143,8 @@
     z-index: 9000;
     pointer-events: auto;
   }
-  .trait-arrow { width: 50px; height: 50px; border: 0; background: transparent; color: #e6e6e6; cursor: pointer; align-self: center; }
-  .trait-arrow:hover { background: rgba(255,255,255,0.06); }
+  .trait-arrow { width: 50px; height: 50px; border: 0; background: rgba(255,255,255,0.08); color: #e6e6e6; cursor: pointer; align-self: center; }
+  .trait-arrow:hover { background: rgba(255,255,255,0.12); }
   .trait-arrow:disabled { opacity: 0.25; cursor: default; }
   .trait-arrow:focus, .trait-arrow:focus-visible { outline: none; box-shadow: none; }
   .trait-strip { flex: 1; display: flex; overflow: hidden; }
