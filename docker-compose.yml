@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  backend:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn backend:run"
+    environment:
+      - DRIFELLASCAPE_BACKEND_REFRESH_MS=30000
+    volumes:
+      - ./:/app
+      - dbdata:/app/database/drifellascape.db
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  worker:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn worker:run"
+    environment:
+      - DRIFELLASCAPE_SYNC_INTERVAL_MS=30000
+    volumes:
+      - ./:/app
+      - dbdata:/app/database/drifellascape.db
+      - ./logs:/app/logs
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  frontend:
+    image: node:24-bookworm-slim
+    working_dir: /app
+    environment:
+      - VITE_API_BASE=
+    command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn workspace @drifellascape/frontend build && yarn workspace @drifellascape/frontend preview --host 0.0.0.0 --port 4173"
+    volumes:
+      - ./:/app
+    expose:
+      - "4173"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  dbdata:
+  caddy_data:
+  caddy_config:
