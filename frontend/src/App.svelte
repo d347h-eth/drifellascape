@@ -4,9 +4,10 @@
     import GalleryScroller from "./components/GalleryScroller.svelte";
     import GridView from "./components/GridView.svelte";
     import HelpOverlay from "./components/HelpOverlay.svelte";
-    import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
+    import AboutOverlay from "./components/AboutOverlay.svelte";
+    import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearch, buildSearchBody } from "./lib/search";
+    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
     import type { Row, ListingTrait, DataSource } from "./lib/types";
@@ -30,6 +31,7 @@
     let exploreIndex: number | null = null;
     let exploreItems: Row[] | null = null;
     let showHelp = false;
+    let showAbout = false;
     let showTraitBar = false;
     import { PURPOSES, type Purpose, normalizedPurpose } from './lib/purposes';
     let selectedPurpose: Purpose = "middle";
@@ -63,8 +65,24 @@
     }
 
     let dataSource: DataSource = 'listings';
+    // Sort state per source
+    let sortAscListings: boolean = true;
+    let sortAscTokens: boolean = true;
+    function currentSort(): string {
+        if (dataSource === 'tokens') return sortAscTokens ? 'token_asc' : 'token_desc';
+        return sortAscListings ? 'price_asc' : 'price_desc';
+    }
 
     let pagingSession = 0;
+    let gridCurrentPage = 1;
+    function computeTotalPages(): number { return Math.max(1, Math.ceil(Number(total || 0) / DEFAULT_SEARCH_LIMIT)); }
+    function computeGridPageForward(): number {
+        const lastLoadedIndex = baseOffset + Math.max(0, items.length - 1);
+        return Math.floor(lastLoadedIndex / DEFAULT_SEARCH_LIMIT) + 1;
+    }
+    function computeGridPageBackward(): number {
+        return Math.floor(baseOffset / DEFAULT_SEARCH_LIMIT) + 1;
+    }
 
     // Best-effort resolution of selected value ids to labels from the current/in-focus token only
     $: {
@@ -87,11 +105,12 @@
         pagingSession++;
         isLoadingMore = false;
         try {
-            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
             items = res.items;
             total = res.total;
             baseOffset = res.baseOffset;
             versionId = res.versionId;
+            gridCurrentPage = computeGridPageBackward();
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
@@ -123,7 +142,7 @@
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
-            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
             const data = await postSearch('listings', body);
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
@@ -245,10 +264,10 @@
                 return;
             } else if (k === 'Home') {
                 e.preventDefault();
-                scrollerRef?.scrollToIndexInstant?.(0);
+                scrollerRef?.snapToIndex?.(0);
             } else if (k === 'End') {
                 e.preventDefault();
-                scrollerRef?.scrollToIndexInstant?.(items.length - 1);
+                scrollerRef?.snapToIndex?.(items.length - 1);
             } else if (k === 'f' || k === 'F') {
                 if (e.ctrlKey || e.metaKey) {
                     // Allow Ctrl/Cmd+F
@@ -319,7 +338,7 @@
             const anchorMintToUse: string | undefined = selectAnchorMint(gridMode, inExploreOrGallery, curMint);
             // Disarm gallery paging around filter transitions to avoid immediate edge prefetch
             galleryPagingArmed = false;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: anchorMintToUse, offset: 0 });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: anchorMintToUse, offset: 0, sort: currentSort() });
             const data = await postSearch(dataSource, body);
             let newItems = data.items ?? [];
             items = newItems;
@@ -458,13 +477,14 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset, currentLength: items.length });
+            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, currentLength: items.length, sort: currentSort() });
             if (session !== pagingSession || !gridMode) return;
             total = newTotal;
             if (newItems.length > 0) {
                 const deduped = dedupeAppend(items, newItems);
                 if (deduped.length > 0) items = items.concat(deduped);
             }
+            gridCurrentPage = computeGridPageForward();
         } catch (e) {
             // ignore transient errors for paging
         } finally {
@@ -484,7 +504,7 @@
         const anchorMint = items[0]?.token_mint_addr;
         const beforeTop = anchorMint ? (document.getElementById(`cell-${anchorMint}`)?.getBoundingClientRect()?.top ?? 0) : 0;
         try {
-            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset });
+            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, sort: currentSort() });
             if (!prev) { isLoadingPrev = false; return; }
             const newItems = prev.newItems;
             if (session !== pagingSession || !gridMode) return;
@@ -497,6 +517,7 @@
                     });
                 }
             }
+            gridCurrentPage = computeGridPageBackward();
         } catch (e) {
             // ignore
         } finally {
@@ -513,7 +534,7 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];
@@ -536,7 +557,7 @@
         try {
             const mint = items[activeIndex]?.token_mint_addr;
             if (!mint) return;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];
@@ -654,6 +675,16 @@
 
     /* Trait bar styles are scoped in TraitBar.svelte */
     /* Trait bar styles live within TraitBar component */
+    .bottom-stack {
+        position: fixed;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        z-index: 9500;
+        pointer-events: auto;
+    }
 </style>
 
 <div class="container">
@@ -689,27 +720,68 @@
         />
     {/if}
 
-    <!-- Hotkeys help overlay -->
+    <!-- Overlays -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
+    <AboutOverlay visible={showAbout} onClose={() => (showAbout = false)} />
     
-    <!-- Toggle button shows only when bar is hidden -->
-    {#if !showTraitBar}
-      <ToggleButton show={false} galleryMode={!gridMode && exploreIndex === null} on:toggle={() => { showTraitBar = !showTraitBar; }} />
-    {/if}
-
-    <!-- Trait bar (extracted) -->
-    {#if showTraitBar}
-        <TraitBar
-            traits={traitsForCurrent}
-            bind:selectedPurpose
-            {selectedValueIds}
-            selectedValueMeta={selectedValueMeta}
-            galleryMode={!gridMode && exploreIndex === null}
-            on:toggleValue={handleToggleValue}
-            on:purposeChange={handlePurposeChange}
-            on:toggleBar={() => { showTraitBar = false; }}
+    <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
+    <div class="bottom-stack" style={`bottom: ${(!gridMode && exploreIndex === null) ? 15 : 0}px`}>
+        {#if showTraitBar}
+            <TraitBar
+                traits={traitsForCurrent}
+                bind:selectedPurpose
+                {selectedValueIds}
+                selectedValueMeta={selectedValueMeta}
+                galleryMode={!gridMode && exploreIndex === null}
+                on:toggleValue={handleToggleValue}
+                on:purposeChange={handlePurposeChange}
+            />
+        {/if}
+        <StatusBar
+            {dataSource}
+            {motionEnabled}
+            {showTraitBar}
+            gridMode={gridMode}
+            inExplore={exploreIndex !== null}
+            {activeIndex}
+            {baseOffset}
+            itemsLength={items.length}
+            total={Number(total || 0)}
+            gridCurrentPage={gridCurrentPage}
+            filtersApplied={selectedValueIds.size > 0}
+            {sortAscListings}
+            {sortAscTokens}
+            networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
+            on:toggleSource={() => {
+                const cur = currentItem();
+                gridTargetMint = cur?.token_mint_addr ?? null;
+                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+                applyValueFilterAndFetch();
+            }}
+            on:nextMode={() => {
+                if (gridMode) exitToGallery();
+                else if (exploreIndex !== null) closeExplore();
+                else enterGrid();
+            }}
+            on:toggleSort={async () => {
+                if (dataSource === 'tokens') sortAscTokens = !sortAscTokens; else sortAscListings = !sortAscListings;
+                // Reset pagination to the first page and index
+                loading = true; pagingSession++; isLoadingMore = false; isLoadingPrev = false;
+                try {
+                    const res = await loadInitialPage({ source: dataSource, valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
+                    items = res.items; total = res.total; baseOffset = res.baseOffset; versionId = res.versionId;
+                    await tick();
+                    if (!gridMode && exploreIndex === null) { scrollerRef?.scrollToIndexInstant?.(0); activeIndex = 0; }
+                } catch {}
+                finally { loading = false; }
+            }}
+            on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
+            on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+            on:toggleHelp={() => { showHelp = !showHelp; }}
+            on:toggleAbout={() => { showAbout = !showAbout; }}
         />
-    {/if}
+    </div>
+
 <!-- Full-screen explorer overlay -->
 {#if exploreIndex !== null && exploreItems}
     <ImageExplorer

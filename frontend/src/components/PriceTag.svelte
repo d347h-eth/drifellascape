@@ -36,6 +36,7 @@
 <style>
   .price, .price-link { font-variant-numeric: tabular-nums; }
   .price-link { text-decoration: none; color: inherit; }
+  .price-link:hover { text-decoration: underline; }
   .price-link:visited { color: inherit; }
   .price { opacity: 0.9; }
 </style>

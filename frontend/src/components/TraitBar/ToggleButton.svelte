@@ -2,10 +2,9 @@
   export let show = false;
   import { createEventDispatcher } from 'svelte';
   const dispatch = createEventDispatcher();
-  import { SCROLLBAR_GAP } from '../../lib/ui-constants';
   export let galleryMode: boolean = true; // when false (Grid/Explore), bar is flush with bottom
-  // Place near bottom-left corner; gap only in gallery mode
-  $: bottom = galleryMode ? SCROLLBAR_GAP : 0;
+  // Place near bottom-left corner; position above main status bar (28px height)
+  $: bottom = (galleryMode ? 15 : 0) + 28;
 </script>
 
 <button

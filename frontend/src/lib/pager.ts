@@ -25,6 +25,7 @@ export async function loadInitialPage(params: {
     includeTraits: boolean;
     anchorMint?: string;
     offset?: number;
+    sort?: string;
 }): Promise<PageResult> {
     const body = buildSearchBody({
         source: params.source,
@@ -33,6 +34,7 @@ export async function loadInitialPage(params: {
         includeTraits: params.includeTraits,
         anchorMint: params.anchorMint,
         offset: params.offset ?? 0,
+        sort: params.sort,
     });
     const data = await postSearch(params.source, body);
     return {
@@ -50,6 +52,7 @@ export async function loadNextPage(params: {
     includeTraits: boolean;
     baseOffset: number;
     currentLength: number;
+    sort?: string;
 }): Promise<{ newItems: Row[]; newTotal: number }> {
     const offset = params.baseOffset + params.currentLength;
     const body = buildSearchBody({
@@ -58,6 +61,7 @@ export async function loadNextPage(params: {
         limit: params.limit,
         includeTraits: params.includeTraits,
         offset,
+        sort: params.sort,
     });
     const data = await postSearch(params.source, body);
     return { newItems: data.items ?? [], newTotal: Number(data.total || 0) };
@@ -69,6 +73,7 @@ export async function loadPrevPage(params: {
     limit: number;
     includeTraits: boolean;
     baseOffset: number;
+    sort?: string;
 }): Promise<{ newItems: Row[]; newBaseOffset: number } | null> {
     const newOffset = Math.max(0, params.baseOffset - params.limit);
     if (newOffset === params.baseOffset) return null;
@@ -78,6 +83,7 @@ export async function loadPrevPage(params: {
         limit: params.limit,
         includeTraits: params.includeTraits,
         offset: newOffset,
+        sort: params.sort,
     });
     const data = await postSearch(params.source, body);
     return { newItems: data.items ?? [], newBaseOffset: newOffset };

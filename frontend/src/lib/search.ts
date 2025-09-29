@@ -7,6 +7,9 @@ export function defaultSortForSource(source: DataSource): string {
     return source === "tokens" ? "token_asc" : "price_asc";
 }
 
+// Single source of truth for default page size in search requests
+export const DEFAULT_SEARCH_LIMIT = 50;
+
 export type BuildParams = {
     source: DataSource;
     valueIds?: number[];
@@ -23,7 +26,7 @@ export function buildSearchBody(p: BuildParams): ListingsSearchBody {
     const mode =
         p.mode ?? (p.traits && p.traits.length > 0 ? "trait" : "value");
     const includeTraits = p.includeTraits ?? true;
-    const limit = p.limit ?? 100;
+    const limit = p.limit ?? DEFAULT_SEARCH_LIMIT;
     const sort = (p.sort ?? defaultSortForSource(p.source)).toLowerCase();
     const body: any = { mode, includeTraits, limit, sort };
     if (mode === "trait") body.traits = p.traits ?? [];
