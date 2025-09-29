@@ -6,6 +6,7 @@
 {#if visible}
   <div class="help-backdrop" on:click={() => onClose?.()}>
     <div class="help-panel" role="dialog" aria-modal="true" on:click|stopPropagation>
+      <button type="button" class="close" aria-label="Close" title="Close" on:click={() => onClose?.()}>✕</button>
       <h2>Keyboard Shortcuts</h2>
       <div class="status" style="padding:0 0 8px; opacity:0.75;">Press <span class="kbd">H</span> or <span class="kbd">F1</span> to close</div>
 
@@ -68,10 +69,27 @@
     padding: 16px 20px;
     color: #e6e6e6;
     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    position: relative;
   }
   .help-panel h2 { margin: 6px 0 8px; font-size: 18px; }
   .help-panel h3 { margin: 12px 0 6px; font-size: 15px; opacity: 0.9; }
   .help-panel ul { margin: 6px 0 10px 18px; padding: 0; }
   .help-panel li { margin: 4px 0; }
   .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #1b1b1d; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 1px 6px; }
+  .close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.35);
+    color: #fff;
+    cursor: pointer;
+  }
+  .close:hover { background: rgba(255,255,255,0.08); }
 </style>

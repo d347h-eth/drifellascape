@@ -95,8 +95,8 @@
   // Directly reference selectedValueIds in markup so Svelte tracks dependency
 </script>
 
-<!-- Selected filters (pills above purpose pills) -->
-  <div class="selected-filters" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1" style={`--filters-bottom:${(galleryMode ? 82 : 60) + 26}px`}>
+<!-- Selected filters (top row) -->
+  <div class="selected-filters" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1">
     {#each Array.from(selectedValueIds) as vid}
       <button type="button" class="filter-pill" title={`Remove filter: ${selectedValueMeta[vid] ?? ('#' + vid)}`} on:click={() => emitToggleValue(vid)}>
         <span aria-hidden="true">×</span>&nbsp;{selectedValueMeta[vid] ?? ('#' + vid)}
@@ -104,8 +104,8 @@
     {/each}
   </div>
 
-<!-- Purpose pills -->
-  <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1" style={`--dots-bottom:${galleryMode ? 82 : 60}px`}>
+<!-- Purpose pills (middle row) -->
+  <div class="purpose-dots" on:wheel|stopPropagation on:click|stopPropagation tabindex="-1">
   {#each PURPOSES as pc}
     {@const cnt = purposeCounts[pc] ?? 0}
     <button type="button" class="purpose-dot {pc === normalizedPurpose(selectedPurpose) ? 'active' : ''} {cnt === 0 ? 'disabled' : ''}"
@@ -114,14 +114,10 @@
       {pc}{#if cnt > 0}&nbsp;({cnt}){/if}
     </button>
   {/each}
-  <div style="height:10px;"></div>
 </div>
 
-<!-- Trait bar at bottom -->
-<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation style={`--bar-bottom:${galleryMode ? 15 : 0}px`}>
-  <button type="button" class="trait-toggle" title="Toggle traits bar" on:mousedown|preventDefault on:click={() => dispatch('toggleBar')}>
-    <span class="glyph">✕</span>
-  </button>
+<!-- Trait bar row (bottom within trait stack) -->
+<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
   <div class="trait-strip">
     {#each filtered.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
       <div class="trait-box {selectedValueIds?.has(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => emitToggleValue(tr.value_id)}>
@@ -138,21 +134,17 @@
 
 <style>
   .purpose-dots {
-    position: fixed;
-    left: 0; right: 0; bottom: var(--dots-bottom, 82px); /* gap above bar */
     height: 22px;
     display: flex; align-items: center; justify-content: center;
     pointer-events: auto;
-    z-index: 9001;
+    padding: 4px 0; /* light internal padding */
   }
   .selected-filters {
-    position: fixed;
-    left: 0; right: 0; bottom: var(--filters-bottom, 108px);
     min-height: 24px;
     display: flex; align-items: center; justify-content: center;
     flex-wrap: wrap; gap: 6px;
     pointer-events: auto;
-    z-index: 9001;
+    padding: 4px 0; /* light internal padding */
   }
   .filter-pill { cursor: pointer; margin: 0 4px; padding: 3px 8px; font-size: 12px; color: #e6e6e6; background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; }
   .filter-pill:hover { background: rgba(255,255,255,0.10); }
@@ -163,11 +155,10 @@
   .purpose-dot:focus, .purpose-dot:focus-visible { outline: none; box-shadow: none; }
 
   .trait-bar {
-    position: fixed; left: 0; right: 0; bottom: var(--bar-bottom, 22px); height: 50px;
-    background: rgba(0,0,0,0.6);
+    height: 50px;
+    background: rgba(0,0,0,0.65); /* match StatusBar fill */
     display: flex; align-items: stretch; justify-content: space-between;
     padding-left: 12px; /* align with grid left padding */
-    z-index: 9000;
     pointer-events: auto;
   }
   .trait-arrow { width: 50px; height: 50px; border: 0; background: rgba(255,255,255,0.08); color: #e6e6e6; cursor: pointer; align-self: center; }
@@ -175,13 +166,11 @@
   .trait-arrow:disabled { opacity: 0.25; cursor: default; }
   .trait-arrow:focus, .trait-arrow:focus-visible { outline: none; box-shadow: none; }
   .trait-strip { flex: 1; display: flex; overflow: hidden; justify-content: center; }
-  .trait-box { width: 150px; height: 50px; padding: 6px 8px; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.06); cursor: pointer; align-self: center; }
+  .trait-box { width: 150px; height: 50px; padding: 6px 8px; box-sizing: border-box; border-left: 1px solid rgba(255,255,255,0.06); border-top: 0; border-bottom: 0; cursor: pointer; align-self: center; }
+  .trait-box:first-child { border-left: 0; }
   .trait-box:hover { background: rgba(255,255,255,0.06); }
   .trait-box.selected { background: rgba(255,255,255,0.12); }
   .trait-head { font-size: 11px; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .trait-val { font-size: 13px; font-weight: 600; white-space: normal; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
-  .trait-toggle { width: 50px; height: 50px; border: 0; background: rgba(0,0,0,0.6); color: #e6e6e6; cursor: pointer; align-self: center; border-radius: 0; }
-  .trait-toggle:hover { background: rgba(0,0,0,0.75); }
-  .trait-toggle:focus, .trait-toggle:focus-visible { outline: none; box-shadow: none; }
-  .glyph { display: inline-block; color: rgba(230,230,230,0.9); font-size: 12px; pointer-events: none; }
+  /* Removed in-bar close toggle; controlled from StatusBar */
 </style>

@@ -3,8 +3,8 @@
   import { createEventDispatcher } from 'svelte';
   const dispatch = createEventDispatcher();
   export let galleryMode: boolean = true; // when false (Grid/Explore), bar is flush with bottom
-  // Place near bottom-left corner; bottom offset matches trait bar (15px in gallery, 0 elsewhere)
-  $: bottom = galleryMode ? 15 : 0;
+  // Place near bottom-left corner; position above main status bar (28px height)
+  $: bottom = (galleryMode ? 15 : 0) + 28;
 </script>
 
 <button
