@@ -3,8 +3,18 @@ import path from "node:path";
 import sharp from "sharp";
 
 const SOURCE_DIR = path.resolve(process.cwd(), "static", "full");
-const TARGET_DIR = path.resolve(process.cwd(), "static", "2560");
+
+// Mode selection: 'width' resizes by width to 2560px; 'height' resizes by height to 540px.
+// Adjust either constant below as needed; keep it simple and hard-coded per request.
+const MODE: "width" | "height" = "height"; // change to "width" to produce 2560px-wide images
 const TARGET_WIDTH_PX = 2560;
+const TARGET_HEIGHT_PX = 540;
+
+const TARGET_DIR = path.resolve(
+    process.cwd(),
+    "static",
+    MODE === "width" ? "2560" : "540h",
+);
 const MAX_CONCURRENCY = 4;
 
 async function ensureDirectoryExists(directoryPath: string): Promise<void> {
@@ -36,7 +46,7 @@ function deriveTargetPathFromSource(sourceFilePath: string): string {
     return path.join(targetDir, targetFilename);
 }
 
-async function convertPngToJpeg2560(sourceFilePath: string): Promise<void> {
+async function convertPngToJpegResized(sourceFilePath: string): Promise<void> {
     const targetFilePath = deriveTargetPathFromSource(sourceFilePath);
     await ensureDirectoryExists(path.dirname(targetFilePath));
 
@@ -44,7 +54,8 @@ async function convertPngToJpeg2560(sourceFilePath: string): Promise<void> {
 
     await image
         .resize({
-            width: TARGET_WIDTH_PX,
+            width: MODE === "width" ? TARGET_WIDTH_PX : undefined,
+            height: MODE === "height" ? TARGET_HEIGHT_PX : undefined,
             fit: "inside",
             withoutEnlargement: true,
             kernel: sharp.kernel.lanczos3,
@@ -99,14 +110,18 @@ async function main(): Promise<void> {
         return;
     }
     console.log(
-        `Found ${pngFiles.length} PNG file(s). Starting conversion to 2560px JPEG...`,
+        `Found ${pngFiles.length} PNG file(s). Starting conversion to ${
+            MODE === "width"
+                ? `${TARGET_WIDTH_PX}px width`
+                : `${TARGET_HEIGHT_PX}px height`
+        } JPEG...`,
     );
 
     let processedCount = 0;
     await runWithConcurrency(
         pngFiles,
         async (sourceFilePath) => {
-            await convertPngToJpeg2560(sourceFilePath);
+            await convertPngToJpegResized(sourceFilePath);
             processedCount++;
             if (processedCount % 10 === 0) {
                 console.log(
