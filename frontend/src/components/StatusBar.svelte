@@ -55,6 +55,12 @@
     <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
       Traits
     </button>
+    <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
+      Hotkeys
+    </button>
+    <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
+      About
+    </button>
   </div>
   <div class="center">
     {#if gridMode}

@@ -4,6 +4,7 @@
     import GalleryScroller from "./components/GalleryScroller.svelte";
     import GridView from "./components/GridView.svelte";
     import HelpOverlay from "./components/HelpOverlay.svelte";
+    import AboutOverlay from "./components/AboutOverlay.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT } from "./lib/search";
@@ -30,6 +31,7 @@
     let exploreIndex: number | null = null;
     let exploreItems: Row[] | null = null;
     let showHelp = false;
+    let showAbout = false;
     let showTraitBar = false;
     import { PURPOSES, type Purpose, normalizedPurpose } from './lib/purposes';
     let selectedPurpose: Purpose = "middle";
@@ -718,8 +720,9 @@
         />
     {/if}
 
-    <!-- Hotkeys help overlay -->
+    <!-- Overlays -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
+    <AboutOverlay visible={showAbout} onClose={() => (showAbout = false)} />
     
     <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
     <div class="bottom-stack" style={`bottom: ${(!gridMode && exploreIndex === null) ? 15 : 0}px`}>
@@ -774,6 +777,8 @@
             }}
             on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
             on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+            on:toggleHelp={() => { showHelp = !showHelp; }}
+            on:toggleAbout={() => { showAbout = !showAbout; }}
         />
     </div>
 
