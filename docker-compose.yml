@@ -9,7 +9,6 @@ services:
       - DRIFELLASCAPE_BACKEND_REFRESH_MS=30000
     volumes:
       - ./:/app
-      - dbdata:/app/database/drifellascape.db
       - ./logs:/app/logs
     restart: unless-stopped
 
@@ -21,7 +20,6 @@ services:
       - DRIFELLASCAPE_SYNC_INTERVAL_MS=30000
     volumes:
       - ./:/app
-      - dbdata:/app/database/drifellascape.db
       - ./logs:/app/logs
     depends_on:
       - backend
@@ -54,6 +52,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  dbdata:
   caddy_data:
   caddy_config:
