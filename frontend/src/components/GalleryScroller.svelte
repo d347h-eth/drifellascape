@@ -8,7 +8,7 @@
   export let showMeta: boolean = true;
   export let motionEnabled: boolean = true;
   export let leaveThresholdFrac: number = 0.5;
-  export let wheelMultiplier: number = 1.5;
+  export let wheelMultiplier: number = 1.6;
   export let activeIndex: number = 0; // bindable
   // Gallery infinite scroll (near-edge prefetch)
   export let galleryPagingEnabled: boolean = false;
@@ -24,6 +24,8 @@
   let draggingScrollbar = false;
   let blockUntilTs = 0;
   const SCROLLBAR_HIT_PX = 24;
+  // Post-snap wheel input block to avoid immediate re-scroll after landing
+  const POST_SNAP_WHEEL_BLOCK_MS = 200;
 
   // Internal helpers (ported from App)
   function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)); }
@@ -47,7 +49,14 @@
       const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       scrollerEl.scrollLeft = start + (left - start) * eased;
       if (t < 1) animReq = requestAnimationFrame(step);
-      else { isAnimating = false; lastSnapIndex = idxToSet; activeIndex = idxToSet; maybeEdgePrefetch(); }
+      else {
+        isAnimating = false;
+        lastSnapIndex = idxToSet;
+        activeIndex = idxToSet;
+        // Briefly block wheel input after landing to avoid immediate re-scroll
+        blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
+        maybeEdgePrefetch();
+      }
     };
     animReq = requestAnimationFrame(step);
   }
@@ -60,36 +69,6 @@
   export function next() { scrollToIndex(activeIndex + 1); }
   export function focusCurrent() { scrollToIndex(nearestIndex()); }
   export function scrollToIndexInstant(i: number) { scrollToIndex(i, false, true); }
-  // Shift viewport by whole-slide widths to preserve the centered slide
-  export function shiftBySlides(n: number) {
-    if (!scrollerEl || !Number.isFinite(n) || n === 0) return;
-    const cw = scrollerEl.clientWidth || 1;
-    scrollerEl.scrollLeft += n * cw;
-    lastSnapIndex = Math.max(0, Math.min(items.length - 1, lastSnapIndex + n));
-    activeIndex = Math.max(0, Math.min(items.length - 1, activeIndex + n));
-    // Suppress finalize/snap briefly to avoid fighting the programmatic shift
-    suppressFinalizeUntilTs = Date.now() + 300;
-    blockUntilTs = Date.now() + 150;
-  }
-  export function getSlideRectByMint(mint: string): DOMRect | null {
-    if (!scrollerEl || !mint) return null;
-    const el = scrollerEl.querySelector<HTMLElement>(`#slide-${mint}`);
-    return el?.getBoundingClientRect() ?? null;
-  }
-  export function scrollByPixels(dx: number) {
-    if (!scrollerEl || !Number.isFinite(dx) || dx === 0) return;
-    scrollerEl.scrollLeft += dx;
-    suppressFinalizeUntilTs = Date.now() + 300;
-    blockUntilTs = Date.now() + 150;
-  }
-  // Rebase internal indices after items were prepended externally
-  export function rebaseAfterPrepend(added: number) {
-    if (!Number.isFinite(added) || added <= 0) return;
-    lastSnapIndex = clamp(lastSnapIndex + added, 0, Math.max(0, items.length - 1));
-    activeIndex = clamp(activeIndex + added, 0, Math.max(0, items.length - 1));
-    suppressFinalizeUntilTs = Date.now() + 300;
-    blockUntilTs = Date.now() + 150;
-  }
 
   function scrollToIndex(i: number, autoSnap = false, forceInstant = false) {
     if (!scrollerEl) return;
@@ -99,7 +78,7 @@
     if (motionEnabled && !forceInstant) { animateScrollTo(target, idx); }
     else {
       scrollerEl.scrollLeft = target; lastSnapIndex = idx; activeIndex = idx;
-      if (autoSnap && motionEnabled) blockUntilTs = Date.now() + 150;
+      if (autoSnap && motionEnabled) blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
       if (forceInstant) suppressFinalizeUntilTs = Date.now() + 200;
     }
   }

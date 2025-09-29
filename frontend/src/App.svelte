@@ -31,8 +31,7 @@
     let exploreItems: Row[] | null = null;
     let showHelp = false;
     let showTraitBar = false;
-    const PURPOSE_CLASSES = ["left", "middle", "right", "decor", "items", "special", "undefined"] as const;
-    type Purpose = typeof PURPOSE_CLASSES[number];
+    import { PURPOSES, type Purpose, normalizedPurpose } from './lib/purposes';
     let selectedPurpose: Purpose = "middle";
     // Trait bar paging is encapsulated in TraitBar
     let selectedValueIds: Set<number> = new Set();
@@ -162,6 +161,11 @@
             // Grid/Gallery toggle — G
             if (k === 'g' || k === 'G') {
                 e.preventDefault();
+                // In exploration, 'G' should behave like closing the explorer (return to Gallery)
+                if (exploreIndex !== null) {
+                    closeExplore();
+                    return;
+                }
                 if (gridMode) {
                     // Return to gallery centered at the last focused token
                     exitToGallery();
@@ -193,10 +197,10 @@
                 const list = traitsForCurrent || [];
                 const counts: Record<string, number> = {};
                 for (const t of list) { const key = normalizedPurpose(t.purpose_class); counts[key] = (counts[key]||0) + 1; }
-                let nextIdx = PURPOSE_CLASSES.indexOf(selectedPurpose);
-                for (let i = 0; i < PURPOSE_CLASSES.length; i++) {
-                    nextIdx = (nextIdx + dir + PURPOSE_CLASSES.length) % PURPOSE_CLASSES.length;
-                    const pc = PURPOSE_CLASSES[nextIdx];
+                let nextIdx = PURPOSES.indexOf(selectedPurpose);
+                for (let i = 0; i < PURPOSES.length; i++) {
+                    nextIdx = (nextIdx + dir + PURPOSES.length) % PURPOSES.length;
+                    const pc = PURPOSES[nextIdx];
                     if ((counts[pc] ?? 0) > 0) { selectedPurpose = pc; break; }
                 }
                 return;
@@ -262,11 +266,7 @@
         if (exploreIndex !== null && exploreItems) return exploreItems[exploreIndex] || null;
         return items[activeIndex] || null;
     }
-    function normalizedPurpose(p: string | null | undefined): Purpose {
-        const v = (p || "").toLowerCase();
-        const m = PURPOSE_CLASSES.find((x) => x === v);
-        return (m ?? "undefined") as Purpose;
-    }
+    // normalizedPurpose imported from lib/purposes
     // Trait bar sizing, paging, and counts are implemented inside TraitBar
     import { dbg } from "./debug";
 

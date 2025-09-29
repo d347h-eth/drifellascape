@@ -58,12 +58,12 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 ## Local Data Model
 
-  - Listings (normalized current state)
-  - `listing_versions`
-    - `id`, `created_at`, `total`, `active` (unique partial index to enforce a single active version).
-  - `listings_current`
-    - `(version_id, token_mint_addr)` as PK; columns: `token_num?`, `price`, `seller`, `image_url`, `listing_source`, `created_at`.
-    - Indexes for the active version: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_num)`.
+- Listings (normalized current state)
+- `listing_versions`
+  - `id`, `created_at`, `total`, `active` (unique partial index to enforce a single active version).
+- `listings_current`
+  - `(version_id, token_mint_addr)` as PK; columns: `token_num?`, `price`, `seller`, `image_url`, `listing_source`, `created_at`.
+  - Indexes for the active version: `(version_id)`, `(version_id, price)`, `(version_id, created_at)`, `(version_id, token_num)`.
 - Token metadata & traits
   - Current: normalized tables for tokens and traits exist (`tokens`, `trait_types` with `spatial_group` and `purpose_class`, `trait_values`, `trait_types_values`, `token_traits`). A helper script updates type groupings/classes from CSV.
   - Ingestion: raw metadata ingested “as is”; counts maintained per type/value; special `trait_values.id=217` (None) is excluded from filters/attachments in API.
@@ -106,7 +106,6 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
     - 1/2/3: fit a 1006px‑tall band (vertically aligned by tuned offset) to viewport height (no 1:1 cap)
     - G: toggle debug overlay (cyan rectangle) for the 1006px band
   - Pixel‑accurate swapping between images; double‑click resets view; ESC closes.
-  
 - Grid mode (default homepage)
   - Vertical 3‑column grid; press `G` or `Esc` to enter from Gallery/Explore; click any image to return to Gallery centered on that token.
   - Infinite scroll up/down with user‑interaction arming for paging; press `F` in Grid to refocus the last anchored token.

@@ -2,7 +2,8 @@
 export const SCROLLBAR_GAP = 22; // px above native horizontal scrollbar
 export const TRAIT_BAR_HEIGHT = 50; // px
 export const PURPOSE_DOTS_GAP = 10; // px gap between trait bar top and pills
-export const PURPOSE_DOTS_BOTTOM = SCROLLBAR_GAP + TRAIT_BAR_HEIGHT + PURPOSE_DOTS_GAP; // 22 + 50 + 10 = 82
+export const PURPOSE_DOTS_BOTTOM =
+    SCROLLBAR_GAP + TRAIT_BAR_HEIGHT + PURPOSE_DOTS_GAP; // 22 + 50 + 10 = 82
 
 export const TOGGLE_BUTTON_WIDTH = 200; // px
 export const TOGGLE_BUTTON_HEIGHT = 14; // px

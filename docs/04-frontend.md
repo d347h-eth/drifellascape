@@ -85,7 +85,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 ## Trait Bar (Bottom Overlay)
 
-  - Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
+- Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
 - Purpose classes (pills) centered above the bar: `left`, `middle`, `right`, `decor`, `items`, `special`, `undefined`.
   - Default selected: `middle`.
   - Pills show counts for the current token (e.g., `middle (5)`); empty pills are disabled and skipped by keyboard nav.

@@ -12,33 +12,38 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 
 ## Plan (Phased)
 
-1) Server: shared offset helper + exclusive params (Phase 1)
+1. Server: shared offset helper + exclusive params (Phase 1)
+
    - Extract `computePageOffset` helper used by all repo functions (listings/tokens; value/trait).
    - Implement rank calculation with identical WHERE/JOIN shape as the items query and deterministic tie‑breaker (mint) for ties.
    - Exclusive params: when `anchorMint` present, ignore `offset` and use anchor; otherwise use `offset`.
    - Response: always return effective `offset` used; add optional debug `{ anchorMint, effectiveOffset, pageContainsAnchor }` behind `DRIFELLASCAPE_DEBUG=1`.
 
-2) FE API: single request builder (Phase 2)
+2. FE API: single request builder (Phase 2)
+
    - `buildSearchBody({ source, filters, anchorMint?, offset? })` enforces the exclusive rule.
    - `postSearch({ source, body })` chooses `/listings/search` or `/tokens/search`, returns typed response with `offset` (effective).
    - Apply across current call sites (initial load, filter changes, mode toggles).
 
-3) FE Pager: unify paging logic (Phase 3)
+3. FE Pager: unify paging logic (Phase 3)
+
    - Tiny pager module (or store) that owns: `items`, `baseOffset`, `total`, `session` and methods `reset(anchorMint?)`, `fetchNext()`, `fetchPrev()`.
    - Dedup by mint, session guard, and viewport‑stable prepend (for `fetchPrev`).
    - Source‑agnostic: internally picks sort and endpoint based on `source`.
    - Extract viewport anchoring into `lib/viewport.ts` to keep App lean.
 
-4) FE Anchor: centralize anchor state (Phase 4)
+4. FE Anchor: centralize anchor state (Phase 4)
+
    - Single `anchor` store: `{ armed, lastMint }`. Arm on first Gallery/Explore entry; track last focused mint in Gallery/Explore.
    - Filter apply uses anchor iff (Gallery/Explore) or (Grid && armed), else uses offset.
    - Replace ad‑hoc branches in `App.svelte` with this store.
 
-5) FE Interactions & toggles (Phase 5)
+5. FE Interactions & toggles (Phase 5)
+
    - Replace `scrollY` gating with a simple `userInteracted` flag (wheel/pointer/key) to arm paging.
    - Consolidate Grid/Gallery toggle into one function (keeps last focused mint).
 
-6) Cleanup & Docs (Phase 6)
+6. Cleanup & Docs (Phase 6)
    - Remove debug from server responses unless `DRIFELLASCAPE_DEBUG=1`.
    - Update API comments (“either `anchorMint` or `offset`; response returns effective `offset`”).
    - Short client README on Pager + SearchBody builder + Anchor store.
@@ -78,5 +83,6 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 - [ ] Phase 6 — Remove debug (prod) + docs update
 
 Notes:
+
 - Phase 1 keeps behavior; introduces helper and consistent offset reporting, and ensures requests are unambiguous.
 - Following phases are mostly mechanical refactors with small integration points.

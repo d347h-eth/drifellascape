@@ -5,6 +5,7 @@ This document captures the plan to decompose `frontend/src/App.svelte` into focu
 ## Goals & Non-Goals
 
 - Goals
+
   - Extract large concerns (gallery scroller, trait bar, help) into components.
   - Centralize shared types, API access, and (optionally) state in a predictable place.
   - Isolate DOM-heavy logic (snap/finalize/scrollbar drag) in a dedicated component.
@@ -46,6 +47,7 @@ frontend/src/
 ## Behavioral Invariants
 
 - Gallery
+
   - Mouse wheel maps Y→X (desktop), no CSS snap.
   - Finalize snap on scroll idle (directional next/prev from last center) with threshold = 50% viewport width (immediate finalize, no debounce).
   - Native scrollbar drag disables snap; on release, snap to nearest slide center (threshold-based).
@@ -54,12 +56,14 @@ frontend/src/
   - W: enter exploration for current in-focus token.
 
 - Trait Bar
+
   - Toggle via V (and centered ▲/▼ button near bottom), stays above native scrollbar (gap ~22 px). Toggle strip is fully transparent by default; only the arrow is visible; lights up subtly on hover.
   - Purpose pills with counts; disabled/greyed if zero; Z/C wrap and skip empty.
   - Trait boxes 150×50; 2-line wrapped value; fixed paging with a single right arrow (wraps on next). `X` performs the same action.
   - Clicking a trait toggles value-based filtering; the current token remains in focus across filter changes (by mint), even when the list grows back.
 
 - Help Overlay
+
   - Function — keys layout for Gallery and Exploration; ESC closes; overlay click closes.
 
 - Data
@@ -70,6 +74,7 @@ frontend/src/
 ## Milestones & Progress
 
 - [x] PR1: Types/API/Stores + HelpOverlay + ToggleButton
+
   - Add `lib/types.ts` and migrate UI types out of App.
   - Add `lib/api.ts` with `postSearchListings()` and adopt in App for fetch + polling + filter apply.
   - Add `lib/stores.ts` skeleton (UI/Gallery/Filters) for gradual adoption.
@@ -78,6 +83,7 @@ frontend/src/
 - [x] PR2: TraitBar split
 - [x] PR3: GalleryScroller extraction — scroller logic/component extracted; scroller CSS moved; methods exposed. Optional: extract snap logic to a `useSnap` action (defer if not needed).
 - [x] PR4: Cleanup & constants — added `lib/ui-constants.ts`; removed dead helpers from App; moved scroller CSS; formalized trait bar numbers in code.
+
   - Extract `TraitBar.svelte`, `PurposePills.svelte`, `TraitStrip.svelte`.
   - Move counts and fixed paging inside; emit `toggleValue` and `purposeChange`; App forwards to API/stores.
 
@@ -89,20 +95,25 @@ frontend/src/
 ### PR1 — Types/API/Stores + HelpOverlay + ToggleButton (Now)
 
 - types.ts
+
   - Export `ListingTrait`, `ListingRow`, `ApiResponse`, `ListingsSearchBody` (UI-facing).
 
 - api.ts
+
   - `postSearchListings(body: ListingsSearchBody): Promise<ApiResponse>`; reads `VITE_API_BASE`.
 
 - stores.ts (optional skeleton)
+
   - Export `showHelp`, `showTraitBar`, `motionEnabled`, `activeIndex` as writables for later adoption.
 
 - HelpOverlay.svelte
+
   - Props: `visible: boolean`.
   - Events: `close` (backdrop click).
   - Presentational only; App handles ESC.
 
 - ToggleButton.svelte
+
   - Props: `show: boolean`.
   - Events: `toggle`.
   - Centered 200×14 ▲/▼, positioned based on bar visibility (22px or ~110px); no focus ring.

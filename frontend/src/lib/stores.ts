@@ -4,4 +4,3 @@ export const showHelp = writable(false);
 export const showTraitBar = writable(false);
 export const motionEnabled = writable(true);
 export const activeIndex = writable(0);
-

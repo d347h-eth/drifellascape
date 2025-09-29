@@ -61,6 +61,7 @@ yarn workspace @drifellascape/frontend dev
 Open http://localhost:5173 — the app will fetch from the backend by default.
 
 Hotkeys (subset)
+
 - Toggle data source (Listings/Tokens): `T`
 - Enter Grid: `G` or `Esc` (from Gallery)
 - Refocus last anchored token in Grid: `F`
@@ -74,6 +75,7 @@ Hotkeys (subset)
 - Inspect with DB Browser for SQLite / SQLiteStudio, or the `sqlite3` CLI.
 
 Traits & ingestion
+
 - Tokens/traits are normalized via `scripts/ingest-traits.ts` using `logs/mint_to_image.csv` and `metadata/`.
 - Duplicate images are expected — the script assigns `image_url → [mints...]` in FIFO order so all 1,333 mints are inserted (uniqueness enforced on `token_mint_addr` and `token_num`, not `image_url`).
 - Utility: `yarn tsx scripts/count-mints-images.ts` prints unique mint/image counts from the CSV.

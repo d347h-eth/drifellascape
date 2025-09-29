@@ -2,19 +2,15 @@
   import { onMount, onDestroy } from 'svelte';
   import type { ListingTrait } from '../../lib/types';
 
+  import { PURPOSES, type Purpose, normalizedPurpose } from '../../lib/purposes';
   export let traits: ListingTrait[] = [];
-  export let selectedPurpose: string = 'middle';
+  export let selectedPurpose: Purpose = 'middle';
   export let selectedValueIds: Set<number> = new Set();
   // When true (Gallery), leave a bottom offset so the native scrollbar is visible.
   // When false (Exploration/Grid), the bar is flush with the bottom.
   export let galleryMode: boolean = true;
 
-  const PURPOSES = ["left","middle","right","decor","items","special","undefined"] as const;
-  type Purpose = typeof PURPOSES[number];
-  function normalizedPurpose(p: string | null | undefined): Purpose {
-    const v = (p || '').toLowerCase();
-    return (PURPOSES.find(x => x === v) ?? 'undefined') as Purpose;
-  }
+  // PURPOSES and normalizedPurpose imported from lib/purposes
 
   // Counts for current token
   let purposeCounts: Record<string, number> = {};

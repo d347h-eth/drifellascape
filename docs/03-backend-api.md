@@ -32,6 +32,7 @@ To avoid a race between reading the active version id and its rows while the wor
 ## Endpoint Contract
 
 - `GET /listings?offset&limit&sort`
+
   - Query params:
     - `offset`: default 0, clamped to `>= 0`.
     - `limit`: default 50, clamped to `[1, 200]`.
@@ -51,6 +52,7 @@ To avoid a race between reading the active version id and its rows while the wor
   - CORS: `Access-Control-Allow-Origin: *`.
 
 - `POST /listings/search`
+
   - Server‑side filtering over the active snapshot; returns enriched listings (token + traits) by default.
   - Body:
     - `mode`: `"value" | "trait"`

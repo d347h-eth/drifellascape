@@ -38,7 +38,7 @@
       <h3>Exploration Mode</h3>
       <ul>
         <li>Previous/Next — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
-        <li>Close exploration — <span class="kbd">Esc</span></li>
+        <li>Close exploration — <span class="kbd">Esc</span> or <span class="kbd">G</span></li>
         <li>Fit‑by‑width centered — <span class="kbd">S</span> or Double‑click</li>
         <li>Fit entire height (middle/left/right) — <span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span></li>
         <li>Fit 1006px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>

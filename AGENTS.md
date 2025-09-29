@@ -19,7 +19,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Database: better‑sqlite3 with pragmas (`WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`). Migrations live in `database/migrations`.
 - Listings schema: primary key is `(version_id, token_mint_addr)`. Ignore price deltas < 0.01 SOL (`PRICE_EPSILON`).
 - Frontend: preserve hard‑pixel rendering and hotkeys contract in the exploration mode.
- - Hotkeys: `T` toggles data source (Listings/Tokens); `G`/`Esc` enter Grid; `F` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
+- Hotkeys: `T` toggles data source (Listings/Tokens); `G`/`Esc` enter Grid; `F` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
 
 ## How to Work
 
@@ -34,7 +34,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - DO ensure one writer (the worker) and short transactions. DON’T hold long transactions in the backend.
 - DO align any new endpoints with `docs/06-api-reference.md`. DON’T change response shapes silently.
 - DO keep public images under `frontend/public/2560/`. DON’T add heavy asset pipelines.
- - DO use `anchorMint` or `offset` exclusively in search calls; `anchorMint` takes precedence and the server returns the effective `offset`.
+- DO use `anchorMint` or `offset` exclusively in search calls; `anchorMint` takes precedence and the server returns the effective `offset`.
 
 ## Ingestion Notes
 

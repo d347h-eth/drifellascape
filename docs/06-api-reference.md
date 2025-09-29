@@ -128,7 +128,7 @@ Errors:
 - 400 invalid JSON
 - 500 `{ "error": "message" }`
 
- CORS & Preflight:
+CORS & Preflight:
 
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET,POST,OPTIONS`
