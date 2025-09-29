@@ -35,6 +35,8 @@
     let selectedPurpose: Purpose = "middle";
     // Trait bar paging is encapsulated in TraitBar
     let selectedValueIds: Set<number> = new Set();
+    // Map of selected trait value id -> display label (best-effort, derived from current items' traits)
+    let selectedValueMeta: Record<number, string> = {};
     let traitsForCurrent: ListingTrait[] = [];
     // Grid mode state
     let gridMode = true; // homepage defaults to grid mode with listings
@@ -63,6 +65,21 @@
     let dataSource: DataSource = 'listings';
 
     let pagingSession = 0;
+
+    // Best-effort resolution of selected value ids to labels from the current/in-focus token only
+    $: {
+        const meta: Record<number, string> = {};
+        const ts = traitsForCurrent || [];
+        const lookup = new Map<number, string>();
+        for (const t of ts) {
+            if (!lookup.has(t.value_id)) lookup.set(t.value_id, t.value);
+        }
+        for (const id of selectedValueIds) {
+            const v = lookup.get(id);
+            if (v) meta[id] = v;
+        }
+        selectedValueMeta = meta;
+    }
 
     async function loadListings() { // existing name kept, behavior depends on dataSource
         loading = true;
@@ -147,8 +164,12 @@
                     return;
                 }
             }
-            // Focus anchor mint in Grid — F
+            // Focus anchor mint in Grid — F (do not intercept Ctrl/Cmd+F)
             if (gridMode && (k === 'f' || k === 'F')) {
+                if (e.ctrlKey || e.metaKey) {
+                    // Let browser find-in-page work
+                    return;
+                }
                 e.preventDefault();
                 const m = getStore(anchorLastMint);
                 if (m) {
@@ -229,6 +250,10 @@
                 e.preventDefault();
                 scrollerRef?.scrollToIndexInstant?.(items.length - 1);
             } else if (k === 'f' || k === 'F') {
+                if (e.ctrlKey || e.metaKey) {
+                    // Allow Ctrl/Cmd+F
+                    return;
+                }
                 e.preventDefault();
                 focusCurrent();
             } else if (k === 'm' || k === 'M') {
@@ -667,8 +692,10 @@
     <!-- Hotkeys help overlay -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
     
-    <!-- Centered toggle button that follows bar state (always visible) -->
-    <ToggleButton show={showTraitBar} on:toggle={() => { showTraitBar = !showTraitBar; }} />
+    <!-- Toggle button shows only when bar is hidden -->
+    {#if !showTraitBar}
+      <ToggleButton show={false} galleryMode={!gridMode && exploreIndex === null} on:toggle={() => { showTraitBar = !showTraitBar; }} />
+    {/if}
 
     <!-- Trait bar (extracted) -->
     {#if showTraitBar}
@@ -676,9 +703,11 @@
             traits={traitsForCurrent}
             bind:selectedPurpose
             {selectedValueIds}
+            selectedValueMeta={selectedValueMeta}
             galleryMode={!gridMode && exploreIndex === null}
             on:toggleValue={handleToggleValue}
             on:purposeChange={handlePurposeChange}
+            on:toggleBar={() => { showTraitBar = false; }}
         />
     {/if}
 <!-- Full-screen explorer overlay -->
