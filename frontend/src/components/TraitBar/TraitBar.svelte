@@ -118,7 +118,7 @@
 </div>
 
 <!-- Trait bar at bottom -->
-<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation style={`--bar-bottom:${galleryMode ? 22 : 0}px`}>
+<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation style={`--bar-bottom:${galleryMode ? 15 : 0}px`}>
   <button type="button" class="trait-toggle" title="Toggle traits bar" on:mousedown|preventDefault on:click={() => dispatch('toggleBar')}>
     <span class="glyph">✕</span>
   </button>

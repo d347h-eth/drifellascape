@@ -6,7 +6,7 @@
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import ToggleButton from "./components/TraitBar/ToggleButton.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearch, buildSearchBody } from "./lib/search";
+    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
     import type { Row, ListingTrait, DataSource } from "./lib/types";
@@ -87,7 +87,7 @@
         pagingSession++;
         isLoadingMore = false;
         try {
-            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true });
             items = res.items;
             total = res.total;
             baseOffset = res.baseOffset;
@@ -123,7 +123,7 @@
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
-            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: 100, includeTraits: true });
+            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true });
             const data = await postSearch('listings', body);
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
@@ -245,10 +245,10 @@
                 return;
             } else if (k === 'Home') {
                 e.preventDefault();
-                scrollerRef?.scrollToIndexInstant?.(0);
+                scrollerRef?.snapToIndex?.(0);
             } else if (k === 'End') {
                 e.preventDefault();
-                scrollerRef?.scrollToIndexInstant?.(items.length - 1);
+                scrollerRef?.snapToIndex?.(items.length - 1);
             } else if (k === 'f' || k === 'F') {
                 if (e.ctrlKey || e.metaKey) {
                     // Allow Ctrl/Cmd+F
@@ -319,7 +319,7 @@
             const anchorMintToUse: string | undefined = selectAnchorMint(gridMode, inExploreOrGallery, curMint);
             // Disarm gallery paging around filter transitions to avoid immediate edge prefetch
             galleryPagingArmed = false;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: anchorMintToUse, offset: 0 });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: anchorMintToUse, offset: 0 });
             const data = await postSearch(dataSource, body);
             let newItems = data.items ?? [];
             items = newItems;
@@ -458,7 +458,7 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset, currentLength: items.length });
+            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, currentLength: items.length });
             if (session !== pagingSession || !gridMode) return;
             total = newTotal;
             if (newItems.length > 0) {
@@ -484,7 +484,7 @@
         const anchorMint = items[0]?.token_mint_addr;
         const beforeTop = anchorMint ? (document.getElementById(`cell-${anchorMint}`)?.getBoundingClientRect()?.top ?? 0) : 0;
         try {
-            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, baseOffset });
+            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset });
             if (!prev) { isLoadingPrev = false; return; }
             const newItems = prev.newItems;
             if (session !== pagingSession || !gridMode) return;
@@ -513,7 +513,7 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];
@@ -536,7 +536,7 @@
         try {
             const mint = items[activeIndex]?.token_mint_addr;
             if (!mint) return;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: 100, includeTraits: true, anchorMint: mint });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];

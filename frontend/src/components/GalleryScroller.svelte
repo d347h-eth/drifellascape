@@ -55,6 +55,7 @@
         activeIndex = idxToSet;
         // Briefly block wheel input after landing to avoid immediate re-scroll
         blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
+        // Trigger prefetch immediately while wheel is blocked to avoid user scrolling mid-fetch
         maybeEdgePrefetch();
       }
     };
@@ -69,6 +70,8 @@
   export function next() { scrollToIndex(activeIndex + 1); }
   export function focusCurrent() { scrollToIndex(nearestIndex()); }
   export function scrollToIndexInstant(i: number) { scrollToIndex(i, false, true); }
+  // Programmatic snap that behaves like finalize (triggers post-snap block and edge prefetch)
+  export function snapToIndex(i: number) { scrollToIndex(i, true, false); }
 
   function scrollToIndex(i: number, autoSnap = false, forceInstant = false) {
     if (!scrollerEl) return;
@@ -78,8 +81,11 @@
     if (motionEnabled && !forceInstant) { animateScrollTo(target, idx); }
     else {
       scrollerEl.scrollLeft = target; lastSnapIndex = idx; activeIndex = idx;
-      if (autoSnap && motionEnabled) blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
+      // Apply post-snap block even when motion is disabled to avoid immediate re-scroll
+      if (autoSnap) blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
       if (forceInstant) suppressFinalizeUntilTs = Date.now() + 200;
+      // If this was an auto snap without animation, trigger prefetch immediately while wheel is blocked
+      if (autoSnap) { maybeEdgePrefetch(); }
     }
   }
 
@@ -87,7 +93,7 @@
     if (!scrollerEl) return;
     if (isAnimating) { e.preventDefault(); return; }
     const ax = Math.abs(e.deltaX); const ay = Math.abs(e.deltaY);
-    if (motionEnabled && Date.now() < blockUntilTs) { e.preventDefault(); return; }
+    if (Date.now() < blockUntilTs) { e.preventDefault(); return; }
     if (ay > ax) { e.preventDefault(); scrollerEl.scrollLeft += e.deltaY * wheelMultiplier; }
   }
   function finalizeDirectionalSnapIdle() {
@@ -128,7 +134,6 @@
     if (draggingScrollbar) return;
     if (scrollEndTimer) clearTimeout(scrollEndTimer);
     scrollEndTimer = setTimeout(() => finalizeDirectionalSnapIdle(), FINALIZE_DELAY_MS);
-    maybeEdgePrefetch();
   }
   function onPointerDown(e: PointerEvent) {
     if (!scrollerEl) return;
@@ -151,7 +156,7 @@
   export function wheelY(deltaY: number) {
     if (!scrollerEl) return;
     if (isAnimating) return;
-    if (motionEnabled && Date.now() < blockUntilTs) return;
+    if (Date.now() < blockUntilTs) return;
     scrollerEl.scrollLeft += deltaY * wheelMultiplier;
   }
 
@@ -159,6 +164,12 @@
   // Helper accessors for union Row type
   function getPrice(r: Row): number | undefined { return (r as any)?.price; }
   function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
+  function getName(r: Row): string | undefined {
+    const anyr: any = r as any;
+    if (anyr?.token_name) return anyr.token_name as string;
+    if (typeof anyr?.token_num === 'number' && anyr.token_num != null) return `#${anyr.token_num}`;
+    return anyr?.token_mint_addr as string;
+  }
 
   onMount(() => {
     scrollerEl?.addEventListener('pointerdown', onPointerDown, { passive: true });
@@ -190,6 +201,10 @@
       {#if showMeta}
         <div class="meta">
           <PriceTag price={getPrice(it)} listingSource={getSource(it)} mint={it.token_mint_addr} />
+        </div>
+      {:else}
+        <div class="meta">
+          <a class="token-link" href={`https://magiceden.io/item-details/${it.token_mint_addr}`} target="_blank" rel="noopener noreferrer">{getName(it)}</a>
         </div>
       {/if}
     </section>
@@ -230,4 +245,6 @@
   .price, .price-link { font-variant-numeric: tabular-nums; }
   .price-link { text-decoration: none; color: inherit; }
   .price-link:visited { color: inherit; }
+  .token-link { text-decoration: none; color: inherit; }
+  .token-link:hover { text-decoration: underline; }
 </style>
