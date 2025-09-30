@@ -62,6 +62,8 @@
     let showScrollShim = false;
     let initialVVH = 0;
     let showScrollHint = false;
+    let showGalleryEntryOverlay = false;
+    let galleryEntryHeightPx = 0;
 
     // Keep TraitBar in sync with the token in focus (gallery or exploration)
     $: {
@@ -321,7 +323,16 @@
                 }
             } catch {}
         };
+        const maybeDismissEntryOverlay = () => {
+            if (!showGalleryEntryOverlay) return;
+            try {
+                if (window.scrollY >= Math.max(0, galleryEntryHeightPx - 1)) {
+                    showGalleryEntryOverlay = false;
+                }
+            } catch {}
+        };
         window.addEventListener('scroll', maybeRemoveShim, { passive: true });
+        window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
         try { (window as any).visualViewport?.addEventListener('resize', maybeRemoveShim); } catch {}
         const dismissScrollHint = () => {
             if (!showScrollHint) return;
@@ -336,6 +347,7 @@
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
             window.removeEventListener('scroll', maybeRemoveShim as any);
+            window.removeEventListener('scroll', maybeDismissEntryOverlay as any);
             try { (window as any).visualViewport?.removeEventListener('resize', maybeRemoveShim as any); } catch {}
             window.removeEventListener('pointerdown', dismissScrollHint as any);
             window.removeEventListener('wheel', dismissScrollHint as any);
@@ -504,10 +516,19 @@
                     } catch {
                         showScrollHint = true;
                     }
+                    // Require a full-screen upward swipe before showing the gallery content
+                    try {
+                        const vvh = (window as any).visualViewport?.height || window.innerHeight || 0;
+                        galleryEntryHeightPx = Math.max(1, vvh);
+                    } catch { galleryEntryHeightPx = Math.max(1, window.innerHeight || 0); }
+                    showGalleryEntryOverlay = true;
+                    // Start at top so the overlay is visible
+                    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
                 }
             } else {
                 showScrollShim = false;
                 showScrollHint = false;
+                showGalleryEntryOverlay = false;
             }
             _prevGalleryMode = isGallery;
         }
@@ -755,12 +776,25 @@
         pointer-events: auto;
     }
     .scroll-shim { height: 24px; width: 1px; }
+    .gallery-entry-overlay { width: 100%; pointer-events: none; }
+    .overlay-msg {
+        position: sticky; top: 40svh; left: 50%; transform: translateX(-50%);
+        display: inline-block; text-align: center;
+        background: rgba(0,0,0,0.65); color: #e6e6e6;
+        font-size: 14px; padding: 8px 12px; border-radius: 8px;
+        width: max-content; max-width: 90vw;
+    }
     .scroll-hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; background: rgba(0,0,0,0.7); color: #e6e6e6; font-size: 12px; padding: 6px 10px; border-radius: 6px; z-index: 9400; }
 </style>
 
 <div class="container">
     {#if !gridMode}
         <!-- Horizontal scroller -->
+        {#if isMobile && showGalleryEntryOverlay}
+          <div class="gallery-entry-overlay" style={`height:${galleryEntryHeightPx}px`} aria-hidden="true">
+            <div class="overlay-msg">Keep scrolling down until you reach the gallery…</div>
+          </div>
+        {/if}
         <!-- Gallery Scroller (extracted) -->
         <GalleryScroller
             bind:activeIndex
