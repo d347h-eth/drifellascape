@@ -61,6 +61,7 @@
     let landscapeOverlayClosed = false;
     let showScrollShim = false;
     let initialVVH = 0;
+    let showScrollHint = false;
 
     // Keep TraitBar in sync with the token in focus (gallery or exploration)
     $: {
@@ -322,12 +323,23 @@
         };
         window.addEventListener('scroll', maybeRemoveShim, { passive: true });
         try { (window as any).visualViewport?.addEventListener('resize', maybeRemoveShim); } catch {}
+        const dismissScrollHint = () => {
+            if (!showScrollHint) return;
+            showScrollHint = false;
+            try { sessionStorage.setItem('scrollHintShown', '1'); } catch {}
+        };
+        window.addEventListener('pointerdown', dismissScrollHint, { passive: true });
+        window.addEventListener('wheel', dismissScrollHint, { passive: true });
+        window.addEventListener('keydown', dismissScrollHint);
         return () => {
             clearInterval(id);
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
             window.removeEventListener('scroll', maybeRemoveShim as any);
             try { (window as any).visualViewport?.removeEventListener('resize', maybeRemoveShim as any); } catch {}
+            window.removeEventListener('pointerdown', dismissScrollHint as any);
+            window.removeEventListener('wheel', dismissScrollHint as any);
+            window.removeEventListener('keydown', dismissScrollHint as any);
         };
     });
 
@@ -482,7 +494,21 @@
     $: {
         const isGallery = !gridMode && exploreIndex === null;
         if (isGallery !== _prevGalleryMode) {
-            if (isGallery) galleryPagingArmed = false; // entering gallery: require user interaction
+            if (isGallery) {
+                galleryPagingArmed = false; // entering gallery: require user interaction
+                if (isMobile) {
+                    try { initialVVH = (window as any).visualViewport?.height || 0; } catch { initialVVH = 0; }
+                    showScrollShim = true;
+                    try {
+                        showScrollHint = sessionStorage.getItem('scrollHintShown') === '1' ? false : true;
+                    } catch {
+                        showScrollHint = true;
+                    }
+                }
+            } else {
+                showScrollShim = false;
+                showScrollHint = false;
+            }
             _prevGalleryMode = isGallery;
         }
         if (exploreIndex !== _prevExploreIndex) {
@@ -729,7 +755,7 @@
         pointer-events: auto;
     }
     .scroll-shim { height: 24px; width: 1px; }
-    .scroll-hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; background: rgba(0,0,0,0.7); color: #e6e6e6; font-size: 12px; padding: 6px 10px; border-radius: 6px; z-index: 9700; }
+    .scroll-hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; background: rgba(0,0,0,0.7); color: #e6e6e6; font-size: 12px; padding: 6px 10px; border-radius: 6px; z-index: 9400; }
 </style>
 
 <div class="container">
@@ -765,8 +791,8 @@
         {/if}
 
         <!-- Edge click targets for mouse-only navigation -->
-        <button type="button" class="edge left {isMobile ? 'hint-l' : ''}" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-        <button type="button" class="edge right {isMobile ? 'hint-r' : ''}" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
     {:else}
         <!-- Grid mode (vertical) -->
         <GridView
@@ -784,7 +810,7 @@
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
     <AboutOverlay visible={showAbout} onClose={() => (showAbout = false)} />
     <!-- Landscape gate for mobile portrait; tap to dismiss -->
-    {#if isMobile && portrait && !landscapeOverlayClosed}
+    {#if isMobile && portrait && !landscapeOverlayClosed && !gridMode && exploreIndex === null}
       <LandscapeOverlay visible={true} onClose={() => (landscapeOverlayClosed = true)} />
     {/if}
     
