@@ -41,6 +41,7 @@
     // Map of selected trait value id -> display label (best-effort, derived from current items' traits)
     let selectedValueMeta: Record<number, string> = {};
     let traitsForCurrent: ListingTrait[] = [];
+    let currentRow: Row | null = null;
     // Grid mode state
     let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
@@ -68,9 +69,11 @@
         if (useExplore) {
             const row = exploreItems?.[exploreIndex as number];
             traitsForCurrent = row?.traits ?? [];
+            currentRow = row ?? null;
         } else {
             const row = items[activeIndex];
             traitsForCurrent = row?.traits ?? [];
+            currentRow = row ?? null;
         }
     }
 
@@ -241,10 +244,32 @@
                 applyValueFilterAndFetch();
                 return;
             }
-            // Trait bar toggle (both modes) — V
+            // Trait/Main bar cycle — V (mobile cycles 3 states; desktop toggles traits)
             if (k === 'v' || k === 'V') {
                 e.preventDefault();
-                showTraitBar = !showTraitBar;
+                if (isMobile) {
+                    const both = showMainBar && showTraitBar;
+                    const collapsed = !showMainBar; // trait bar hidden when collapsed
+                    const mainOnly = showMainBar && !showTraitBar;
+                    if (both) {
+                        // both -> collapsed
+                        showMainBar = false;
+                        showTraitBar = false;
+                    } else if (collapsed) {
+                        // collapsed -> only main bar
+                        showMainBar = true;
+                        showTraitBar = false;
+                    } else if (mainOnly) {
+                        // only main bar -> both
+                        showMainBar = true;
+                        showTraitBar = true;
+                    } else {
+                        // fallback: toggle traits
+                        showTraitBar = !showTraitBar;
+                    }
+                } else {
+                    showTraitBar = !showTraitBar;
+                }
                 return;
             }
             // Purpose class nav (both modes; wrap and skip empty) — right moved to C
@@ -782,8 +807,10 @@
         
 
         <!-- Edge click targets for mouse-only navigation -->
-        <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-        <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        {#if !showGalleryEntryOverlay}
+            <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+            <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        {/if}
     {:else}
         <!-- Grid mode (vertical) -->
         <GridView
@@ -837,11 +864,12 @@
               networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
               isMobile={isMobile}
               collapsed={!showMainBar}
+              {currentRow}
               on:toggleSource={() => {
-                  const cur = currentItem();
-                  gridTargetMint = cur?.token_mint_addr ?? null;
-                  dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
-                  applyValueFilterAndFetch();
+                const cur = currentItem();
+                gridTargetMint = cur?.token_mint_addr ?? null;
+                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+                applyValueFilterAndFetch();
               }}
               on:nextMode={() => {
                   if (gridMode) exitToGallery();

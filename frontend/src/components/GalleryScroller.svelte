@@ -265,4 +265,7 @@
   .price-link:visited { color: inherit; }
   .token-link { text-decoration: none; color: inherit; }
   .token-link:hover { text-decoration: underline; }
+  @media (hover: none) and (pointer: coarse) {
+    .meta { display: none; }
+  }
 </style>

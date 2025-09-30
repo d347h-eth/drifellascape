@@ -1,7 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { DEFAULT_SEARCH_LIMIT } from '../lib/search';
-  import type { DataSource } from '../lib/types';
+  import type { DataSource, Row } from '../lib/types';
+  import PriceTag from './PriceTag.svelte';
 
   export let dataSource: DataSource = 'listings';
   export let gridMode: boolean = true;
@@ -20,7 +21,8 @@
   export let sortAscListings: boolean = true;
   export let sortAscTokens: boolean = true;
   export let networkBusy: boolean = false;
-
+  export let currentRow: Row | null = null;
+  
   const dispatch = createEventDispatcher();
 
   $: sortLabel = dataSource === 'tokens'
@@ -32,6 +34,13 @@
   // Use last loaded index for grid so page increases as you load forward
   $: totalPages = Math.max(1, Math.ceil((Number(total) || 0) / DEFAULT_SEARCH_LIMIT));
   // gridCurrentPage is provided by parent to reflect user viewport progression
+  function getPrice(r: Row): number | undefined { return (r as any)?.price; }
+  function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
+  function getMint(r: Row): string { return (r as any)?.token_mint_addr; }
+  function getName(r: Row): string {
+    const anyr: any = r as any;
+    return anyr?.token_name || (typeof anyr?.token_num === 'number' ? `#${anyr.token_num}` : getMint(r));
+  }
 
 </script>
 
@@ -86,6 +95,14 @@
         {/if}
       {:else if !inExplore}
         <span class="mono">{galleryIndex1}/{total}</span>
+        {#if currentRow}
+          <span class="sep">•</span>
+          {#if dataSource === 'listings'}
+            <PriceTag price={getPrice(currentRow)} listingSource={getSource(currentRow)} mint={getMint(currentRow)} />
+          {:else}
+            <a class="token-link" href={`https://magiceden.io/item-details/${getMint(currentRow)}`} target="_blank" rel="noopener noreferrer">{getName(currentRow)}</a>
+          {/if}
+        {/if}
       {/if}
     {/if}
   </div>
@@ -101,6 +118,14 @@
         {/if}
       {:else if !inExplore}
         <span class="mono">{galleryIndex1}/{total}</span>
+        {#if currentRow}
+          <span class="sep">•</span>
+          {#if dataSource === 'listings'}
+            <PriceTag price={getPrice(currentRow)} listingSource={getSource(currentRow)} mint={getMint(currentRow)} />
+          {:else}
+            <a class="token-link" href={`https://magiceden.io/item-details/${getMint(currentRow)}`} target="_blank" rel="noopener noreferrer">{getName(currentRow)}</a>
+          {/if}
+        {/if}
       {/if}
     {/if}
     {#if networkBusy}
@@ -142,4 +167,6 @@
     0%, 100% { opacity: 0.5; transform: scale(0.9); }
     50% { opacity: 1; transform: scale(1.1); }
   }
+  .token-link { text-decoration: none; color: inherit; }
+  .token-link:hover { text-decoration: underline; }
 </style>
