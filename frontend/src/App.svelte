@@ -59,9 +59,6 @@
     let edgeHintTimer: any = null;
     let portrait = false;
     let landscapeOverlayClosed = false;
-    let showScrollShim = false;
-    let initialVVH = 0;
-    let showScrollHint = false;
     let showGalleryEntryOverlay = false;
     let galleryEntryHeightPx = 0;
 
@@ -314,15 +311,6 @@
         };
         window.addEventListener("keydown", onKey);
         window.addEventListener("keyup", onKeyUp);
-        const maybeRemoveShim = () => {
-            if (!showScrollShim) return;
-            try {
-                const vvh = (window as any).visualViewport?.height || 0;
-                if (window.scrollY > 0 || (vvh && initialVVH && vvh > initialVVH + 1)) {
-                    showScrollShim = false;
-                }
-            } catch {}
-        };
         const maybeDismissEntryOverlay = () => {
             if (!showGalleryEntryOverlay) return;
             try {
@@ -331,27 +319,12 @@
                 }
             } catch {}
         };
-        window.addEventListener('scroll', maybeRemoveShim, { passive: true });
         window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
-        try { (window as any).visualViewport?.addEventListener('resize', maybeRemoveShim); } catch {}
-        const dismissScrollHint = () => {
-            if (!showScrollHint) return;
-            showScrollHint = false;
-            try { sessionStorage.setItem('scrollHintShown', '1'); } catch {}
-        };
-        window.addEventListener('pointerdown', dismissScrollHint, { passive: true });
-        window.addEventListener('wheel', dismissScrollHint, { passive: true });
-        window.addEventListener('keydown', dismissScrollHint);
         return () => {
             clearInterval(id);
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
-            window.removeEventListener('scroll', maybeRemoveShim as any);
             window.removeEventListener('scroll', maybeDismissEntryOverlay as any);
-            try { (window as any).visualViewport?.removeEventListener('resize', maybeRemoveShim as any); } catch {}
-            window.removeEventListener('pointerdown', dismissScrollHint as any);
-            window.removeEventListener('wheel', dismissScrollHint as any);
-            window.removeEventListener('keydown', dismissScrollHint as any);
         };
     });
 
@@ -509,25 +482,16 @@
             if (isGallery) {
                 galleryPagingArmed = false; // entering gallery: require user interaction
                 if (isMobile) {
-                    try { initialVVH = (window as any).visualViewport?.height || 0; } catch { initialVVH = 0; }
-                    showScrollShim = true;
-                    try {
-                        showScrollHint = sessionStorage.getItem('scrollHintShown') === '1' ? false : true;
-                    } catch {
-                        showScrollHint = true;
-                    }
-                    // Require a full-screen upward swipe before showing the gallery content
+                    // Require a full-screen upward swipe (2× viewport) before showing the gallery content
                     try {
                         const vvh = (window as any).visualViewport?.height || window.innerHeight || 0;
-                        galleryEntryHeightPx = Math.max(1, vvh);
+                        galleryEntryHeightPx = Math.max(1, vvh * 2);
                     } catch { galleryEntryHeightPx = Math.max(1, window.innerHeight || 0); }
                     showGalleryEntryOverlay = true;
                     // Start at top so the overlay is visible
                     try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
                 }
             } else {
-                showScrollShim = false;
-                showScrollHint = false;
                 showGalleryEntryOverlay = false;
             }
             _prevGalleryMode = isGallery;
@@ -775,7 +739,6 @@
         z-index: 9500;
         pointer-events: auto;
     }
-    .scroll-shim { height: 24px; width: 1px; }
     .gallery-entry-overlay { width: 100%; pointer-events: none; }
     .overlay-msg {
         position: sticky; top: 40svh; left: 50%; transform: translateX(-50%);
@@ -784,7 +747,7 @@
         font-size: 14px; padding: 8px 12px; border-radius: 8px;
         width: max-content; max-width: 90vw;
     }
-    .scroll-hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; background: rgba(0,0,0,0.7); color: #e6e6e6; font-size: 12px; padding: 6px 10px; border-radius: 6px; z-index: 9400; }
+    
 </style>
 
 <div class="container">
@@ -816,13 +779,7 @@
             bind:this={scrollerRef}
         />
 
-        {#if isMobile && !gridMode && exploreIndex === null && showScrollShim}
-          <div class="scroll-shim" aria-hidden="true"></div>
-        {/if}
-
-        {#if isMobile && !gridMode && exploreIndex === null && showScrollHint}
-          <div class="scroll-hint" on:click={() => { showScrollHint = false; try { sessionStorage.setItem('scrollHintShown','1'); } catch {} }}>Swipe up to hide browser UI</div>
-        {/if}
+        
 
         <!-- Edge click targets for mouse-only navigation -->
         <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
