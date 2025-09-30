@@ -229,7 +229,15 @@
     scroll-behavior: auto;
     height: 100vh;
     box-sizing: border-box;
-    overscroll-behavior: contain;
+  }
+  /* Mobile: allow vertical scroll to bubble to the page so the address bar can hide */
+  @media (hover: none) and (pointer: coarse) {
+    .scroller {
+      height: 100svh; /* dynamic visual viewport height to avoid partial view */
+      overscroll-behavior-x: contain; /* keep horizontal chain inside */
+      overscroll-behavior-y: auto;    /* allow vertical scroll to bubble */
+      touch-action: pan-x pan-y;      /* do not block vertical panning */
+    }
   }
   .slide {
     flex: 0 0 100vw;
