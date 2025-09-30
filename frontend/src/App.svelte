@@ -445,6 +445,7 @@
         } else {
             gridMode = false;
         }
+        if (isMobile) showMainBar = false;
     }
 
     // --- Infinite scroll for Grid (listings & tokens) ---
@@ -588,6 +589,7 @@
         const idx = items.findIndex((r) => r.token_mint_addr === mint);
         const i = idx >= 0 ? idx : 0;
         gridMode = false;
+        if (isMobile) showMainBar = false;
         anchorArm(mint);
         // Wait for gallery to mount and bind scrollerRef
         await tick();
@@ -762,7 +764,7 @@
     {/if}
     
     <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
-    <div class="bottom-stack" style={`bottom: ${(!gridMode && exploreIndex === null) ? 15 : 0}px`}>
+    <div class="bottom-stack" style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
         {#if showTraitBar}
             <TraitBar
                 traits={traitsForCurrent}
