@@ -126,6 +126,9 @@
     pointer-events: none;
     transition: opacity 120ms ease-in-out, transform 120ms ease-in-out, background-color 120ms ease-in-out;
   }
+  @media (hover: none) and (pointer: coarse) {
+    .price-tab { display: none; }
+  }
   .cell:hover .price-tab { opacity: 1; pointer-events: auto; }
   .price-tab :global(.price-link) { color: #fff; }
   .price-tab :global(.price) { color: #fff; }

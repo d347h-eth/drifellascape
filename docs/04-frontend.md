@@ -27,10 +27,11 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 - `VITE_API_BASE` — backend base URL (default `http://localhost:3000`)
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`
+- Default page size — 50 (client sends `limit=50` unless overridden)
 
 ## Data Flow
 
-- On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 100, includeTraits: true }` and stores `items`, `versionId`.
+- On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 50, includeTraits: true }` and stores `items`, `versionId`.
 - A periodic poll (default 30s) posts again for listings; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
 - Price shown is fee‑inclusive (see below). Clicking the price opens the marketplace listing in a new tab.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
@@ -53,7 +54,8 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
     - Debounce: `FINALIZE_DELAY_MS` (0 ms) — finalize immediately once scrolling idles.
     - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (150 ms) to avoid accidental re‑scrolls right after landing.
     - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
-  - Motion toggle: users can toggle motion with `M`. When motion is off, there is no automated snap at all (pure linear scrolling). With motion on and `prefers‑reduced‑motion`, auto‑snap is also disabled.
+  - Animation toggle: users can toggle animation with `M`. When animation is off, there is no automated snap at all (pure linear scrolling). With `prefers‑reduced‑motion`, auto‑snap is also disabled.
+  - Autosnap toggle: users can disable auto finalize‑to‑center. On mobile, autosnap defaults off.
 
 - Animation (when motion is on)
 
@@ -154,6 +156,8 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
 - Paging — Infinite scroll up/down with real‑interaction arming. Observers attach only after user wheel/click/keydown to avoid surprise requests on entry. Paging uses server‑returned effective `offset`.
 - Refocus — Press `F` in Grid to refocus the last anchored token (from Gallery/Explore).
+- Images — grid uses downsized assets from `/540h/{mint}.jpg` for faster loads.
+- Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
 
 ### Image Swapping & Flicker Control
@@ -188,5 +192,41 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Virtualize the listing grid if we ever render many more rows per page.
 
 ## Debugging
+
+## Main Bar (Reworked)
+
+- Persistent bottom strip stacked with the trait bar.
+- Buttons (left → right):
+  - Source (Listings ⇄ Tokens)
+  - Mode (Grid ⇄ Gallery). Enter Exploration from Gallery with `W`.
+  - Sorting (Price ↑/↓ for Listings; Token ↑/↓ for Tokens). Resets to first page.
+  - Animation (enable/disable snap animation)
+  - Autosnap (enable/disable auto finalize to center). Default off on mobile.
+  - Traits (show/hide trait bar)
+  - Hotkeys (open helper overlay)
+  - About (open about overlay)
+- Indicators:
+  - Gallery: index/total (1‑based across the full filtered set)
+  - Grid: Page X/Y and Total N (always for Listings; for Tokens only when filtered)
+  - Network activity dot on the right
+- Mobile:
+  - The bar collapses into a 28px flat hamburger at the left; tap to expand/collapse.
+  - Page indicator renders at the right edge.
+  - Bottom offset invariant: 15px in Gallery (to not block horizontal scroll), 0 in Grid/Exploration.
+
+## Trait Bar Stack (Reworked)
+
+- The trait stack now composes three rows in a vertical stack above the main bar:
+  1. Selected filters (pills)
+  2. Purpose pills
+  3. Trait boxes (paginated)
+- Each row is a simple, static block; the stack sits above the main bar inside a bottom container.
+
+## Mobile Enhancements
+
+- Autosnap default: disabled.
+- Always‑visible chevrons: subtle left/right chevrons on gallery edges signal horizontal navigation.
+- Landscape overlay: on mobile portrait, an overlay asks to rotate to landscape; tap anywhere to dismiss.
+- Grid prices: price pills are hidden on touch devices (hoverless).
 
 - Global debug helper under `frontend/src/debug.ts` (`DEBUG=false` by default). Import `dbg(label, data?)` and flip `DEBUG=true` for development logs.

@@ -5,6 +5,7 @@
     import GridView from "./components/GridView.svelte";
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import AboutOverlay from "./components/AboutOverlay.svelte";
+    import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT } from "./lib/search";
@@ -49,8 +50,15 @@
 
     // Snap and scrollbar release logic are handled within GalleryScroller
 
-    // Motion toggle
+    // Motion + autosnap + device flags
     let motionEnabled = true;
+    let autoSnapEnabled = true;
+    let isMobile = false;
+    let showMainBar = true;
+    let showEdgeHints = false;
+    let edgeHintTimer: any = null;
+    let portrait = false;
+    let landscapeOverlayClosed = false;
 
     // Keep TraitBar in sync with the token in focus (gallery or exploration)
     $: {
@@ -157,6 +165,13 @@
     }
 
     onMount(() => {
+        try {
+            const mm = (q: string) => window.matchMedia && window.matchMedia(q).matches;
+            isMobile = (typeof window !== 'undefined') && (mm('(hover: none) and (pointer: coarse)') || ('ontouchstart' in window) || window.innerWidth <= 900);
+            portrait = mm('(orientation: portrait)');
+            window.addEventListener('resize', () => { try { portrait = mm('(orientation: portrait)'); } catch {} });
+        } catch {}
+        if (isMobile) autoSnapEnabled = false;
         loadListings();
         const id = setInterval(pollForUpdates, Math.max(5000, POLL_MS));
         const onKey = (e: KeyboardEvent) => {
@@ -663,18 +678,29 @@
     .error { color: #ff6b6b; }
     /* Scroller styles moved into GalleryScroller.svelte */
     /* Edge click targets for prev/next */
-    .edge { position: fixed; top: 0; height: 1087px; width: 25px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; }
+    .edge { position: fixed; top: 0; height: 1087px; width: 25px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; transition: opacity 0.25s ease; }
     .edge:focus, .edge:focus-visible { outline: none; }
     .edge.left { left: 0; }
     .edge.right { right: 0; }
     .edge:hover { background: linear-gradient(to right, rgba(255,255,255,0.04), transparent); }
     .edge.right:hover { background: linear-gradient(to left, rgba(255,255,255,0.04), transparent); }
+    .edge.hint-l { opacity: 0.9; background: linear-gradient(to right, rgba(255,255,255,0.08), transparent); }
+    .edge.hint-r { opacity: 0.9; background: linear-gradient(to left, rgba(255,255,255,0.08), transparent); }
+    .edge.hint-l::after, .edge.hint-r::after { content: ''; position: absolute; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.7); font-size: 22px; }
+    .edge.hint-l::after { content: '‹'; left: 6px; }
+    .edge.hint-r::after { content: '›'; right: 6px; }
 
     /* Help overlay */
     /* help overlay styles moved to components/HelpOverlay.svelte */
 
     /* Trait bar styles are scoped in TraitBar.svelte */
     /* Trait bar styles live within TraitBar component */
+    .mobile-mainbar-toggle {
+        position: fixed; left: 12px; width: 50px; height: 50px;
+        background: rgba(0,0,0,0.65); color: #e6e6e6; border: 0; border-radius: 6px;
+        z-index: 9600; display: inline-flex; align-items: center; justify-content: center;
+    }
+    .mobile-mainbar-toggle:hover { background: rgba(0,0,0,0.75); }
     .bottom-stack {
         position: fixed;
         left: 0;
@@ -696,17 +722,24 @@
             items={items}
             showMeta={dataSource === 'listings'}
             motionEnabled={motionEnabled}
+            autoSnapEnabled={autoSnapEnabled}
             galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
             on:loadMore={() => handleLoadMoreGallery()}
             on:loadPrev={() => handleLoadPrevGallery()}
             on:enterExplore={(e) => openExploreByMint(e.detail)}
             on:imageLoad={recomputeEdgeHeight}
+            on:manualScroll={() => {
+                if (!isMobile) return;
+                showEdgeHints = true;
+                if (edgeHintTimer) clearTimeout(edgeHintTimer);
+                edgeHintTimer = setTimeout(() => { showEdgeHints = false; }, 250);
+            }}
             bind:this={scrollerRef}
         />
 
         <!-- Edge click targets for mouse-only navigation -->
-        <button type="button" class="edge left" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-        <button type="button" class="edge right" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <button type="button" class="edge left {isMobile ? 'hint-l' : ''}" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+        <button type="button" class="edge right {isMobile ? 'hint-r' : ''}" title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
     {:else}
         <!-- Grid mode (vertical) -->
         <GridView
@@ -723,6 +756,10 @@
     <!-- Overlays -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
     <AboutOverlay visible={showAbout} onClose={() => (showAbout = false)} />
+    <!-- Landscape gate for mobile portrait; tap to dismiss -->
+    {#if isMobile && portrait && !landscapeOverlayClosed}
+      <LandscapeOverlay visible={true} onClose={() => (landscapeOverlayClosed = true)} />
+    {/if}
     
     <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
     <div class="bottom-stack" style={`bottom: ${(!gridMode && exploreIndex === null) ? 15 : 0}px`}>
@@ -740,6 +777,7 @@
         <StatusBar
             {dataSource}
             {motionEnabled}
+            {autoSnapEnabled}
             {showTraitBar}
             gridMode={gridMode}
             inExplore={exploreIndex !== null}
@@ -752,6 +790,8 @@
             {sortAscListings}
             {sortAscTokens}
             networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
+            isMobile={isMobile}
+            collapsed={!showMainBar}
             on:toggleSource={() => {
                 const cur = currentItem();
                 gridTargetMint = cur?.token_mint_addr ?? null;
@@ -777,10 +817,14 @@
             }}
             on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
             on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+            on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
             on:toggleHelp={() => { showHelp = !showHelp; }}
             on:toggleAbout={() => { showAbout = !showAbout; }}
+            on:toggleMainBar={() => { showMainBar = !showMainBar; }}
         />
     </div>
+
+    
 
 <!-- Full-screen explorer overlay -->
 {#if exploreIndex !== null && exploreItems}

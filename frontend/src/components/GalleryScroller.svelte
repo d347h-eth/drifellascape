@@ -7,6 +7,7 @@
   export let items: Row[] = [];
   export let showMeta: boolean = true;
   export let motionEnabled: boolean = true;
+  export let autoSnapEnabled: boolean = true;
   export let leaveThresholdFrac: number = 0.5;
   export let wheelMultiplier: number = 1.6;
   export let activeIndex: number = 0; // bindable
@@ -23,6 +24,7 @@
   let suppressFinalizeUntilTs = 0;
   let draggingScrollbar = false;
   let blockUntilTs = 0;
+  let lastProgrammaticTs = 0;
   const SCROLLBAR_HIT_PX = 24;
   // Post-snap wheel input block to avoid immediate re-scroll after landing
   const POST_SNAP_WHEEL_BLOCK_MS = 200;
@@ -38,6 +40,7 @@
     if (!scrollerEl) return;
     const start = scrollerEl.scrollLeft;
     const distance = Math.abs(left - start);
+    lastProgrammaticTs = Date.now();
     // duration ~ 0.233 ms/px clamped 80..160
     const perPx = 0.233; const minMs = 80; const maxMs = 160;
     const duration = Math.round(Math.min(maxMs, Math.max(minMs, distance * perPx)));
@@ -84,6 +87,7 @@
       // Apply post-snap block even when motion is disabled to avoid immediate re-scroll
       if (autoSnap) blockUntilTs = Date.now() + POST_SNAP_WHEEL_BLOCK_MS;
       if (forceInstant) suppressFinalizeUntilTs = Date.now() + 200;
+      lastProgrammaticTs = Date.now();
       // If this was an auto snap without animation, trigger prefetch immediately while wheel is blocked
       if (autoSnap) { maybeEdgePrefetch(); }
     }
@@ -99,6 +103,7 @@
   function finalizeDirectionalSnapIdle() {
     if (!scrollerEl) return;
     if (isAnimating) return;
+    if (!autoSnapEnabled) return;
     const cw = scrollerEl.clientWidth || 1;
     const lastCenter = lastSnapIndex * cw;
     const dx = scrollerEl.scrollLeft - lastCenter;
@@ -132,6 +137,10 @@
     if (isAnimating) return; // avoid fighting the tween
     if (Date.now() < suppressFinalizeUntilTs) return;
     if (draggingScrollbar) return;
+    // Signal manual scrolling (not recently programmatic)
+    if (Date.now() - lastProgrammaticTs > 100) {
+      dispatch('manualScroll');
+    }
     if (scrollEndTimer) clearTimeout(scrollEndTimer);
     scrollEndTimer = setTimeout(() => finalizeDirectionalSnapIdle(), FINALIZE_DELAY_MS);
   }
@@ -140,7 +149,7 @@
     const r = scrollerEl.getBoundingClientRect();
     if (e.clientY >= r.bottom - SCROLLBAR_HIT_PX) draggingScrollbar = true;
   }
-  function onPointerUp() { if (draggingScrollbar) { draggingScrollbar = false; finalizeSnapOnRelease(); } }
+  function onPointerUp() { if (draggingScrollbar) { draggingScrollbar = false; if (autoSnapEnabled) finalizeSnapOnRelease(); } }
 
   // Expose helpers to parent
   export function getCurrentImageClientRect(): DOMRect | null {
@@ -220,6 +229,7 @@
     scroll-behavior: auto;
     height: 100vh;
     box-sizing: border-box;
+    overscroll-behavior: contain;
   }
   .slide {
     flex: 0 0 100vw;

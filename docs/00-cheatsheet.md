@@ -53,7 +53,7 @@
 ## Frontend Hotkeys (Exploration)
 
 - Previous/Next — Left/Right or `A`/`D`
-- Close exploration — `Esc`
+- Close exploration — `Esc` or `G`
 - Fit‑by‑width centered — `S`
 - Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
 - Fit 1006 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1006)/2 + 36`)
@@ -65,6 +65,29 @@
 - Refocus last anchored token — `F`
 - Enter gallery — `G`
 - Toggle data source (Listings/Tokens) — `T`
+
+## Main Bar (Toggles & Indicators)
+
+- Source toggle — Listings ⇄ Tokens
+- Mode toggle — Grid ⇄ Gallery (Exploration is entered from Gallery with `W`)
+- Sorting — Price ↑/↓ (Listings), Token ↑/↓ (Tokens); resets to the first page
+- Animation — enable/disable snap animation
+- Autosnap — enable/disable auto finalize to center
+- Traits — show/hide the trait bar stack
+- Hotkeys — show/hide hotkeys helper overlay
+- About — show project/about overlay
+- Indicators
+  - Gallery: index/total (1‑based across full result set)
+  - Grid: Page X/Y; Total N (always for Listings; for Tokens only when filtered)
+  - Network activity dot (right)
+
+Mobile specifics
+
+- Main bar collapses into a flat 28px hamburger at left; tap to expand/collapse
+- Page indicator moves to the right edge
+- Gallery shows left/right chevrons at edges
+- Autosnap is disabled by default
+- Grid hides price pills (hoverless)
 
 ## Env Vars
 
