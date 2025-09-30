@@ -849,67 +849,69 @@
     {/if}
     
     <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
-    <div class="bottom-stack" style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
-        {#if showTraitBar}
-            <TraitBar
-                traits={traitsForCurrent}
-                bind:selectedPurpose
-                {selectedValueIds}
-                selectedValueMeta={selectedValueMeta}
-                galleryMode={!gridMode && exploreIndex === null}
-                on:toggleValue={handleToggleValue}
-                on:purposeChange={handlePurposeChange}
-            />
-        {/if}
-        <StatusBar
-            {dataSource}
-            {motionEnabled}
-            {autoSnapEnabled}
-            {showTraitBar}
-            gridMode={gridMode}
-            inExplore={exploreIndex !== null}
-            {activeIndex}
-            {baseOffset}
-            itemsLength={items.length}
-            total={Number(total || 0)}
-            gridCurrentPage={gridCurrentPage}
-            filtersApplied={selectedValueIds.size > 0}
-            {sortAscListings}
-            {sortAscTokens}
-            networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
-            isMobile={isMobile}
-            collapsed={!showMainBar}
-            on:toggleSource={() => {
-                const cur = currentItem();
-                gridTargetMint = cur?.token_mint_addr ?? null;
-                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
-                applyValueFilterAndFetch();
-            }}
-            on:nextMode={() => {
-                if (gridMode) exitToGallery();
-                else if (exploreIndex !== null) closeExplore();
-                else enterGrid();
-            }}
-            on:toggleSort={async () => {
-                if (dataSource === 'tokens') sortAscTokens = !sortAscTokens; else sortAscListings = !sortAscListings;
-                // Reset pagination to the first page and index
-                loading = true; pagingSession++; isLoadingMore = false; isLoadingPrev = false;
-                try {
-                    const res = await loadInitialPage({ source: dataSource, valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
-                    items = res.items; total = res.total; baseOffset = res.baseOffset; versionId = res.versionId;
-                    await tick();
-                    if (!gridMode && exploreIndex === null) { scrollerRef?.scrollToIndexInstant?.(0); activeIndex = 0; }
-                } catch {}
-                finally { loading = false; }
-            }}
-            on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
-            on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
-            on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
-            on:toggleHelp={() => { showHelp = !showHelp; }}
-            on:toggleAbout={() => { showAbout = !showAbout; }}
-            on:toggleMainBar={() => { showMainBar = !showMainBar; }}
-        />
-    </div>
+    {#if !(isMobile && showGalleryEntryOverlay)}
+      <div class="bottom-stack" style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
+          {#if showTraitBar}
+              <TraitBar
+                  traits={traitsForCurrent}
+                  bind:selectedPurpose
+                  {selectedValueIds}
+                  selectedValueMeta={selectedValueMeta}
+                  galleryMode={!gridMode && exploreIndex === null}
+                  on:toggleValue={handleToggleValue}
+                  on:purposeChange={handlePurposeChange}
+              />
+          {/if}
+          <StatusBar
+              {dataSource}
+              {motionEnabled}
+              {autoSnapEnabled}
+              {showTraitBar}
+              gridMode={gridMode}
+              inExplore={exploreIndex !== null}
+              {activeIndex}
+              {baseOffset}
+              itemsLength={items.length}
+              total={Number(total || 0)}
+              gridCurrentPage={gridCurrentPage}
+              filtersApplied={selectedValueIds.size > 0}
+              {sortAscListings}
+              {sortAscTokens}
+              networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
+              isMobile={isMobile}
+              collapsed={!showMainBar}
+              on:toggleSource={() => {
+                  const cur = currentItem();
+                  gridTargetMint = cur?.token_mint_addr ?? null;
+                  dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+                  applyValueFilterAndFetch();
+              }}
+              on:nextMode={() => {
+                  if (gridMode) exitToGallery();
+                  else if (exploreIndex !== null) closeExplore();
+                  else enterGrid();
+              }}
+              on:toggleSort={async () => {
+                  if (dataSource === 'tokens') sortAscTokens = !sortAscTokens; else sortAscListings = !sortAscListings;
+                  // Reset pagination to the first page and index
+                  loading = true; pagingSession++; isLoadingMore = false; isLoadingPrev = false;
+                  try {
+                      const res = await loadInitialPage({ source: dataSource, valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
+                      items = res.items; total = res.total; baseOffset = res.baseOffset; versionId = res.versionId;
+                      await tick();
+                      if (!gridMode && exploreIndex === null) { scrollerRef?.scrollToIndexInstant?.(0); activeIndex = 0; }
+                  } catch {}
+                  finally { loading = false; }
+              }}
+              on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
+              on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+              on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
+              on:toggleHelp={() => { showHelp = !showHelp; }}
+              on:toggleAbout={() => { showAbout = !showAbout; }}
+              on:toggleMainBar={() => { showMainBar = !showMainBar; }}
+          />
+      </div>
+    {/if}
 
     
 
