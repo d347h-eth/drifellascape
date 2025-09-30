@@ -59,6 +59,8 @@
     let edgeHintTimer: any = null;
     let portrait = false;
     let landscapeOverlayClosed = false;
+    let showScrollShim = false;
+    let initialVVH = 0;
 
     // Keep TraitBar in sync with the token in focus (gallery or exploration)
     $: {
@@ -309,10 +311,23 @@
         };
         window.addEventListener("keydown", onKey);
         window.addEventListener("keyup", onKeyUp);
+        const maybeRemoveShim = () => {
+            if (!showScrollShim) return;
+            try {
+                const vvh = (window as any).visualViewport?.height || 0;
+                if (window.scrollY > 0 || (vvh && initialVVH && vvh > initialVVH + 1)) {
+                    showScrollShim = false;
+                }
+            } catch {}
+        };
+        window.addEventListener('scroll', maybeRemoveShim, { passive: true });
+        try { (window as any).visualViewport?.addEventListener('resize', maybeRemoveShim); } catch {}
         return () => {
             clearInterval(id);
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
+            window.removeEventListener('scroll', maybeRemoveShim as any);
+            try { (window as any).visualViewport?.removeEventListener('resize', maybeRemoveShim as any); } catch {}
         };
     });
 
@@ -713,6 +728,8 @@
         z-index: 9500;
         pointer-events: auto;
     }
+    .scroll-shim { height: 24px; width: 1px; }
+    .scroll-hint { position: fixed; left: 50%; transform: translateX(-50%); bottom: 56px; background: rgba(0,0,0,0.7); color: #e6e6e6; font-size: 12px; padding: 6px 10px; border-radius: 6px; z-index: 9700; }
 </style>
 
 <div class="container">
@@ -738,6 +755,14 @@
             }}
             bind:this={scrollerRef}
         />
+
+        {#if isMobile && !gridMode && exploreIndex === null && showScrollShim}
+          <div class="scroll-shim" aria-hidden="true"></div>
+        {/if}
+
+        {#if isMobile && !gridMode && exploreIndex === null && showScrollHint}
+          <div class="scroll-hint" on:click={() => { showScrollHint = false; try { sessionStorage.setItem('scrollHintShown','1'); } catch {} }}>Swipe up to hide browser UI</div>
+        {/if}
 
         <!-- Edge click targets for mouse-only navigation -->
         <button type="button" class="edge left {isMobile ? 'hint-l' : ''}" title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
