@@ -50,6 +50,9 @@
       <button class="btn hamburger" on:click={() => dispatch('toggleMainBar')} title="Toggle menu bar">
         {#if collapsed}☰{:else}✕{/if}
       </button>
+      {#if collapsed && !inExplore}
+        <button class="btn rescroll" on:click={() => dispatch('rescroll')} title="Re-run gallery entry scroll">Rescroll</button>
+      {/if}
     {/if}
     {#if !collapsed}
     <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
@@ -156,6 +159,7 @@
     cursor: pointer;
   }
   .btn.hamburger { height: 28px; border-radius: 0; border: 0; }
+  .btn.rescroll { height: 28px; margin-left: 6px; }
   .btn:hover { background: rgba(255,255,255,0.06); }
   .btn:focus, .btn:focus-visible { outline: none; box-shadow: none; }
   .btn.active { background: rgba(255,255,255,0.12); }

@@ -152,6 +152,43 @@
         }
     }
 
+    function refreshMobileGalleryMetrics() {
+        const root = typeof document !== 'undefined' ? document.documentElement : null;
+        if (!isMobile || typeof window === 'undefined') {
+            galleryEntryHeightPx = 0;
+            root?.style.removeProperty('--gallery-mobile-vh');
+            return;
+        }
+        try {
+            const viewport = (window as any)?.visualViewport?.height;
+            const basis = Math.max(0, typeof viewport === 'number' ? viewport : window.innerHeight || 0);
+            const overlayBasis = basis > 0 ? basis : 1;
+            galleryEntryHeightPx = Math.max(1, Math.round(overlayBasis * 4));
+            root?.style.setProperty('--gallery-mobile-vh', `${overlayBasis}px`);
+        } catch {
+            const fallback = Math.max(0, window.innerHeight || 0);
+            const overlayBasis = fallback > 0 ? fallback : 1;
+            galleryEntryHeightPx = Math.max(1, Math.round(overlayBasis * 4));
+            root?.style.setProperty('--gallery-mobile-vh', `${overlayBasis}px`);
+        }
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+                if (!gridMode && exploreIndex === null) {
+                    try { recomputeEdgeHeight(); } catch {}
+                }
+            });
+        }
+    }
+
+    function rearmGalleryEntryOverlay() {
+        if (!isMobile) return;
+        if (gridMode) return;
+        if (exploreIndex !== null) return;
+        refreshMobileGalleryMetrics();
+        showGalleryEntryOverlay = true;
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+    }
+
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
@@ -170,13 +207,56 @@
     }
 
     onMount(() => {
+        const mm = (q: string) => {
+            if (typeof window === 'undefined' || !window.matchMedia) return false;
+            try { return window.matchMedia(q).matches; } catch { return false; }
+        };
         try {
-            const mm = (q: string) => window.matchMedia && window.matchMedia(q).matches;
             isMobile = (typeof window !== 'undefined') && (mm('(hover: none) and (pointer: coarse)') || ('ontouchstart' in window) || window.innerWidth <= 900);
             portrait = mm('(orientation: portrait)');
-            window.addEventListener('resize', () => { try { portrait = mm('(orientation: portrait)'); } catch {} });
         } catch {}
-        if (isMobile) autoSnapEnabled = false;
+        if (isMobile) {
+            autoSnapEnabled = false;
+            if (!gridMode) refreshMobileGalleryMetrics();
+            else if (typeof document !== 'undefined') {
+                document.documentElement?.style.removeProperty('--gallery-mobile-vh');
+            }
+        } else {
+            galleryEntryHeightPx = 0;
+            if (typeof document !== 'undefined') {
+                document.documentElement?.style.removeProperty('--gallery-mobile-vh');
+            }
+        }
+        const onResize = () => {
+            try { portrait = mm('(orientation: portrait)'); } catch {}
+            if (isMobile && !gridMode) refreshMobileGalleryMetrics();
+        };
+        window.addEventListener('resize', onResize);
+        const vv = (typeof window !== 'undefined') ? (window as any).visualViewport : null;
+        const onVisualViewportChange = () => {
+            if (isMobile && !gridMode) refreshMobileGalleryMetrics();
+        };
+        vv?.addEventListener('resize', onVisualViewportChange);
+        vv?.addEventListener('scroll', onVisualViewportChange);
+        const onWindowFocus = () => {
+            rearmGalleryEntryOverlay();
+        };
+        const onVisibilityChange = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                rearmGalleryEntryOverlay();
+            }
+        };
+        window.addEventListener('focus', onWindowFocus);
+        if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityChange);
+        const maybeDismissEntryOverlay = () => {
+            if (!showGalleryEntryOverlay) return;
+            try {
+                if (window.scrollY >= Math.max(0, galleryEntryHeightPx - 1)) {
+                    showGalleryEntryOverlay = false;
+                }
+            } catch {}
+        };
+        window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
         loadListings();
         const id = setInterval(pollForUpdates, Math.max(5000, POLL_MS));
         const onKey = (e: KeyboardEvent) => {
@@ -336,20 +416,16 @@
         };
         window.addEventListener("keydown", onKey);
         window.addEventListener("keyup", onKeyUp);
-        const maybeDismissEntryOverlay = () => {
-            if (!showGalleryEntryOverlay) return;
-            try {
-                if (window.scrollY >= Math.max(0, galleryEntryHeightPx - 1)) {
-                    showGalleryEntryOverlay = false;
-                }
-            } catch {}
-        };
-        window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
         return () => {
             clearInterval(id);
             window.removeEventListener("keydown", onKey);
             window.removeEventListener("keyup", onKeyUp);
             window.removeEventListener('scroll', maybeDismissEntryOverlay as any);
+            window.removeEventListener('resize', onResize);
+            vv?.removeEventListener('resize', onVisualViewportChange);
+            vv?.removeEventListener('scroll', onVisualViewportChange);
+            window.removeEventListener('focus', onWindowFocus);
+            if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange);
         };
     });
 
@@ -507,17 +583,17 @@
             if (isGallery) {
                 galleryPagingArmed = false; // entering gallery: require user interaction
                 if (isMobile) {
-                    // Require a full-screen upward swipe (2× viewport) before showing the gallery content
-                    try {
-                        const vvh = (window as any).visualViewport?.height || window.innerHeight || 0;
-                        galleryEntryHeightPx = Math.max(1, vvh * 2);
-                    } catch { galleryEntryHeightPx = Math.max(1, window.innerHeight || 0); }
-                    showGalleryEntryOverlay = true;
-                    // Start at top so the overlay is visible
-                    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+                    rearmGalleryEntryOverlay();
+                } else {
+                    showGalleryEntryOverlay = false;
+                    galleryEntryHeightPx = 0;
                 }
             } else {
                 showGalleryEntryOverlay = false;
+                galleryEntryHeightPx = 0;
+                if (typeof document !== 'undefined') {
+                    document.documentElement?.style.removeProperty('--gallery-mobile-vh');
+                }
             }
             _prevGalleryMode = isGallery;
         }
@@ -804,8 +880,6 @@
             bind:this={scrollerRef}
         />
 
-        
-
         <!-- Edge click targets for mouse-only navigation -->
         {#if !showGalleryEntryOverlay}
             <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
@@ -828,7 +902,7 @@
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
     <AboutOverlay visible={showAbout} onClose={() => (showAbout = false)} />
     <!-- Landscape gate for mobile portrait; tap to dismiss -->
-    {#if isMobile && portrait && !landscapeOverlayClosed && !gridMode && exploreIndex === null}
+    {#if isMobile && portrait && !landscapeOverlayClosed && exploreIndex === null}
       <LandscapeOverlay visible={true} onClose={() => (landscapeOverlayClosed = true)} />
     {/if}
     
@@ -894,6 +968,7 @@
               on:toggleHelp={() => { showHelp = !showHelp; }}
               on:toggleAbout={() => { showAbout = !showAbout; }}
               on:toggleMainBar={() => { showMainBar = !showMainBar; }}
+              on:rescroll={() => { rearmGalleryEntryOverlay(); }}
           />
       </div>
     {/if}

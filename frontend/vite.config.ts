@@ -12,6 +12,12 @@ export default defineConfig({
         port: 5173,
         strictPort: true,
         host: true,
+        proxy: {
+            "^/(listings|tokens)": {
+                target: "http://localhost:3000",
+                changeOrigin: true,
+            },
+        },
     },
     preview: {
         host: true,

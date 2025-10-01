@@ -227,16 +227,30 @@
     overflow-x: auto;
     overflow-y: hidden;
     scroll-behavior: auto;
+    min-height: 100vh;
     height: 100vh;
     box-sizing: border-box;
+  }
+  @supports (height: 100dvh) {
+    .scroller {
+      min-height: 100dvh;
+      height: 100dvh;
+    }
   }
   /* Mobile: allow vertical scroll to bubble to the page so the address bar can hide */
   @media (hover: none) and (pointer: coarse) {
     .scroller {
-      height: 100svh; /* dynamic visual viewport height to avoid partial view */
+      height: var(--gallery-mobile-vh, 100vh); /* runtime-updated via CSS var */
+      min-height: var(--gallery-mobile-vh, 100vh);
       overscroll-behavior-x: contain; /* keep horizontal chain inside */
       overscroll-behavior-y: auto;    /* allow vertical scroll to bubble */
       touch-action: pan-x pan-y;      /* do not block vertical panning */
+    }
+    @supports (height: 100dvh) {
+      .scroller {
+        height: var(--gallery-mobile-vh, 100dvh);
+        min-height: var(--gallery-mobile-vh, 100dvh);
+      }
     }
   }
   .slide {
