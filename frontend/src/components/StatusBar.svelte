@@ -50,7 +50,7 @@
       <button class="btn hamburger" on:click={() => dispatch('toggleMainBar')} title="Toggle menu bar">
         {#if collapsed}☰{:else}✕{/if}
       </button>
-      {#if collapsed && !inExplore}
+      {#if collapsed && !inExplore && !gridMode}
         <button class="btn rescroll" on:click={() => dispatch('rescroll')} title="Re-run gallery entry scroll">Rescroll</button>
       {/if}
     {/if}
