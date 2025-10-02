@@ -1,7 +1,12 @@
 import type { ApiResponse, DataSource, ListingsSearchBody, Row } from "./types";
 
+const configuredBase = (import.meta as any).env?.VITE_API_BASE;
 const API_BASE =
-    (import.meta as any).env?.VITE_API_BASE ?? "http://localhost:3000";
+    typeof configuredBase === "string" && configuredBase.length > 0
+        ? configuredBase
+        : (typeof window === "undefined"
+              ? "http://localhost:3000"
+              : "");
 
 export function defaultSortForSource(source: DataSource): string {
     return source === "tokens" ? "token_asc" : "price_asc";
