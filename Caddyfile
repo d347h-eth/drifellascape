@@ -1,15 +1,22 @@
 drifellascape.art {
   encode zstd gzip
 
-  @api path /listings* /tokens*
-  reverse_proxy @api backend:3000
+  route {
+    @static path /static/*
+    handle @static {
+      root * /srv/static
+      file_server
+    }
 
-  handle /static/* {
-    root * /srv/static
-    file_server
+    @api path /listings* /tokens*
+    handle @api {
+      reverse_proxy backend:3000
+    }
+
+    handle {
+      root * /srv/releases/current
+      try_files {path} {path}/ /index.html
+      file_server
+    }
   }
-
-  root * /srv/releases/current
-  try_files {path} {path}/ /index.html
-  file_server
 }
