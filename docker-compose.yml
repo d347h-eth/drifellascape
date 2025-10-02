@@ -28,19 +28,18 @@ services:
     frontend-build:
         image: node:24-bookworm-slim
         working_dir: /app
-        environment:
-            - RELEASE_ID=
         command: >-
-            sh -lc "set -euo pipefail &&
+            bash -lc "set -euo pipefail &&
             apt-get update &&
             apt-get install -y --no-install-recommends build-essential python3 &&
             rm -rf /var/lib/apt/lists/* &&
+            export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 &&
             corepack enable &&
             yarn install --immutable &&
-            if [ -z \"$RELEASE_ID\" ]; then echo 'RELEASE_ID is required' >&2; exit 1; fi &&
-            rm -rf /app/releases/\"$RELEASE_ID\" &&
-            mkdir -p /app/releases/\"$RELEASE_ID\" &&
-            yarn workspace @drifellascape/frontend build --outDir /app/releases/\"$RELEASE_ID\""
+            if [ -z \"$${RELEASE_ID:-}\" ]; then echo 'RELEASE_ID is required' >&2; exit 1; fi &&
+            rm -rf /app/releases/\"$${RELEASE_ID}\" &&
+            mkdir -p /app/releases/\"$${RELEASE_ID}\" &&
+            yarn workspace @drifellascape/frontend build --outDir /app/releases/\"$${RELEASE_ID}\""
         volumes:
             - ./:/app
 

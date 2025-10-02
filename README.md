@@ -96,6 +96,7 @@ The VPS setup builds the frontend once per release and serves the static output 
 4. (Optional) Roll back by re-pointing the symlink: `ln -sfn <previous-id> releases/current` followed by another Caddy reload.
 
 Backend/worker containers still use `docker compose up -d` as before; only the frontend now deploys with a quick, no-downtime swap of static files.
+If you still have the legacy `frontend` container running, clean it up once with `docker compose up -d --remove-orphans`.
 
 ## Database
 
