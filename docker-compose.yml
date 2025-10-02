@@ -64,13 +64,16 @@ services:
             - ./Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy_data:/data
             - caddy_config:/config
+            - ./releases:/srv/releases:ro
+            - ./frontend/static:/srv/static:ro
         depends_on:
             - backend
-            - frontend
         restart: unless-stopped
 
     caddy-verify:
         image: caddy:2-alpine
+        profiles:
+            - verify
         ports:
             - "8080:8080"
         volumes:
