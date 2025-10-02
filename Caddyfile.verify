@@ -1,0 +1,23 @@
+:8080 {
+  encode zstd gzip
+
+  route {
+    handle_path /static/* {
+      root * /srv/static
+      file_server
+    }
+
+    handle /listings* {
+      reverse_proxy backend:3000
+    }
+    handle /tokens* {
+      reverse_proxy backend:3000
+    }
+
+    handle {
+      root * /srv/releases/current
+      try_files {path} {path}/ /index.html
+      file_server
+    }
+  }
+}

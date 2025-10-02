@@ -70,13 +70,14 @@ Hotkeys (subset)
 
 ## Static Assets (Images)
 
-- High-resolution images live outside the build under `frontend/static/2560/` and `frontend/static/540h/` (git-ignored).
-- The app requests them under `/static/2560/...` and `/static/540h/...`.
-- For local development, symlink those folders into `frontend/public` so Vite can serve them:
+- High‑resolution images live outside the build under `frontend/static/art/2560/` and `frontend/static/art/540h/` (git‑ignored).
+- The app requests them under `/static/art/2560/...` and `/static/art/540h/...`.
+- For local development, symlink the `static` folder into `frontend/public` so Vite can serve them:
   ```bash
   ln -s ../static frontend/public/static
+  # verifies: ls frontend/public/static/art/2560
   ```
-- In production, `docker-compose.yml` mounts `frontend/static` into the Caddy container and the Caddyfile exposes `/static/*`, so builds stay small while the image library remains shared across releases.
+- In production, `docker-compose.yml` mounts `frontend/static` into the Caddy container and the Caddyfile serves `/static/*` using `handle_path`, so requests for `/static/art/...` map to `/srv/static/art/...` on disk.
 
 ## Deployment (VPS Workflow)
 
