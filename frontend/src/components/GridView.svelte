@@ -149,7 +149,7 @@
   {#each items as it (it.token_mint_addr)}
     <div id={`cell-${it.token_mint_addr}`} class="cell" role="listitem" class:flash={flashMint === it.token_mint_addr}>
       <button type="button" aria-label={`Open ${it.token_num ?? it.token_mint_addr} in gallery`} on:click={() => handleClick(it.token_mint_addr)}>
-        <img class="img" src={`/540h/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" />
+        <img class="img" src={`/static/art/540h/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" />
       </button>
       {#if hasPrice(it)}
         <div class="price-tab">

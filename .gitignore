@@ -39,5 +39,10 @@ database/drifellascape.db/*
 metadata/
 static/
 
-frontend/public/2560/
-frontend/public/540h/
+# for local development (supposed to have a symlink like: "ln -s ../static static")
+frontend/public/
+# in real deployment: "frontend/static" is mounted into container and served by Caddy with a wildcard route
+frontend/static/art/
+
+releases/*
+!releases/.gitkeep

@@ -4,6 +4,12 @@ drifellascape.art {
   @api path /listings* /tokens*
   reverse_proxy @api backend:3000
 
-  reverse_proxy frontend:4173
-}
+  handle /static/* {
+    root * /srv/static
+    file_server
+  }
 
+  root * /srv/releases/current
+  try_files {path} {path}/ /index.html
+  file_server
+}

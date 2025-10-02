@@ -204,7 +204,7 @@
     <section class="slide" id={`slide-${it.token_mint_addr}`} aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
       <div class="img-wrap">
         <button type="button" class="img-button" aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`} on:click={() => dispatch('enterExplore', it.token_mint_addr)}>
-          <img class="token" src={`/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
+          <img class="token" src={`/static/art/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
         </button>
       </div>
       {#if showMeta}

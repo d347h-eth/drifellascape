@@ -25,17 +25,24 @@ services:
             - backend
         restart: unless-stopped
 
-    frontend:
+    frontend-build:
         image: node:24-bookworm-slim
         working_dir: /app
         environment:
-            - VITE_API_BASE=
-        command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn workspace @drifellascape/frontend build && yarn workspace @drifellascape/frontend preview --host 0.0.0.0 --port 4173"
+            - RELEASE_ID=
+        command: >-
+            sh -lc "set -euo pipefail &&
+            apt-get update &&
+            apt-get install -y --no-install-recommends build-essential python3 &&
+            rm -rf /var/lib/apt/lists/* &&
+            corepack enable &&
+            yarn install --immutable &&
+            if [ -z \"$RELEASE_ID\" ]; then echo 'RELEASE_ID is required' >&2; exit 1; fi &&
+            rm -rf /app/releases/\"$RELEASE_ID\" &&
+            mkdir -p /app/releases/\"$RELEASE_ID\" &&
+            yarn workspace @drifellascape/frontend build --outDir /app/releases/\"$RELEASE_ID\""
         volumes:
             - ./:/app
-        expose:
-            - "4173"
-        restart: unless-stopped
 
     caddy:
         image: caddy:2-alpine
@@ -46,9 +53,10 @@ services:
             - ./Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy_data:/data
             - caddy_config:/config
+            - ./releases:/srv/releases:ro
+            - ./frontend/static:/srv/static:ro
         depends_on:
             - backend
-            - frontend
         restart: unless-stopped
 
 volumes:

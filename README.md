@@ -68,6 +68,35 @@ Hotkeys (subset)
 - Enter Explore: `W`
 - Toggle Explore debug overlay: `O`
 
+## Static Assets (Images)
+
+- High-resolution images live outside the build under `frontend/static/2560/` and `frontend/static/540h/` (git-ignored).
+- The app requests them under `/static/2560/...` and `/static/540h/...`.
+- For local development, symlink those folders into `frontend/public` so Vite can serve them:
+  ```bash
+  ln -s ../static frontend/public/static
+  ```
+- In production, `docker-compose.yml` mounts `frontend/static` into the Caddy container and the Caddyfile exposes `/static/*`, so builds stay small while the image library remains shared across releases.
+
+## Deployment (VPS Workflow)
+
+The VPS setup builds the frontend once per release and serves the static output directly from Caddy. Backend and worker services continue to run from source.
+
+1. Pull the latest code: `git pull`
+2. Build a new frontend release:
+   ```bash
+   ./scripts/build-frontend-release.sh
+   # optional custom ID: ./scripts/build-frontend-release.sh 20241021-frontend
+   ```
+   The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
+3. Reload Caddy to swap the live assets:
+   ```bash
+   docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+   ```
+4. (Optional) Roll back by re-pointing the symlink: `ln -sfn <previous-id> releases/current` followed by another Caddy reload.
+
+Backend/worker containers still use `docker compose up -d` as before; only the frontend now deploys with a quick, no-downtime swap of static files.
+
 ## Database
 
 - SQLite file is stored under:
