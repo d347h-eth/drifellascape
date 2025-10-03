@@ -39,6 +39,7 @@
 
 - Previous/Next image — Left/Right or `A`/`D`
 - Focus current — `F`
+- Focus token search — `E`
 - Enter exploration — `W`
 - Enter grid view — `G` or `Esc`
 - Toggle data source (Listings/Tokens) — `T`
@@ -64,6 +65,7 @@
 
 - Refocus last anchored token — `F`
 - Enter gallery — `G`
+- Focus token search — `E`
 - Toggle data source (Listings/Tokens) — `T`
 
 ## Main Bar (Toggles & Indicators)
@@ -76,6 +78,7 @@
 - Traits — show/hide the trait bar stack
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
+- Token search — input accepts `#NUM` (0–1332). Enter jumps to the token (Tokens mode). Price and [ME]/[TS] links render in the bar; the Gallery image footer is removed.
 - Indicators
   - Gallery: index/total (1‑based across full result set)
   - Grid: Page X/Y; Total N (always for Listings; for Tokens only when filtered)
@@ -83,11 +86,21 @@
 
 Mobile specifics
 
-- Main bar collapses into a flat 28px hamburger at left; tap to expand/collapse
+- Main bar uses wrap‑around sections: ☰ (collapsed) → toggles → → pagination/search → ✕ (collapse). Control button is a 28px square.
 - Page indicator moves to the right edge
 - Gallery shows left/right chevrons at edges
 - Autosnap is disabled by default
 - Grid hides price pills (hoverless)
+ - Gallery entry overlay must absorb pointer events; it re‑arms on token jumps so users scroll to hide the browser address bar consistently.
+
+## Deep Links
+
+- `?token=NUM` (0–1332) deep‑links Gallery to a token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
+
+## Static & Releases
+
+- Images are served from `/static/art/{2560,540h}/{mint}.jpg` mounted in Caddy.
+- Frontend is a static bundle served by Caddy from `releases/current`. Use the `frontend-build` container and symlink flip; verify on `:8080` via the `caddy-verify` compose profile.
 
 ## Env Vars
 

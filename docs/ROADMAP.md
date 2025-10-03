@@ -250,6 +250,9 @@ FROM temp_listings;`
   - [x] Exploration mode (Leaflet) with hard‑pixel rendering and fit‑by‑width default
   - [x] Next/prev via hotkeys and invisible edge targets; ESC to close
   - [x] Positioning hotkeys: S/W/Q/E and 1/2/3 (region‑fit with tuned offset); G toggles debug overlay
+  - [x] Main bar updates: token quick search (Enter to jump, Tokens mode), `[ME]/[TS]` links, non‑breaking pagination text, vertical centering, mobile wrap‑around sections
+  - [x] Deep‑links: `?token=NUM` (0–1332) opens Gallery; param updates during Gallery navigation; removed when entering Grid
+  - [x] Static serving via Caddy: bundles under `/srv/releases/current`, images under `/static/art/...`; `caddy-verify` profile for side‑by‑side checks on `:8080`
 
 ---
 

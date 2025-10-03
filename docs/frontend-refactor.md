@@ -89,6 +89,7 @@ frontend/src/
 
 - [x] PR3: GalleryScroller — finalized component with wheel mapping, finalize snap, scrollbar release snap, and methods for App.
 - [x] PR4: Cleanup & constants — constants centralized; unused code removed; CSS scoped in components.
+- [x] Main bar rework (mobile) — two‑step wrap‑around (☰ → toggles → → pagination/search → ✕); token quick search in the bar, Enter to jump (Tokens mode); price + `[ME] [TS]` links in the bar; Gallery footer removed. Non‑breaking spacing in pagination text and vertical centering of bar content.
 
 ## Step Details
 

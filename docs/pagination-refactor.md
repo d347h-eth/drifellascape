@@ -79,6 +79,7 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 - [ ] Phase 2 — FE builder + unified postSearch
 - [x] Phase 3 — Pager module (next/prev, dedup, viewport anchor)
 - [x] Phase 4 — Anchor store; remove ad‑hoc branches
+- [x] Tokens‑only quick jump — search input and `?token=NUM` always anchor via Tokens; Gallery URL param updates during navigation and is removed when entering Grid
 - [ ] Phase 5 — Interactions/toggles cleanup
 - [ ] Phase 6 — Remove debug (prod) + docs update
 

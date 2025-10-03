@@ -13,7 +13,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/index.html` — Vite entry
 - `frontend/vite.config.ts` — Vite + Svelte configuration (with svelte‑preprocess)
 - `frontend/src/main.ts` — mounts the Svelte app
-- `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components)
+- `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components, URL token param integration)
 - `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — purpose pills + trait strip (fixed paging)
@@ -25,7 +25,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL (default `http://localhost:3000`)
+- `VITE_API_BASE` — backend base URL (default same‑origin; `http://localhost:3000` in dev)
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -33,7 +33,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 - On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 50, includeTraits: true }` and stores `items`, `versionId`.
 - A periodic poll (default 30s) posts again for listings; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
-- Price shown is fee‑inclusive (see below). Clicking the price opens the marketplace listing in a new tab.
+- Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 
 ## Horizontal Gallery (Continuous Travel)
@@ -53,7 +53,8 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
     - Directional finalize: if you moved at least a threshold (default 50% of viewport width) away from the last centered slide, snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
     - Debounce: `FINALIZE_DELAY_MS` (0 ms) — finalize immediately once scrolling idles.
     - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (150 ms) to avoid accidental re‑scrolls right after landing.
-    - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
+  - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
+  - Mobile entry overlay: while visible, it must absorb pointer events (no scroll‑through). The overlay re‑arms on token jumps so users scroll to hide the browser address bar consistently.
   - Animation toggle: users can toggle animation with `M`. When animation is off, there is no automated snap at all (pure linear scrolling). With `prefers‑reduced‑motion`, auto‑snap is also disabled.
   - Autosnap toggle: users can disable auto finalize‑to‑center. On mobile, autosnap defaults off.
 
@@ -205,12 +206,13 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Traits (show/hide trait bar)
   - Hotkeys (open helper overlay)
   - About (open about overlay)
+- Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)
   - Grid: Page X/Y and Total N (always for Listings; for Tokens only when filtered)
   - Network activity dot on the right
 - Mobile:
-  - The bar collapses into a 28px flat hamburger at the left; tap to expand/collapse.
+  - The bar uses wrap‑around sections: ☰ (collapsed) → toggles → → pagination/search → ✕ (collapse). The control button is a 28px square.
   - Page indicator renders at the right edge.
   - Bottom offset invariant: 15px in Gallery (to not block horizontal scroll), 0 in Grid/Exploration.
 

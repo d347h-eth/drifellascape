@@ -67,6 +67,11 @@ Hotkeys (subset)
 - Refocus last anchored token in Grid: `F`
 - Enter Explore: `W`
 - Toggle Explore debug overlay: `O`
+- Focus token search: `E`
+
+Deep‑links
+
+- `?token=NUM` (0–1332) opens Gallery centered on that token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
 
 ## Static Assets (Images)
 

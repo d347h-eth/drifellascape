@@ -63,3 +63,25 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 - Dev minimal: backend → worker → frontend; open http://localhost:5173
 - Production: run worker as a service (single instance), backend as a simple Node service behind a reverse proxy, frontend static hosting
+### 7) 405 on `/listings/search` after switching to static serving
+
+- Symptoms: `405 Method Not Allowed` from `/listings/search`.
+- Action: Ensure Caddy routes `/listings*` and `/tokens*` to the backend (no path rewrite), e.g.:
+  ```
+  route {
+    handle /listings* { reverse_proxy backend:3000 }
+    handle /tokens* { reverse_proxy backend:3000 }
+    handle /static/* { root * /srv/static; file_server }
+    handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
+  }
+  ```
+
+### 8) 404 on images under `/static/art/...`
+
+- Symptoms: 404 for `/static/art/2560/{mint}.jpg` or `/static/art/540h/{mint}.jpg`.
+- Action: Verify the container mount path matches the URL: host `frontend/static/art/...` → container `/srv/static/art/...` → Caddy `handle /static/*`.
+
+### 9) Side‑by‑side verification without touching prod
+
+- Start a temporary Caddy on `:8080` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
+- Test routes and static assets; tear down when done. This keeps the live Caddy untouched.

@@ -34,6 +34,8 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 - Frontend (Vite + Svelte)
   - Lists the current snapshot with fast pagination and price display. Trait Bar enables trait/value filtering and purpose‑based browsing with fixed paging.
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
+  - Main bar: token quick search (Enter to jump), price + [ME]/[TS] links in the bar; Gallery footer removed. On mobile, the bar wraps sections (☰ → toggles → → pagination/search → ✕).
+  - Deep link: `?token=NUM` (0–1332) opens Gallery centered on the token (Tokens mode). Param updates as you browse; removed when entering Grid.
 
 ### Data Flow (Conceptual)
 
@@ -130,7 +132,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
   - `DRIFELLASCAPE_PORT` (default: 3000)
 - Frontend
-  - `VITE_API_BASE` (default: http://localhost:3000)
+  - `VITE_API_BASE` (default: same‑origin; http://localhost:3000 in dev)
   - `VITE_POLL_MS` (default: 30000)
 
 ## Roadmap & TBDs

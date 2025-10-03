@@ -61,3 +61,23 @@
 - Decision: Use anchor‑by‑mint for deterministic pagination across Listings and Tokens. Requests provide either `anchorMint` or `offset` (exclusive). When `anchorMint` is present, the server computes an effective `offset` so the mint appears (centered when possible) and returns it in the response.
 - Rationale: Preserve focus across filter and mode transitions without client heuristics. Avoid surprise jumps and extra requests.
 - Notes: Grid paging uses the server‑returned `offset` for up/down requests; observers arm only after user interaction (wheel/pointer/keydown) to avoid accidental requests on entry.
+
+## ADR-012: Static Serving via Caddy + Release Symlink
+
+- Decision: Serve the built frontend as static files from Caddy, mounted under `/srv/releases/current`; serve heavy images from `/srv/static` under `/static/art/...`.
+- Rationale: Zero‑downtime swaps, small bundles, and simplified production footprint. Verified side‑by‑side via a `caddy-verify` profile on `:8080`.
+
+## ADR-013: Tokens‑only Quick Jump + URL Param
+
+- Decision: Token quick search (Enter) always anchors via Tokens to guarantee the token exists, then enters Gallery centered on it. Deep link `?token=NUM` (0–1332) opens Gallery on that token; param updates during Gallery navigation and is removed when entering Grid.
+- Rationale: Deterministic behavior independent of current listings; shareable links that encode Gallery focus only.
+
+## ADR-014: Mobile Entry Overlay Captures Gestures
+
+- Decision: The Gallery entry overlay uses `pointer-events: auto` and re‑arms on token jumps. While visible, it absorbs gestures so the scroller doesn’t map vertical wheel to horizontal travel.
+- Rationale: Prevents subtle left‑offset drift and keeps the “enter gate” interaction predictable across devices.
+
+## ADR-015: Main Bar Wrap‑around on Mobile
+
+- Decision: The main bar on mobile is split into two sections (toggles; pagination/search) navigated by a 28px control button: ☰ → → → ✕.
+- Rationale: Avoid overlap and maintain a compact, touch‑friendly interface.

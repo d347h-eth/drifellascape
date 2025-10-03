@@ -18,7 +18,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Packages: `database`, `worker`, `backend`, `frontend`, `shared`. Keep boundaries sharp; database access goes through `@drifellascape/database`.
 - Database: better‑sqlite3 with pragmas (`WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`). Migrations live in `database/migrations`.
 - Listings schema: primary key is `(version_id, token_mint_addr)`. Ignore price deltas < 0.01 SOL (`PRICE_EPSILON`).
-- Frontend: preserve hard‑pixel rendering and hotkeys contract in the exploration mode.
+- Frontend: preserve hard‑pixel rendering and hotkeys contract in the exploration mode. Main bar on mobile uses a two‑step “wrap‑around” menu (☰ → toggles → → pagination/search → ✕ collapse). Token quick search lives in the bar (Enter to jump; no magnifier on mobile). Pagination/search text uses non‑breaking spacing.
 - Hotkeys: `T` toggles data source (Listings/Tokens); `G`/`Esc` enter Grid; `F` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
 
 ## How to Work
@@ -27,6 +27,22 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Scope: Implement what’s requested without opportunistic refactors. Mention unrelated issues in your summary instead of changing them.
 - Validation: Prefer targeted tests around the code you touch. For DB logic, use temp DBs and run migrations.
 - Logging: Append to `logs/` files; keep logs concise and actionable.
+
+## Static Serving & Releases
+
+- Frontend build is a static bundle served by Caddy from `releases/current`.
+- Heavy images are mounted under `/static/art/{2560,540h}/…`; the app requests `/static/art/...` paths.
+- Use the one‑shot `frontend-build` container via `./scripts/build-frontend-release.sh`; flip `releases/current` symlink and `caddy reload`. A `caddy-verify` profile exists for side‑by‑side checks on `:8080` without touching live traffic.
+
+## URL & Navigation
+
+- `?token=NUM` (0–1332) deep‑links Gallery to a token (Tokens mode). Param updates as Gallery focus changes; it is removed on entering Grid.
+- Token quick search always anchors via Tokens (then enters Gallery centered on the token).
+
+## Mobile Overlay & Input
+
+- The Gallery entry overlay must capture pointer events (no Y→X wheel leakage). Overlay re‑arms on token jumps so users scroll to hide the address bar consistently.
+- Inside the token search input: `E` focuses and selects all; `Esc` refills with the current token and blurs. Never overwrite the field while it is focused.
 
 ## DO / DON’T
 

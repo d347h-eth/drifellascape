@@ -80,6 +80,7 @@ Notes:
 
 - Sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced; add secondary sort if needed.
 - Price formatting, fees, and image rendering are handled by the frontend.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; dev uses `http://localhost:3000`.
 
 ## Process Flow
 
