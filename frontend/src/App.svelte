@@ -8,7 +8,7 @@
     import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT } from "./lib/search";
+    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
     import type { Row, ListingTrait, DataSource } from "./lib/types";
@@ -673,11 +673,17 @@
     let _prevGalleryMode = !gridMode && exploreIndex === null;
     $: {
         const isGallery = !gridMode && exploreIndex === null;
+        const cameFromExplore = _prevExploreIndex !== null;
         if (isGallery !== _prevGalleryMode) {
             if (isGallery) {
                 galleryPagingArmed = false; // entering gallery: require user interaction
                 if (isMobile) {
-                    rearmGalleryEntryOverlay();
+                    if (!cameFromExplore) {
+                        rearmGalleryEntryOverlay();
+                    } else {
+                        showGalleryEntryOverlay = false;
+                        galleryEntryHeightPx = 0;
+                    }
                 } else {
                     showGalleryEntryOverlay = false;
                     galleryEntryHeightPx = 0;
@@ -833,6 +839,8 @@
         exploreItems = items.slice(); // freeze current page order
         const idx = exploreItems.findIndex((r) => r.token_mint_addr === mint);
         exploreIndex = idx >= 0 ? idx : 0;
+        showTraitBar = false;
+        if (isMobile) showMainBar = false;
         // Keep gallery in sync with the entered token so exiting lands on it
         if (idx >= 0) {
             scrollerRef?.scrollToIndexInstant?.(idx);
@@ -1053,7 +1061,7 @@
               filtersApplied={selectedValueIds.size > 0}
               {sortAscListings}
               {sortAscTokens}
-              networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev)}
+              networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev || $pendingRequestsStore > 0)}
               isMobile={isMobile}
               collapsed={!showMainBar}
               {currentRow}
@@ -1086,7 +1094,12 @@
               on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
               on:toggleHelp={() => { showHelp = !showHelp; }}
               on:toggleAbout={() => { showAbout = !showAbout; }}
-              on:toggleMainBar={() => { showMainBar = !showMainBar; }}
+              on:toggleMainBar={(e) => {
+                  showMainBar = !showMainBar;
+                  if (!showMainBar && isMobile && exploreIndex === null && e?.detail?.fromSecondary) {
+                      showTraitBar = false;
+                  }
+              }}
               on:rescroll={() => { rearmGalleryEntryOverlay(); }}
           />
       </div>

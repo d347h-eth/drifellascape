@@ -1,3 +1,4 @@
+import { writable } from "svelte/store";
 import type { ApiResponse, DataSource, ListingsSearchBody, Row } from "./types";
 
 const configuredBase = (import.meta as any).env?.VITE_API_BASE;
@@ -7,6 +8,12 @@ const API_BASE =
         : (typeof window === "undefined"
               ? "http://localhost:3000"
               : "");
+
+
+export const pendingRequests = writable(0);
+
+function incrementPending() { pendingRequests.update((n) => n + 1); }
+function decrementPending() { pendingRequests.update((n) => (n > 0 ? n - 1 : 0)); }
 
 export function defaultSortForSource(source: DataSource): string {
     return source === "tokens" ? "token_asc" : "price_asc";
@@ -46,11 +53,16 @@ export async function postSearch(
     body: ListingsSearchBody,
 ): Promise<ApiResponse<Row>> {
     const path = source === "tokens" ? "/tokens/search" : "/listings/search";
-    const res = await fetch(`${API_BASE}${path}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as ApiResponse<Row>;
+    incrementPending();
+    try {
+        const res = await fetch(`${API_BASE}${path}`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as ApiResponse<Row>;
+    } finally {
+        decrementPending();
+    }
 }

@@ -26,7 +26,7 @@
 
   // Mobile sectionization: 0 = toggles, 1 = pagination/search
   let section = 0;
-  $: if (collapsed) section = 0;
+  $: if (collapsed || inExplore) section = 0;
 
   // Quick token search
   let tokenInput = '';
@@ -110,47 +110,60 @@
   <div class="left">
     {#if isMobile}
       <button class="btn hamburger" on:click={() => {
-        if (collapsed) dispatch('toggleMainBar');
-        else if (section === 0) section = 1;
-        else dispatch('toggleMainBar');
+        if (collapsed) {
+          dispatch('toggleMainBar', { fromSecondary: false });
+        } else if (!inExplore && section === 0) {
+          section = 1;
+        } else {
+          const fromSecondary = !inExplore && section === 1;
+          dispatch('toggleMainBar', { fromSecondary });
+        }
       }} title={collapsed ? 'Open' : (section===0 ? 'Next' : 'Collapse')}>
-        {#if collapsed}☰{:else if section===0}☰²{:else}✕{/if}
+        {#if collapsed}☰{:else if inExplore}✕{:else if section===0}☰²{:else}✕{/if}
       </button>
       {#if collapsed && !inExplore && !gridMode}
         <button class="btn rescroll" on:click={() => dispatch('rescroll')} title="Re-run gallery entry scroll">Rescroll</button>
       {/if}
     {/if}
-    {#if !collapsed && (!isMobile || section === 0)}
-    <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
-      Traits
-    </button>
-    <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
-      {#if gridMode}
-        Gallery
-      {:else if inExplore}
-        Gallery
-      {:else}
-        Grid
-      {/if}
-    </button>
-    <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
-      {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
-    </button>
-    <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
-      {sortLabel}
-    </button>
-    <button class="btn {motionEnabled ? 'active' : ''}" on:click={() => dispatch('toggleMotion')} title="Toggle animation">
-      Animation
-    </button>
-    <button class="btn {autoSnapEnabled ? 'active' : ''}" on:click={() => dispatch('toggleAutoSnap')} title="Toggle auto-snap">
-      Autosnap
-    </button>
-    <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
-      Hotkeys
-    </button>
-    <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
-      About
-    </button>
+    {#if !collapsed}
+      <div class="toggle-strip">
+        {#if !isMobile || section === 0}
+          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
+            Traits
+          </button>
+          <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
+            {#if gridMode}
+              Gallery
+            {:else if inExplore}
+              Gallery
+            {:else}
+              Grid
+            {/if}
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
+            {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
+            {sortLabel}
+          </button>
+          <button class="btn {motionEnabled ? 'active' : ''}" on:click={() => dispatch('toggleMotion')} title="Toggle animation">
+            Animation
+          </button>
+          <button class="btn {autoSnapEnabled ? 'active' : ''}" on:click={() => dispatch('toggleAutoSnap')} title="Toggle auto-snap">
+            Autosnap
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
+            Hotkeys
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
+            About
+          </button>
+        {:else}
+          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
+            Traits
+          </button>
+        {/if}
+      </div>
     {/if}
   </div>
   {#if !collapsed}
@@ -265,6 +278,7 @@
   .left { min-width: 420px; }
   .right { min-width: 40px; justify-content: flex-end; display: flex; align-items: center; white-space: nowrap; }
   .statusbar.collapsed .left { min-width: 0; }
+  .toggle-strip { display: flex; align-items: center; gap: 8px; }
   .btn {
     height: 20px; padding: 0 8px; font-size: 12px; line-height: 1; color: #e6e6e6;
     background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;

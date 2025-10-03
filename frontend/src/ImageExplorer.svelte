@@ -32,6 +32,68 @@
     let firstLoadDone = false;
     let swapToken = 0;
 
+    const RETURN_OFFSET_PX = 30;
+    let returnButtonLeft = 0;
+    let returnButtonTop = 0;
+    let returnButtonVisible = false;
+    let returnUpdateQueued = false;
+    let mapMotionHandler: (() => void) | null = null;
+
+    function scheduleReturnButtonUpdate() {
+        if (returnUpdateQueued) return;
+        if (typeof window === 'undefined') return;
+        returnUpdateQueued = true;
+        requestAnimationFrame(() => {
+            returnUpdateQueued = false;
+            updateReturnButtonPosition();
+        });
+    }
+
+    function updateReturnButtonPosition() {
+        if (!mapEl || !overlay) return;
+        if (loading) {
+            returnButtonVisible = false;
+            return;
+        }
+        const imgEl = (overlay as any)?._image as HTMLImageElement | undefined;
+        if (!imgEl) {
+            returnButtonVisible = false;
+            return;
+        }
+        try {
+            const mapRect = mapEl.getBoundingClientRect();
+            const imgRect = imgEl.getBoundingClientRect();
+            if (imgRect.width === 0 || imgRect.height === 0) {
+                returnButtonVisible = false;
+                return;
+            }
+            const verticallyVisible = imgRect.bottom >= mapRect.top && imgRect.top <= mapRect.bottom;
+            const horizontallyVisible = imgRect.right >= mapRect.left && imgRect.left <= mapRect.right;
+            if (!verticallyVisible || !horizontallyVisible) {
+                returnButtonVisible = false;
+                return;
+            }
+            const left = imgRect.left + imgRect.width / 2 - mapRect.left;
+            const minLeft = 16;
+            const maxLeft = mapRect.width - 16;
+            if (left < minLeft || left > maxLeft) {
+                returnButtonVisible = false;
+                return;
+            }
+            let top = imgRect.bottom + RETURN_OFFSET_PX - mapRect.top;
+            const maxTop = mapRect.height - 16;
+            if (top > maxTop) {
+                returnButtonVisible = false;
+                return;
+            }
+            returnButtonLeft = Math.round(left);
+            returnButtonTop = Math.round(Math.max(0, top));
+            returnButtonVisible = true;
+        } catch {
+            returnButtonVisible = false;
+        }
+    }
+
     function lockScroll(lock: boolean) {
         if (typeof document === "undefined") return;
         if (lock) {
@@ -76,6 +138,7 @@
         map.setMaxZoom(baseZoomByWidth + Math.log2(maxZoomFactor));
         const center = [(IMG_HEIGHT / 2) as any, (IMG_WIDTH / 2) as any];
         map.setView(center as any, baseZoomByWidth, { animate });
+        scheduleReturnButtonUpdate();
     }
 
     function setViewFitHeightAt(centerX: number, animate: boolean) {
@@ -87,6 +150,7 @@
         const clampedX = Math.max(0, Math.min(IMG_WIDTH, centerX));
         const center = [(IMG_HEIGHT / 2) as any, clampedX as any];
         map.setView(center as any, zH, { animate });
+        scheduleReturnButtonUpdate();
     }
 
     function setViewRegionHeightAt(centerX: number, top: number, height: number, animate: boolean) {
@@ -103,6 +167,7 @@
         const centerY = Math.max(0, Math.min(IMG_HEIGHT, top + height / 2));
         const center = [centerY as any, clampedX as any];
         map.setView(center as any, zR, { animate });
+        scheduleReturnButtonUpdate();
     }
 
     onMount(async () => {
@@ -141,10 +206,21 @@
             try { overlay.setOpacity(1); } catch {}
             // After first load, ensure backdrop is solid for subsequent swaps
             if (mapEl) mapEl.style.background = "#000";
+            scheduleReturnButtonUpdate();
         });
         map.invalidateSize(false);
         // Fit-by-width and snap to integer zoom levels
         setViewFitWidthCentered(false);
+        scheduleReturnButtonUpdate();
+
+        const motionHandler = () => scheduleReturnButtonUpdate();
+        mapMotionHandler = motionHandler;
+        map.on('move', motionHandler);
+        map.on('moveend', motionHandler);
+        map.on('zoom', motionHandler);
+        map.on('zoomend', motionHandler);
+        map.on('viewreset', motionHandler);
+        map.on('resize', motionHandler);
 
         keyHandlerDown = (e: KeyboardEvent) => {
             const k = e.key;
@@ -218,6 +294,7 @@
             baseZoomByWidth = computeBaseZoomByWidth();
             map.setMinZoom(baseZoomByWidth);
             map.setMaxZoom(baseZoomByWidth + Math.log2(maxZoomFactor));
+            scheduleReturnButtonUpdate();
         };
         window.addEventListener("resize", resizeHandler);
 
@@ -257,6 +334,15 @@
             window.removeEventListener("resize", resizeHandler);
             resizeHandler = null;
         }
+        if (map && mapMotionHandler) {
+            map.off('move', mapMotionHandler);
+            map.off('moveend', mapMotionHandler);
+            map.off('zoom', mapMotionHandler);
+            map.off('zoomend', mapMotionHandler);
+            map.off('viewreset', mapMotionHandler);
+            map.off('resize', mapMotionHandler);
+        }
+        mapMotionHandler = null;
         try {
             map?.remove?.();
         } catch {}
@@ -303,6 +389,8 @@
         const preload = transparentUntilFirstLoad && !firstLoadDone && loading;
         mapEl.style.background = preload ? "transparent" : "#000";
     }
+
+    $: if (!loading) { scheduleReturnButtonUpdate(); } else { returnButtonVisible = false; }
 </script>
 
 <style>
@@ -346,6 +434,29 @@
         user-select: none;
     }
     .close:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .return {
+        position: absolute;
+        min-width: 96px;
+        padding: 6px 14px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.4);
+        color: #fff;
+        cursor: pointer;
+        transform: translate(-50%, 0);
+        z-index: 1002;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out;
+    }
+    .return.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .return:hover {
         background: rgba(255, 255, 255, 0.1);
     }
     .edge {
@@ -409,6 +520,9 @@
 <div class="overlay" class:preload={(transparentUntilFirstLoad && !firstLoadDone && loading)} role="dialog" aria-modal="true">
     <div bind:this={mapEl} class="map" />
     <button class="close" title="Close (Esc)" on:click={() => onClose?.()}>✕</button>
+    <button class="return" class:visible={returnButtonVisible} title="Return to gallery" on:click={() => onClose?.()} style={`left:${returnButtonLeft}px; top:${returnButtonTop}px;`}>
+        Return
+    </button>
     {#if onPrev}
         <button
             class="edge edge-left"
