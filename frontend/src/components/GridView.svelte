@@ -5,7 +5,7 @@
 
   export let items: Row[] = [];
   export let targetMint: string | null = null;
-  // Beat 3 times; 1.25s → 1.875s per beat → total ≈ 5625ms
+  // Beat 6 times; 0.9375s per beat (half duration; twice as fast) → total ≈ 5625ms
   export let flashDurationMs: number = 5625;
   export let enablePaging: boolean = false;
   export let loadingMore: boolean = false;
@@ -134,12 +134,12 @@
   .price-tab :global(.price) { color: #fff; }
   /* Brief cyan outline pulse to anchor the eye */
   .flash {
-    animation: grid-flash 1.875s ease-in-out 3;
+    animation: grid-flash 0.9375s ease-in-out 6;
   }
   @keyframes grid-flash {
     0% { box-shadow: 0 0 0 0 rgba(0,255,255,0.0); outline: 0 solid rgba(0,255,255,0.0); }
-    10% { box-shadow: 0 0 0 2px rgba(0,255,255,0.75); outline: 2px solid rgba(0,255,255,0.85); }
-    60% { box-shadow: 0 0 0 2px rgba(0,255,255,0.45); outline: 2px solid rgba(0,255,255,0.6); }
+    10% { box-shadow: 0 0 0 4px rgba(0,255,255,0.75); outline: 4px solid rgba(0,255,255,0.85); }
+    60% { box-shadow: 0 0 0 4px rgba(0,255,255,0.45); outline: 4px solid rgba(0,255,255,0.6); }
     100% { box-shadow: 0 0 0 0 rgba(0,255,255,0.0); outline: 0 solid rgba(0,255,255,0.0); }
   }
 </style>

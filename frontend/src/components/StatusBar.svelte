@@ -114,15 +114,15 @@
         else if (section === 0) section = 1;
         else dispatch('toggleMainBar');
       }} title={collapsed ? 'Open' : (section===0 ? 'Next' : 'Collapse')}>
-        {#if collapsed}☰{:else if section===0}→{:else}✕{/if}
+        {#if collapsed}☰{:else if section===0}☰²{:else}✕{/if}
       </button>
       {#if collapsed && !inExplore && !gridMode}
         <button class="btn rescroll" on:click={() => dispatch('rescroll')} title="Re-run gallery entry scroll">Rescroll</button>
       {/if}
     {/if}
     {#if !collapsed && (!isMobile || section === 0)}
-    <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
-      {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
+    <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
+      Traits
     </button>
     <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
       {#if gridMode}
@@ -133,6 +133,9 @@
         Grid
       {/if}
     </button>
+    <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
+      {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
+    </button>
     <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
       {sortLabel}
     </button>
@@ -141,9 +144,6 @@
     </button>
     <button class="btn {autoSnapEnabled ? 'active' : ''}" on:click={() => dispatch('toggleAutoSnap')} title="Toggle auto-snap">
       Autosnap
-    </button>
-    <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
-      Traits
     </button>
     <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
       Hotkeys
@@ -170,7 +170,7 @@
           
         </div>
       {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
+        <span class="mono">{galleryIndex1}/{total}</span>
         <span class="sep">•</span>
         <div class="token-search">
           <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}
@@ -216,7 +216,7 @@
           
         </div>
       {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
+        <span class="mono">{galleryIndex1}/{total}</span>
         <span class="sep">•</span>
         <div class="token-search">
           <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}

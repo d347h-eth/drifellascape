@@ -102,13 +102,18 @@
     $: {
         const meta: Record<number, string> = {};
         const ts = traitsForCurrent || [];
-        const lookup = new Map<number, string>();
+        const lookup = new Map<number, { value: string; purpose: Purpose }>();
         for (const t of ts) {
-            if (!lookup.has(t.value_id)) lookup.set(t.value_id, t.value);
+            if (!lookup.has(t.value_id)) {
+                lookup.set(t.value_id, { value: t.value, purpose: normalizedPurpose(t.purpose_class) });
+            }
         }
         for (const id of selectedValueIds) {
-            const v = lookup.get(id);
-            if (v) meta[id] = v;
+            const info = lookup.get(id);
+            if (info) {
+                const label = info.purpose ? `${info.purpose}: ${info.value}` : info.value;
+                meta[id] = label;
+            }
         }
         selectedValueMeta = meta;
     }
@@ -202,6 +207,7 @@
     async function handleTokenSearch(num: number) {
         // Always jump via Tokens dataset to ensure the token exists
         dataSource = 'tokens';
+        if (selectedValueIds.size > 0) { selectedValueIds = new Set(); }
         const mint = await resolveMintByTokenNum(num);
         if (!mint) return;
         try {
