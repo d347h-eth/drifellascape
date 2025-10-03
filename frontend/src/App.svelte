@@ -45,6 +45,7 @@
     // Grid mode state
     let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
+    let statusBarRef: any = null;
 
     // Horizontal scroller state (delegated to GalleryScroller)
     let activeIndex = 0; // nearest item to viewport center
@@ -189,6 +190,47 @@
         try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
     }
 
+    // Quick token search: resolve token_num to mint via tokens/search and re-anchor current source
+    async function resolveMintByTokenNum(num: number): Promise<string | null> {
+        try {
+            const body = buildSearchBody({ source: 'tokens', valueIds: [], offset: Math.max(0, Math.min(num, 1332)), limit: 1, includeTraits: false, sort: 'token_asc' });
+            const res = await postSearch('tokens', body);
+            const m = res?.items?.[0]?.token_mint_addr;
+            return typeof m === 'string' ? m : null;
+        } catch { return null; }
+    }
+    async function handleTokenSearch(num: number) {
+        // Always jump via Tokens dataset to ensure the token exists
+        dataSource = 'tokens';
+        const mint = await resolveMintByTokenNum(num);
+        if (!mint) return;
+        try {
+            // Update URL param for shareable link (non-navigating)
+            if (typeof window !== 'undefined' && window.history && window.location) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('token', String(num));
+                window.history.replaceState({}, '', url.toString());
+            }
+        } catch {}
+        try {
+            const resp = await postSearch('tokens', buildSearchBody({ source: 'tokens', valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() }));
+            items = resp.items ?? [];
+            total = Number(resp.total || 0);
+            baseOffset = Number(resp.offset || 0);
+            versionId = resp.versionId ?? versionId;
+            gridMode = false;
+            if (isMobile) showMainBar = false;
+            // On mobile, require the user to scroll past the entry overlay again
+            if (isMobile) rearmGalleryEntryOverlay();
+            await tick();
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+            const idx = items.findIndex((r) => r.token_mint_addr === mint);
+            const i = idx >= 0 ? idx : 0;
+            scrollerRef?.snapToIndex?.(i);
+            activeIndex = i;
+        } catch {}
+    }
+
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
@@ -217,6 +259,8 @@
         } catch {}
         if (isMobile) {
             autoSnapEnabled = false;
+            // Start with collapsed main bar on mobile
+            showMainBar = false;
             if (!gridMode) refreshMobileGalleryMetrics();
             else if (typeof document !== 'undefined') {
                 document.documentElement?.style.removeProperty('--gallery-mobile-vh');
@@ -253,14 +297,41 @@
             try {
                 if (window.scrollY >= Math.max(0, galleryEntryHeightPx - 1)) {
                     showGalleryEntryOverlay = false;
+                    // Recentre gallery after overlay dismissal to avoid left-offset
+                    if (!gridMode && exploreIndex === null) {
+                        try { scrollerRef?.snapToIndex?.(activeIndex); } catch {}
+                    }
                 }
             } catch {}
         };
         window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
-        loadListings();
+        // If URL has ?token=NUM, try to jump there after startup
+        try {
+            const sp = new URLSearchParams(window.location.search);
+            const tok = sp.get('token');
+            const n = tok ? Number(tok) : NaN;
+            if (Number.isFinite(n)) {
+                // Force Tokens mode for canonical anchor so the token always exists
+                dataSource = 'tokens';
+                handleTokenSearch(Math.max(0, Math.min(1332, Math.floor(n))));
+            } else {
+                loadListings();
+            }
+        } catch { loadListings(); }
         const id = setInterval(pollForUpdates, Math.max(5000, POLL_MS));
+        const isTypingTarget = (el: any) => {
+            if (!el) return false;
+            const tag = (el.tagName || '').toUpperCase();
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+            if ((el as any).isContentEditable) return true;
+            return false;
+        };
         const onKey = (e: KeyboardEvent) => {
             const k = e.key;
+            if (isTypingTarget(e.target)) {
+                // Let native editing shortcuts work inside inputs
+                return;
+            }
             // Help overlay toggles (works in both modes)
             if (k === 'F1' || k === 'h' || k === 'H') {
                 e.preventDefault();
@@ -312,6 +383,12 @@
                 } else {
                     enterGrid();
                 }
+                return;
+            }
+            // Focus token search — E
+            if (k === 'e' || k === 'E') {
+                e.preventDefault();
+                try { (statusBarRef as any)?.focusTokenSearch?.(); } catch {}
                 return;
             }
             // Toggle data source — T (listings <-> tokens)
@@ -404,6 +481,7 @@
             }
         };
         const onKeyUp = (e: KeyboardEvent) => {
+            if (isTypingTarget(e.target)) return;
             if (exploreIndex !== null || gridMode) return; // gallery only
             const k = e.key;
             if (k === "ArrowLeft" || k === "a" || k === "A") {
@@ -550,6 +628,16 @@
         if (exploreIndex !== null) closeExplore();
         gridMode = true;
         pagingArmed = false; // avoid immediate paging on entry
+        // Drop token param from URL when leaving gallery
+        try {
+            if (typeof window !== 'undefined' && window.history && window.location) {
+                const u = new URL(window.location.href);
+                if (u.searchParams.has('token')) {
+                    u.searchParams.delete('token');
+                    window.history.replaceState({}, '', u.toString());
+                }
+            }
+        } catch {}
     }
     function exitToGallery() {
         const target = gridTargetMint ?? items[activeIndex]?.token_mint_addr ?? items[0]?.token_mint_addr ?? null;
@@ -717,6 +805,16 @@
         const i = idx >= 0 ? idx : 0;
         gridMode = false;
         if (isMobile) showMainBar = false;
+        // Update URL token param on entering Gallery from Grid
+        try {
+            const row: any = items[i] as any;
+            const tn = row?.token_num;
+            if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('token', String(tn));
+                window.history.replaceState({}, '', url.toString());
+            }
+        } catch {}
         anchorArm(mint);
         // Wait for gallery to mount and bind scrollerRef
         await tick();
@@ -779,6 +877,19 @@
         const row = items[activeIndex];
         if (row) anchorUpdateFromFocused(row.token_mint_addr);
     }
+    // Update URL token param as navigation goes in Gallery (no history spam)
+    let _lastUrlToken: number | null = null;
+    $: if (typeof window !== 'undefined' && !gridMode && exploreIndex === null) {
+        const tn: any = (items[activeIndex] as any)?.token_num;
+        if (typeof tn === 'number' && tn !== _lastUrlToken) {
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('token', String(tn));
+                window.history.replaceState({}, '', url.toString());
+                _lastUrlToken = tn;
+            } catch {}
+        }
+    }
 
     // Edge overlays should match the visible image height
     let edgeHeight = 0;
@@ -840,7 +951,7 @@
         z-index: 9500;
         pointer-events: auto;
     }
-    .gallery-entry-overlay { width: 100%; pointer-events: none; }
+    .gallery-entry-overlay { width: 100%; pointer-events: auto; }
     .overlay-msg {
         position: sticky; top: 40svh; left: 50%; transform: translateX(-50%);
         display: inline-block; text-align: center;
@@ -863,7 +974,7 @@
         <GalleryScroller
             bind:activeIndex
             items={items}
-            showMeta={dataSource === 'listings'}
+            showMeta={false}
             motionEnabled={motionEnabled}
             autoSnapEnabled={autoSnapEnabled}
             galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
@@ -921,6 +1032,7 @@
               />
           {/if}
           <StatusBar
+              bind:this={statusBarRef}
               {dataSource}
               {motionEnabled}
               {autoSnapEnabled}
@@ -939,6 +1051,7 @@
               isMobile={isMobile}
               collapsed={!showMainBar}
               {currentRow}
+              on:tokenSearch={(e) => handleTokenSearch(e.detail)}
               on:toggleSource={() => {
                 const cur = currentItem();
                 gridTargetMint = cur?.token_mint_addr ?? null;

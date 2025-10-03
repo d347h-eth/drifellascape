@@ -17,6 +17,7 @@
         <li>Toggle trait bar — <span class="kbd">V</span></li>
         <li>Traits purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
         <li>Next trait page (wrap) — <span class="kbd">X</span></li>
+        <li>Focus token search — <span class="kbd">E</span></li>
       </ul>
       
       <h3>Grid</h3>

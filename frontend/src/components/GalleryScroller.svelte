@@ -207,15 +207,6 @@
           <img class="token" src={`/static/art/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
         </button>
       </div>
-      {#if showMeta}
-        <div class="meta">
-          <PriceTag price={getPrice(it)} listingSource={getSource(it)} mint={it.token_mint_addr} />
-        </div>
-      {:else}
-        <div class="meta">
-          <a class="token-link" href={`https://magiceden.io/item-details/${it.token_mint_addr}`} target="_blank" rel="noopener noreferrer">{getName(it)}</a>
-        </div>
-      {/if}
     </section>
   {/each}
 </div>
@@ -272,14 +263,5 @@
     height: auto;
     margin: 0 auto;
     object-fit: contain;
-  }
-  .meta { display: flex; align-items: center; justify-content: center; padding: 8px 0; font-size: 14px; }
-  .price, .price-link { font-variant-numeric: tabular-nums; }
-  .price-link { text-decoration: none; color: inherit; }
-  .price-link:visited { color: inherit; }
-  .token-link { text-decoration: none; color: inherit; }
-  .token-link:hover { text-decoration: underline; }
-  @media (hover: none) and (pointer: coarse) {
-    .meta { display: none; }
   }
 </style>

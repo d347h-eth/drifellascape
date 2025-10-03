@@ -25,18 +25,6 @@ services:
             - backend
         restart: unless-stopped
 
-    frontend:
-        image: node:24-bookworm-slim
-        working_dir: /app
-        environment:
-            - VITE_API_BASE=
-        command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn workspace @drifellascape/frontend build && yarn workspace @drifellascape/frontend preview --host 0.0.0.0 --port 4173"
-        volumes:
-            - ./:/app
-        expose:
-            - "4173"
-        restart: unless-stopped
-
     frontend-build:
         image: node:24-bookworm-slim
         working_dir: /app
