@@ -1,19 +1,69 @@
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
 const SOURCE_DIR = path.resolve(process.cwd(), "static", "full");
 
-// Mode selection: 'width' resizes by width to 2560px; 'height' resizes by height to 540px.
-// Adjust either constant below as needed; keep it simple and hard-coded per request.
-const MODE: "width" | "height" = "height"; // change to "width" to produce 2560px-wide images
-const TARGET_WIDTH_PX = 2560;
-const TARGET_HEIGHT_PX = 540;
+type Mode = "width" | "height" | "meta";
+const DEFAULT_MODE: Mode = "height";
+const MODE_CONFIG: Record<Mode, {
+    targetDirName: string;
+    description: string;
+    resizeOptions: sharp.ResizeOptions;
+}> = {
+    width: {
+        targetDirName: "2560",
+        description: "resize to 2560px width (fit inside)",
+        resizeOptions: {
+            width: 2560,
+            fit: sharp.fit.inside,
+            withoutEnlargement: true,
+            kernel: sharp.kernel.lanczos3,
+        },
+    },
+    height: {
+        targetDirName: "540h",
+        description: "resize to 540px height (fit inside)",
+        resizeOptions: {
+            height: 540,
+            fit: sharp.fit.inside,
+            withoutEnlargement: true,
+            kernel: sharp.kernel.lanczos3,
+        },
+    },
+    meta: {
+        targetDirName: "meta",
+        description: "resize & crop to 1200×630 (OG preview)",
+        resizeOptions: {
+            width: 1200,
+            height: 630,
+            fit: sharp.fit.cover,
+            position: "centre",
+            withoutEnlargement: true,
+            kernel: sharp.kernel.lanczos3,
+        },
+    },
+};
+
+const allowedModes = Object.keys(MODE_CONFIG) as Mode[];
+const modeArgRaw = process.argv[2]?.toLowerCase();
+let MODE: Mode = DEFAULT_MODE;
+if (modeArgRaw) {
+    if ((allowedModes as string[]).includes(modeArgRaw)) {
+        MODE = modeArgRaw as Mode;
+    } else {
+        console.error(
+            `Invalid mode "${modeArgRaw}". Allowed values: ${allowedModes.join(", ")}.`,
+        );
+        process.exit(1);
+    }
+}
 
 const TARGET_DIR = path.resolve(
     process.cwd(),
     "static",
-    MODE === "width" ? "2560" : "540h",
+    MODE_CONFIG[MODE].targetDirName,
 );
 const MAX_CONCURRENCY = 4;
 
@@ -53,13 +103,7 @@ async function convertPngToJpegResized(sourceFilePath: string): Promise<void> {
     const image = sharp(sourceFilePath, { failOn: "warning" });
 
     await image
-        .resize({
-            width: MODE === "width" ? TARGET_WIDTH_PX : undefined,
-            height: MODE === "height" ? TARGET_HEIGHT_PX : undefined,
-            fit: "inside",
-            withoutEnlargement: true,
-            kernel: sharp.kernel.lanczos3,
-        })
+        .resize(MODE_CONFIG[MODE].resizeOptions)
         .flatten({ background: { r: 255, g: 255, b: 255 } })
         .jpeg({
             quality: 80,
@@ -110,11 +154,7 @@ async function main(): Promise<void> {
         return;
     }
     console.log(
-        `Found ${pngFiles.length} PNG file(s). Starting conversion to ${
-            MODE === "width"
-                ? `${TARGET_WIDTH_PX}px width`
-                : `${TARGET_HEIGHT_PX}px height`
-        } JPEG...`,
+        `Found ${pngFiles.length} PNG file(s). Starting conversion using mode "${MODE}" (${MODE_CONFIG[MODE].description})...`,
     );
 
     let processedCount = 0;
@@ -134,7 +174,7 @@ async function main(): Promise<void> {
 
     const elapsedSec = ((Date.now() - startTimeMs) / 1000).toFixed(1);
     console.log(
-        `Done. Converted ${processedCount} image(s) in ${elapsedSec}s.`,
+        `Done. Converted ${processedCount} image(s) in ${elapsedSec}s. Output directory: ${TARGET_DIR}`,
     );
 }
 
