@@ -5,15 +5,18 @@ const configuredBase = (import.meta as any).env?.VITE_API_BASE;
 const API_BASE =
     typeof configuredBase === "string" && configuredBase.length > 0
         ? configuredBase
-        : (typeof window === "undefined"
-              ? "http://localhost:3000"
-              : "");
-
+        : typeof window === "undefined"
+          ? "http://localhost:3000"
+          : "";
 
 export const pendingRequests = writable(0);
 
-function incrementPending() { pendingRequests.update((n) => n + 1); }
-function decrementPending() { pendingRequests.update((n) => (n > 0 ? n - 1 : 0)); }
+function incrementPending() {
+    pendingRequests.update((n) => n + 1);
+}
+function decrementPending() {
+    pendingRequests.update((n) => (n > 0 ? n - 1 : 0));
+}
 
 export function defaultSortForSource(source: DataSource): string {
     return source === "tokens" ? "token_asc" : "price_asc";

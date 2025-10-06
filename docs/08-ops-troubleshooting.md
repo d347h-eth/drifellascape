@@ -63,6 +63,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 - Dev minimal: backend → worker → frontend; open http://localhost:5173
 - Production: run worker as a service (single instance), backend as a simple Node service behind a reverse proxy, frontend static hosting
+
 ### 7) 405 on `/listings/search` after switching to static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.

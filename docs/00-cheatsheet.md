@@ -91,7 +91,7 @@ Mobile specifics
 - Gallery shows left/right chevrons at edges
 - Autosnap is disabled by default
 - Grid hides price pills (hoverless)
- - Gallery entry overlay must absorb pointer events; it re‑arms on token jumps so users scroll to hide the browser address bar consistently.
+- Gallery entry overlay must absorb pointer events; it re‑arms on token jumps so users scroll to hide the browser address bar consistently.
 
 ## Deep Links
 

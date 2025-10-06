@@ -1,4 +1,3 @@
-
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -7,11 +6,14 @@ const SOURCE_DIR = path.resolve(process.cwd(), "static", "full");
 
 type Mode = "width" | "height" | "meta";
 const DEFAULT_MODE: Mode = "height";
-const MODE_CONFIG: Record<Mode, {
-    targetDirName: string;
-    description: string;
-    resizeOptions: sharp.ResizeOptions;
-}> = {
+const MODE_CONFIG: Record<
+    Mode,
+    {
+        targetDirName: string;
+        description: string;
+        resizeOptions: sharp.ResizeOptions;
+    }
+> = {
     width: {
         targetDirName: "2560",
         description: "resize to 2560px width (fit inside)",
