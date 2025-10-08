@@ -95,6 +95,7 @@ The VPS setup builds the frontend once per release and serves the static output 
    # optional custom ID: ./scripts/build-frontend-release.sh 20241021-frontend
    ```
    The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
+   By default the build sets `VITE_API_BASE=https://api.drifellascape.art`; export `VITE_API_BASE` before running the script to override.
 3. Reload Caddy to swap the live assets:
    ```bash
    docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile

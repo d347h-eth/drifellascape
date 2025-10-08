@@ -25,7 +25,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL (default same‑origin; `http://localhost:3000` in dev)
+- `VITE_API_BASE` — backend base URL (default same‑origin; `http://localhost:3000` in dev, `https://api.drifellascape.art` in production)
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -182,7 +182,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 ## Build & Run
 
 - Dev: `yarn workspace @drifellascape/frontend dev`
-- Configure API base: `VITE_API_BASE=http://localhost:3000`
+- Configure API base: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
 - Optional poll override: `VITE_POLL_MS=15000`
 
 ## Extensibility

@@ -12,6 +12,7 @@ const MODE_CONFIG: Record<
         targetDirName: string;
         description: string;
         resizeOptions: sharp.ResizeOptions;
+        flattenBackground: { r: number; g: number; b: number };
     }
 > = {
     width: {
@@ -23,6 +24,7 @@ const MODE_CONFIG: Record<
             withoutEnlargement: true,
             kernel: sharp.kernel.lanczos3,
         },
+        flattenBackground: { r: 255, g: 255, b: 255 },
     },
     height: {
         targetDirName: "540h",
@@ -33,18 +35,20 @@ const MODE_CONFIG: Record<
             withoutEnlargement: true,
             kernel: sharp.kernel.lanczos3,
         },
+        flattenBackground: { r: 255, g: 255, b: 255 },
     },
     meta: {
         targetDirName: "meta",
-        description: "resize & crop to 1200×630 (OG preview)",
+        description: "resize to 1200px width onto 1200x630 black canvas",
         resizeOptions: {
             width: 1200,
             height: 630,
-            fit: sharp.fit.cover,
-            position: "centre",
+            fit: sharp.fit.contain,
+            background: { r: 0, g: 0, b: 0, alpha: 1 },
             withoutEnlargement: true,
             kernel: sharp.kernel.lanczos3,
         },
+        flattenBackground: { r: 0, g: 0, b: 0 },
     },
 };
 
@@ -103,10 +107,11 @@ async function convertPngToJpegResized(sourceFilePath: string): Promise<void> {
     await ensureDirectoryExists(path.dirname(targetFilePath));
 
     const image = sharp(sourceFilePath, { failOn: "warning" });
+    const { resizeOptions, flattenBackground } = MODE_CONFIG[MODE];
 
     await image
-        .resize(MODE_CONFIG[MODE].resizeOptions)
-        .flatten({ background: { r: 255, g: 255, b: 255 } })
+        .resize(resizeOptions)
+        .flatten({ background: flattenBackground })
         .jpeg({
             quality: 80,
             progressive: true,

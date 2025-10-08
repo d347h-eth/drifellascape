@@ -26,6 +26,7 @@
   let blockUntilTs = 0;
   let lastProgrammaticTs = 0;
   const SCROLLBAR_HIT_PX = 24;
+  const STATIC_BASE = "https://app.drifellascape.art/static";
   // Post-snap wheel input block to avoid immediate re-scroll after landing
   const POST_SNAP_WHEEL_BLOCK_MS = 200;
 
@@ -204,7 +205,7 @@
     <section class="slide" id={`slide-${it.token_mint_addr}`} aria-label={`Token ${it.token_num ?? it.token_mint_addr}`}>
       <div class="img-wrap">
         <button type="button" class="img-button" aria-label={`Explore token ${it.token_num ?? it.token_mint_addr}`} on:click={() => dispatch('enterExplore', it.token_mint_addr)}>
-          <img class="token" src={`/static/art/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
+          <img class="token" src={`${STATIC_BASE}/art/2560/${it.token_mint_addr}.jpg`} alt={`Token ${it.token_num ?? it.token_mint_addr}`} loading="lazy" decoding="async" on:load={() => dispatch('imageLoad')} />
         </button>
       </div>
     </section>

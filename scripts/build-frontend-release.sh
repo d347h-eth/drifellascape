@@ -10,7 +10,13 @@ RELEASE_ID="${1:-$(date +%Y%m%d%H%M%S)}"
 mkdir -p releases
 
 echo "[frontend-build] Building release ${RELEASE_ID}"
-docker compose run --rm -e RELEASE_ID="$RELEASE_ID" frontend-build
+DEFAULT_VITE_API_BASE="https://api.drifellascape.art"
+VITE_API_BASE=${VITE_API_BASE:-$DEFAULT_VITE_API_BASE}
+
+docker compose run --rm \
+    -e RELEASE_ID="$RELEASE_ID" \
+    -e VITE_API_BASE="$VITE_API_BASE" \
+    frontend-build
 
 ln -sfn "$RELEASE_ID" releases/current
 

@@ -16,9 +16,10 @@ export default {
             });
         }
 
-        const originUrl = `http://verify.drifellascape.art:8080${url.pathname}${url.search}`;
-        const originRequest = new Request(originUrl, request);
-        return fetch(originRequest);
+        const originRequest = new Request(request);
+        return fetch(originRequest, {
+            cf: { resolveOverride: "app.drifellascape.art" },
+        });
     },
 };
 
@@ -27,7 +28,7 @@ function buildMeta(tokenParam) {
         return {
             title: "Drifellascape",
             url: "https://drifellascape.art/",
-            image: "https://app.drifellascape.art/static/meta/home-default.jpg",
+            image: "https://app.drifellascape.art/static/art/meta/default.jpg",
         };
     }
 
@@ -38,9 +39,9 @@ function buildMeta(tokenParam) {
     const target = `https://drifellascape.art/?token=${safe}`;
 
     return {
-        title: `Drifellascape – Token #${safe}`,
+        title: `Drifellascape - Token #${safe}`,
         url: target,
-        image: `https://app.drifellascape.art/static/meta/token-${safe}.jpg`,
+        image: `https://app.drifellascape.art/static/art/meta/${safe}.jpg`,
     };
 }
 
