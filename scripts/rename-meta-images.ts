@@ -45,7 +45,9 @@ async function renameMetaImages() {
         renamed++;
     }
 
-    console.log(`Renamed ${renamed} file(s); ${missing} source image(s) missing.`);
+    console.log(
+        `Renamed ${renamed} file(s); ${missing} source image(s) missing.`,
+    );
 }
 
 renameMetaImages().catch((error) => {
