@@ -16,7 +16,8 @@ export default {
             });
         }
 
-        const originRequest = new Request(request);
+        const originUrl = `https://drifellascape.art${url.pathname}${url.search}`;
+        const originRequest = new Request(originUrl, request);
         return fetch(originRequest, {
             cf: { resolveOverride: "app.drifellascape.art" },
         });
