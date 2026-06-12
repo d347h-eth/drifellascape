@@ -40,14 +40,14 @@
 - Decision: Implement desktop‑first horizontal browsing with linear wheel scrolling, no CSS snap, and a small JS finalize‑to‑center that only triggers after moving far enough from the last center and always in the direction of travel. Provide a motion toggle to disable auto‑snap completely.
 - Rationale: Achieves a continuous “travel” feel across wide artwork while retaining precise centering on demand. Avoids CSS snap stickiness and snap‑back. Keeps logic simple and tunable (threshold, debounce, easing, duration) and respects reduced‑motion.
 - Key parameters:
-  - `WHEEL_MULTIPLIER` (default 1.5), `LEAVE_THRESHOLD_FRAC` (0.5 viewport width), `FINALIZE_DELAY_MS` (0 ms), `BLOCK_SCROLL_MS` (100–150 ms)
+  - `wheelMultiplier` default 1.6, `LEAVE_THRESHOLD_FRAC` (0.5 viewport width), `FINALIZE_DELAY_MS` (0 ms), post-snap wheel block 200 ms
   - Easing: ease‑in‑out cubic; duration ≈ 0.233 ms/px (80–160 ms caps)
   - Motion off: no automated snap; keys/edges are instant
   - Reduced motion: disables auto‑snap
 
-## ADR-009: Enriched Listings + Trait Search API
+## ADR-009: Enriched Listings/Tokens + Trait Search API
 
-- Decision: Add `POST /listings/search` with value‑based and trait‑based modes using numeric IDs, with pagination and price sorting. Return enriched listings (token + traits) by default.
+- Decision: Add `POST /listings/search` and `POST /tokens/search` with value‑based and trait‑based modes using numeric IDs. Listings sort by price; Tokens sort by token number. Return enriched rows with traits by default.
 - Rationale: Keep the API uniform and explicit, expose the DB “as is” for exploration, and avoid GET query limits.
 - Notes: Unknown IDs are ignored; consistent reads on active snapshot; value `trait_values.id=217` (None) is excluded from filters and attached traits.
 

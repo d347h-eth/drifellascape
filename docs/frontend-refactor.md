@@ -2,6 +2,8 @@
 
 This document captures the plan to decompose `frontend/src/App.svelte` into focused, composable pieces with clear responsibilities. The goals are to keep behavior identical, improve maintainability, and enable faster iteration. The milestones below mirror a ROADMAP-style execution with progress tracking.
 
+Status: the refactor is mostly complete, but the final shape differs from the original target. The current API module is `frontend/src/lib/search.ts`, not `api.ts`; `TraitBar.svelte` owns purpose pills and the trait strip internally rather than splitting them into separate `PurposePills` / `TraitStrip` files.
+
 ## Goals & Non-Goals
 
 - Goals
@@ -18,8 +20,9 @@ This document captures the plan to decompose `frontend/src/App.svelte` into focu
 
 ## Current Architecture (Summary)
 
-- `App.svelte` orchestrates everything: data fetch + polling, gallery scroller (wheel Y→X, finalize snap, scrollbar release snap), hotkeys, trait bar (pills, strip, toggle), help overlay, and exploration integration.
-- `ImageExplorer.svelte` already isolated; uses Leaflet and its own hotkeys.
+- `App.svelte` orchestrates data fetch + polling, hotkeys, mode/source/filter transitions, URL token param integration, and component wiring.
+- `GalleryScroller.svelte`, `GridView.svelte`, `StatusBar.svelte`, `TraitBar.svelte`, `HelpOverlay.svelte`, `AboutOverlay.svelte`, and `LandscapeOverlay.svelte` own the main UI surfaces.
+- `ImageExplorer.svelte` is isolated; uses Leaflet and its own exploration hotkeys.
 - `debug.ts` provides a global `DEBUG` flag and `dbg()` helper.
 
 ## Target Architecture
@@ -27,17 +30,23 @@ This document captures the plan to decompose `frontend/src/App.svelte` into focu
 ```
 frontend/src/
   lib/
-    api.ts              # POST /listings/search client
+    search.ts           # Build search bodies, POST /listings/search or /tokens/search, pending request count
+    pager.ts            # Offset paging helpers and dedupe
+    anchor.ts           # Anchor-mint state
+    purposes.ts         # Purpose normalization/list
     types.ts            # UI-facing types: ListingRow, ListingTrait, ApiResponse, ...
-    stores.ts           # (Optional, stepwise adoption) writable stores for UI/Gallery/Filters
+    stores.ts           # Small writable store helpers retained for gradual adoption
     ui-constants.ts     # Shared UI constants (sizes, offsets)
+    viewport.ts         # Viewport anchor preservation
   components/
     GalleryScroller.svelte        # Slides, wheel mapping, finalize/release-snap, gallery methods
+    GridView.svelte                # Grid cells and paging sentinels
+    StatusBar.svelte               # Main bar, toggles, token search
     HelpOverlay.svelte            # Keyboard help
+    AboutOverlay.svelte
+    LandscapeOverlay.svelte
     TraitBar/
-      TraitBar.svelte            # Container & coordination
-      PurposePills.svelte        # Purpose class pills with counts/disabled
-      TraitStrip.svelte          # Trait boxes, fixed paging, arrows
+      TraitBar.svelte            # Selected filters, purpose pills, trait boxes, fixed paging
       ToggleButton.svelte        # ▲/▼ button centered; follows bar state
   App.svelte                      # Orchestrator (fetch, polling, filter apply, wiring)
   ImageExplorer.svelte            # (existing)
@@ -67,8 +76,8 @@ frontend/src/
   - Function — keys layout for Gallery and Exploration; ESC closes; overlay click closes.
 
 - Data
-  - POST /listings/search with includeTraits=true for enriched items.
-  - Default browse: value mode with empty valueIds, price_asc, limit=100.
+  - POST /listings/search or /tokens/search with includeTraits=true for enriched items.
+  - Default browse: value mode with empty valueIds, source-specific sort, limit=50.
   - Exclude `trait_values.id=217` (None) is enforced backend-side.
 
 ## Milestones & Progress
@@ -76,7 +85,7 @@ frontend/src/
 - [x] PR1: Types/API/Stores + HelpOverlay + ToggleButton
 
   - Add `lib/types.ts` and migrate UI types out of App.
-  - Add `lib/api.ts` with `postSearchListings()` and adopt in App for fetch + polling + filter apply.
+  - Add `lib/search.ts` with `buildSearchBody()` / `postSearch()` and adopt in App for fetch + polling + filter apply.
   - Add `lib/stores.ts` skeleton (UI/Gallery/Filters) for gradual adoption.
   - Extract `HelpOverlay.svelte` and `TraitBar/ToggleButton.svelte`; wire props/events; remove inline CSS.
 
@@ -84,8 +93,8 @@ frontend/src/
 - [x] PR3: GalleryScroller extraction — scroller logic/component extracted; scroller CSS moved; methods exposed. Optional: extract snap logic to a `useSnap` action (defer if not needed).
 - [x] PR4: Cleanup & constants — added `lib/ui-constants.ts`; removed dead helpers from App; moved scroller CSS; formalized trait bar numbers in code.
 
-  - Extract `TraitBar.svelte`, `PurposePills.svelte`, `TraitStrip.svelte`.
-  - Move counts and fixed paging inside; emit `toggleValue` and `purposeChange`; App forwards to API/stores.
+  - Extract `TraitBar.svelte`; keep purpose pills, selected filters, and fixed trait paging inside that component.
+  - Emit `toggleValue` and `purposeChange`; App forwards to search/state handling.
 
 - [x] PR3: GalleryScroller — finalized component with wheel mapping, finalize snap, scrollbar release snap, and methods for App.
 - [x] PR4: Cleanup & constants — constants centralized; unused code removed; CSS scoped in components.
@@ -99,9 +108,10 @@ frontend/src/
 
   - Export `ListingTrait`, `ListingRow`, `ApiResponse`, `ListingsSearchBody` (UI-facing).
 
-- api.ts
+- search.ts
 
-  - `postSearchListings(body: ListingsSearchBody): Promise<ApiResponse>`; reads `VITE_API_BASE`.
+  - `buildSearchBody(...)` enforces `anchorMint`/`offset` exclusivity and source-specific default sort.
+  - `postSearch(source, body): Promise<ApiResponse<Row>>` chooses `/listings/search` or `/tokens/search`; reads `VITE_API_BASE`.
 
 - stores.ts (optional skeleton)
 
@@ -121,14 +131,13 @@ frontend/src/
 
 - App changes
   - Import types from `lib/types.ts`.
-  - Replace raw fetch with `postSearchListings` in load, poll, and filter apply.
+  - Replace raw fetch with `postSearch` in load, poll, and filter apply.
   - Replace inline Help Overlay and Toggle Button with components.
 
 ### PR2 — TraitBar split
 
 - TraitBar.svelte: container receiving current token traits, `selectedPurpose`, `selectedValueIds`; exposes events; composes subcomponents.
-- PurposePills.svelte: counts/disabled logic, click => purposeChange.
-- TraitStrip.svelte: fixed paging (non-overlap), arrows, box rendering, X wrap; click => toggleValue.
+- Final implementation note: `TraitBar.svelte` owns purpose counts/disabled state, fixed paging, arrows, box rendering, `X` wrap, and `toggleValue` / `purposeChange` events.
 
 ### PR3 — GalleryScroller
 

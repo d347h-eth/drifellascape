@@ -6,7 +6,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 
 - Slow & steady sync worker (rate‑limited; resilient), append‑only snapshots with atomic activation
 - Normalized SQLite schema (WAL); concurrent reads while syncing
-- Backend API with in‑memory cache for low‑latency reads
+- Backend API with an in‑memory listings cache plus DB‑side search for listings/tokens
 - Frontend (Svelte) with:
   - Grid (default homepage): 3 columns, infinite scroll up/down (user‑interaction armed)
   - Gallery (horizontal): near‑edge paging recenters around current mint (no jumps)
@@ -17,7 +17,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 - `worker/` — periodic sync from marketplace → SQLite snapshot
 - `backend/` — Node HTTP server with in‑memory snapshot cache
 - `frontend/` — Vite + Svelte app (grid + gallery + exploration)
-- `scripts/` — utilities (e.g., `count-mints-images.ts`, `ingest-traits.ts`)
+- `scripts/` — utilities (metadata/images download, image resizing, trait ingestion)
 - `database/` — SQLite integration, pragmas, migrations
 - `docs/` — product & technical docs (start with `docs/01-product-overview.md`)
 
@@ -58,7 +58,7 @@ yarn workspace @drifellascape/frontend dev
 #   VITE_API_BASE=http://localhost:3000 VITE_POLL_MS=15000 yarn workspace @drifellascape/frontend dev
 ```
 
-Open http://localhost:5173 — the app will fetch from the backend by default.
+Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*` and `/tokens*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
 
 Hotkeys (subset)
 
@@ -75,14 +75,10 @@ Deep‑links
 
 ## Static Assets (Images)
 
-- High‑resolution images live outside the build under `frontend/static/art/2560/` and `frontend/static/art/540h/` (git‑ignored).
-- The app requests them under `/static/art/2560/...` and `/static/art/540h/...`.
-- For local development, symlink the `static` folder into `frontend/public` so Vite can serve them:
-  ```bash
-  ln -s ../static frontend/public/static
-  # verifies: ls frontend/public/static/art/2560
-  ```
-- In production, `docker-compose.yml` mounts `frontend/static` into the Caddy container and the Caddyfile serves `/static/*` using `handle_path`, so requests for `/static/art/...` map to `/srv/static/art/...` on disk.
+- High‑resolution and grid images live outside the bundle under `frontend/static/art/2560/` and `frontend/static/art/540h/` (git‑ignored).
+- The current Gallery/Grid components request `https://app.drifellascape.art/static/art/{2560,540h}/{mint}.jpg`.
+- In production, `docker-compose.yml` mounts `frontend/static` into Caddy and the Caddyfile serves `/static/*` using `handle_path`, so `/static/art/...` maps to `/srv/static/art/...` on disk.
+- The resize helper is cwd‑relative: `yarn tsx scripts/resize-images.ts width|height|meta` reads `static/full` and writes `static/{2560,540h,meta}` from the directory where it is run. Move or sync generated assets into `frontend/static/art/...` for the current Caddy mount.
 
 ## Deployment (VPS Workflow)
 
@@ -115,7 +111,7 @@ Traits & ingestion
 
 - Tokens/traits are normalized via `scripts/ingest-traits.ts` using `logs/mint_to_image.csv` and `metadata/`.
 - Duplicate images are expected — the script assigns `image_url → [mints...]` in FIFO order so all 1,333 mints are inserted (uniqueness enforced on `token_mint_addr` and `token_num`, not `image_url`).
-- Utility: `yarn tsx scripts/count-mints-images.ts` prints unique mint/image counts from the CSV.
+- Trait grouping maintenance: `yarn tsx scripts/update-trait-types.ts` reads `logs/trait_groups.csv`.
 
 ## Tests
 

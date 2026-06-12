@@ -10,6 +10,8 @@ This plan implements the listings pipeline with a simple, durable, and testable 
 
 The steps are isolated and can be developed/tested incrementally with local fixtures and an in-memory or temp-file SQLite DB.
 
+Current status: the core listings pipeline is implemented, token/trait ingestion and search endpoints are implemented, and the frontend now defaults to Grid with Listings/Tokens data-source switching. This document remains a historical roadmap plus status tracker; for current API and frontend behavior, prefer `docs/03-backend-api.md`, `docs/04-frontend.md`, and `docs/06-api-reference.md`.
+
 ---
 
 ## 1) Schema & Migrations
@@ -46,9 +48,9 @@ The steps are isolated and can be developed/tested incrementally with local fixt
 
   - `journal_mode=WAL`, `synchronous=NORMAL`, `foreign_keys=ON`, `busy_timeout=5000`
 
-- Initial migration file (to add later)
+- Migration file
 
-  - `database/migrations/001_listings_schema.sql` containing the table and index DDL above, plus seeding an empty active version if none exists.
+  - `database/migrations/001_listings_schema.sql` contains the table and index DDL above, plus seeding an empty active version if none exists.
 
 - Tests
   - Migration runner creates tables and constraints.
@@ -207,6 +209,7 @@ FROM temp_listings;`
   - [x] Implemented ListingsCache with consistent snapshot load
   - [x] Added refresh loop with `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s)
   - [x] Implemented `/listings` with offset/limit and price sorting
+  - [x] Implemented `/listings/search` and `/tokens/search` with trait/value filtering and anchor pagination
   - [ ] Add health endpoint and backend tests
 
 - Tests
@@ -245,11 +248,11 @@ FROM temp_listings;`
 
 - Progress
 
-  - [x] Listings page fetch (limit=100) + staged polling (apply when at top)
+  - [x] Grid/Gallery fetch via search endpoints (frontend default limit=50) + staged Listings polling
   - [x] Price with maker (2%) + royalty (5%) fees; SOL rounding
   - [x] Exploration mode (Leaflet) with hard‑pixel rendering and fit‑by‑width default
   - [x] Next/prev via hotkeys and invisible edge targets; ESC to close
-  - [x] Positioning hotkeys: S/W/Q/E and 1/2/3 (region‑fit with tuned offset); G toggles debug overlay
+  - [x] Positioning hotkeys: S/W/Q/E and 1/2/3 (region‑fit with tuned offset); O toggles debug overlay
   - [x] Main bar updates: token quick search (Enter to jump, Tokens mode), `[ME]/[TS]` links, non‑breaking pagination text, vertical centering, mobile wrap‑around sections
   - [x] Deep‑links: `?token=NUM` (0–1332) opens Gallery; param updates during Gallery navigation; removed when entering Grid
   - [x] Static serving via Caddy: bundles under `/srv/releases/current`, images under `/static/art/...`; `caddy-verify` profile for side‑by‑side checks on `:8080`
@@ -288,8 +291,8 @@ FROM temp_listings;`
    - Minimal logs (sync success/fail, version id, counts).
    - Health endpoint exposing last sync time/version.
 
-7. Future: Token metadata & traits (out of scope for now)
-   - Normalize tokens and traits for filterable queries; integrate with listings.
+7. Token metadata & traits
+   - [x] Normalize tokens and traits for filterable queries; integrate with listings and Tokens search.
 
 ---
 
@@ -303,8 +306,9 @@ FROM temp_listings;`
 
 ---
 
-## 10) Open Questions
+## 10) Resolved / Open Questions
 
-- Do we seed an initial empty active version in migration (recommended for simpler first run)?
-- Any need to prune old inactive `listing_versions` rows (rows in `listings_current` are cleaned automatically after activation)?
-- Exact sorting and tie-breaking for `/listings` (by price, then token_id?).
+- Resolved: seed an initial empty active version in migration.
+- Resolved: prune inactive `listing_versions` rows and non-active `listings_current` rows after activation.
+- Current behavior: `GET /listings` sorts by price only with no secondary tie-breaker; search anchor rank queries use `token_mint_addr` as a deterministic tie-breaker.
+- Still open: health endpoint and backend API tests.

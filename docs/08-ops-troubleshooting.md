@@ -51,13 +51,13 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 6) Exploration Mode Artifacts
 
 - Symptoms: flicker when next/prev; blur at non‑1:1 zoom; region‑fit clipping
-- Action: overlay opacity swap + hard‑pixel CSS are in place; fractional zoom enabled; region zoom uses a tiny epsilon; verify debug overlay alignment (`G` key)
+- Action: overlay opacity swap + hard‑pixel CSS are in place; fractional zoom enabled; region zoom uses a tiny epsilon; verify debug overlay alignment (`O` key)
 
 ## Environment Variables
 
-- Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS`
-- Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS`, `DRIFELLASCAPE_PORT`
-- Frontend: `VITE_API_BASE`, `VITE_POLL_MS`
+- Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30000, min 5000)
+- Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30000, min 5000), `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
+- Frontend: `VITE_API_BASE`, `VITE_POLL_MS` (default 30000, min 5000 at runtime)
 
 ## Run Sequences
 
@@ -68,10 +68,10 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
   rsync -avh --progress frontend/static/ $REMOTE:$APP_DIR/frontend/static/
   ```
 
-### 7) 405 on `/listings/search` after switching to static serving
+### 7) 405 on `/listings/search` after switching to same-origin static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.
-- Action: Ensure Caddy routes `/listings*` and `/tokens*` to the backend (no path rewrite), e.g.:
+- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*` and `/tokens*` to the backend (no path rewrite), e.g.:
   ```
   route {
     handle /listings* { reverse_proxy backend:3000 }

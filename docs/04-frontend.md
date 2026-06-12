@@ -14,25 +14,25 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/vite.config.ts` — Vite + Svelte configuration (with svelte‑preprocess)
 - `frontend/src/main.ts` — mounts the Svelte app
 - `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components, URL token param integration)
-- `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap
+- `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap, near-edge Gallery paging events
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — purpose pills + trait strip (fixed paging)
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
-- `frontend/public/` — static assets
-  - `2560/{token_mint_addr}.jpg` — locally hosted 2560‑wide images per token mint
-  - `icon-magic_eden.svg`, `icon-tensor.svg` — (present but currently unused)
+- `frontend/static/` — git-ignored image tree mounted by Caddy in production
+  - `art/2560/{token_mint_addr}.jpg` — 2560-wide Gallery images
+  - `art/540h/{token_mint_addr}.jpg` — Grid thumbnails
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL (default same‑origin; `http://localhost:3000` in dev, `https://api.drifellascape.art` in production)
-- `VITE_POLL_MS` — listings poll interval (ms), default `30000`
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*` and `/tokens*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
 ## Data Flow
 
 - On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 50, includeTraits: true }` and stores `items`, `versionId`.
-- A periodic poll (default 30s) posts again for listings; if `versionId` changed, the result is staged and applied when the user is at the start (≤ 50px), preventing jumps.
+- A periodic poll (default 30s) posts again for Listings only; if `versionId` changed, the result is staged and applied when Gallery focus is at index 0. Tokens are static and are not polled.
 - Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 
@@ -48,11 +48,11 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 - Scrolling & Snap Logic
 
-  - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned internally (default multiplier 1.5).
+  - Mouse wheel maps vertical delta to horizontal travel (desktop only); tuned internally (default multiplier 1.6).
   - No CSS scroll‑snap. Instead, a small JS “finalize to center” runs on scroll‑idle when motion is on:
     - Directional finalize: if you moved at least a threshold (default 50% of viewport width) away from the last centered slide, snap to the adjacent slide in the direction of travel. Never snap back to the same slide.
     - Debounce: `FINALIZE_DELAY_MS` (0 ms) — finalize immediately once scrolling idles.
-    - Post‑snap block: ignore wheel for `BLOCK_SCROLL_MS` (150 ms) to avoid accidental re‑scrolls right after landing.
+    - Post‑snap block: ignore wheel for 200 ms after landing to avoid accidental re‑scrolls right after landing.
   - Native scrollbar drag: snapping is disabled while dragging the native horizontal scrollbar and a snap decision is executed immediately on release (threshold‑based to the nearest slide center).
   - Mobile entry overlay: while visible, it must absorb pointer events (no scroll‑through). The overlay re‑arms on token jumps so users scroll to hide the browser address bar consistently.
   - Animation toggle: users can toggle animation with `M`. When animation is off, there is no automated snap at all (pure linear scrolling). With `prefers‑reduced‑motion`, auto‑snap is also disabled.
@@ -97,14 +97,14 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
   - Shows only traits for the selected purpose class of the current token in focus.
   - Box size 150×50; head: `spatial_group. type_name`; value wraps to two lines as needed.
   - Fixed page size: a single right arrow (50×50) advances to the next page; hotkey `X` performs the same action. Pagination wraps to the start.
-- Clicking a box toggles value‑based filtering (adds/removes that `value_id`) and immediately refreshes listings via `POST /listings/search`.
+- Clicking a box toggles value‑based filtering (adds/removes that `value_id`) and immediately refreshes the current source via `POST /listings/search` or `POST /tokens/search`.
   - The frontend keeps the same token in focus across filter changes (by mint), including when removing the last/only filter.
 
-## Listings View
+## Gallery/Listings Rendering
 
-- Layout: single column, each row contains a centered artwork image.
+- Layout: one viewport-wide slide per token in Gallery; Grid rendering is covered below.
 - Images:
-  - Source: `/2560/{token_mint_addr}.jpg` served from `frontend/public`.
+  - Gallery source: `https://app.drifellascape.art/static/art/2560/{token_mint_addr}.jpg`.
   - Behavior: 100% width, max‑width 2560px, never upscaled, centered horizontally, landscape preserved.
 - Price:
   - Final price = nominal + maker fee (2%) + royalty fee (5%), computed in integer base units (rawAmount, 9 decimals) with ceiling per fee.
@@ -126,7 +126,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Leaflet CRS.Simple + ImageOverlay
 - Hard‑pixel rendering at any zoom via CSS on the image layer:
   - `image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; image-rendering: pixelated;`
-- Fractional zoom (no snap): `zoomSnap: 0`, `zoomDelta: 0.1`, `wheelDebounceTime: 0`, `zoomAnimation: false` for immediate response.
+- Fractional zoom (no snap): `zoomSnap: 0`, `zoomDelta: 0.01`, `wheelDebounceTime: 0`, `zoomAnimation: false` for immediate response.
 - Black backdrop; overlay opacity is set to 0 during a source swap to avoid flicker, restored on image `load`.
 - Navigation state always fresh on entry: the app derives the current index by mint and freezes `items` for the session.
 
@@ -141,13 +141,13 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 ### Hotkeys — Exploration
 
 - Previous/Next — Left/Right or `A`/`D`
-- Close exploration — `Esc`
+- Close exploration — `Esc` or `G`
 - Fit‑by‑width centered — `S`
 - Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
-- Fit 1006 px band (left/middle/right) — `1` / `2` / `3`
-  - Region math: `IMG_WIDTH = 3125`, `IMG_HEIGHT = 1327`, `REGION_HEIGHT = 1006`, `REGION_TOP = (IMG_HEIGHT − 1006)/2 + 36`
+- Fit 1007 px band (left/middle/right) — `1` / `2` / `3`
+  - Region math: `IMG_WIDTH = 3125`, `IMG_HEIGHT = 1327`, `REGION_HEIGHT = 1007`, `REGION_TOP = (IMG_HEIGHT − 1007)/2 + 36`
   - Region zoom: `log2(containerHeight / REGION_HEIGHT) - epsilon`
-- Toggle debug overlay — `O` (cyan rectangle for the 1006 px band)
+- Toggle debug overlay — `O` (cyan rectangle for the 1007 px band)
 
 ### Grid Mode
 
@@ -157,7 +157,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
 - Paging — Infinite scroll up/down with real‑interaction arming. Observers attach only after user wheel/click/keydown to avoid surprise requests on entry. Paging uses server‑returned effective `offset`.
 - Refocus — Press `F` in Grid to refocus the last anchored token (from Gallery/Explore).
-- Images — grid uses downsized assets from `/540h/{mint}.jpg` for faster loads.
+- Images — grid uses downsized assets from `https://app.drifellascape.art/static/art/540h/{mint}.jpg` for faster loads.
 - Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
 
@@ -175,20 +175,20 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 ## Performance Considerations
 
-- Listing page only fetches 100 items; sorting and pagination are trivial on the client.
+- Initial/search page size is 50 items; search and paging work is server-side, with client-side dedupe for appended/prepended Grid pages.
 - Exploration mode renders a single large image; no preloading by default (can be added later for next/prev).
 - Hard‑pixel mode trades off anti‑aliasing for sharpness by design.
 
 ## Build & Run
 
 - Dev: `yarn workspace @drifellascape/frontend dev`
-- Configure API base: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
+- Configure API base when bypassing the dev proxy: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
 - Optional poll override: `VITE_POLL_MS=15000`
 
 ## Extensibility
 
 - Deep‑linking the explorer to `/explore/:mint` for shareable links.
-- Filters UI: value‑based and trait‑based modes backed by `POST /listings/search`.
+- Additional filter controls beyond current value toggles, backed by the existing search endpoints.
 - Preload or double‑buffer next/prev artwork for instant transitions.
 - Virtualize the listing grid if we ever render many more rows per page.
 

@@ -29,8 +29,9 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Tables: `listing_versions` (one active), `listings_current` (append‑only snapshot rows).
   - Concurrency: WAL enables concurrent reads while the worker writes short transactions.
 - Backend API (Node)
-  - Loads and keeps the active snapshot in memory; background loop reloads if version changes.
-  - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc` and `POST /listings/search` (value/trait modes) over the active snapshot.
+  - Loads and keeps the active listings snapshot in memory; background loop reloads if version changes.
+  - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc` from memory.
+  - Exposes DB-side `POST /listings/search` over the active snapshot and `POST /tokens/search` over the static canon token dataset.
 - Frontend (Vite + Svelte)
   - Lists the current snapshot with fast pagination and price display. Trait Bar enables trait/value filtering and purpose‑based browsing with fixed paging.
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
@@ -44,7 +45,8 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 2. DB → Backend
    - Backend on startup: migration + load active snapshot → in‑memory cache → periodic refresh if version changes
 3. Backend → Frontend
-   - `GET /listings` serves in‑memory data; frontend fetches, renders, and periodically polls/stages updates.
+   - The frontend primarily uses `{listings,tokens}/search` with `limit=50`, traits attached by default, and either `offset` or `anchorMint`.
+   - Listings polling stages a new first page when `versionId` changes; tokens are static and are not polled.
 
 ## External Dependencies (Marketplace API)
 
@@ -85,17 +87,18 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 ## API Serving Strategy (Backend)
 
-- In‑memory cache: load active snapshot on startup; background loop checks for `active` version change (default every 30s).
-- Single endpoint:
-  - `GET /listings?offset=0&limit=50&sort=price_asc|price_desc`
-  - Returns `{ versionId, total, offset, limit, sort, items: [...] }` using the in‑memory dataset.
+- In‑memory cache: load active listings snapshot on startup; background loop checks for `active` version change (default every 30s, clamped to at least 5s).
+- `GET /listings?offset=0&limit=100&sort=price_asc|price_desc` returns the in‑memory active listing rows.
+- `POST /listings/search` and `POST /tokens/search` run short, transactionally consistent DB reads for trait/value filtering, enrichment, and anchor-based pagination.
 - No auth; CORS enabled for ease of development; designed for ~100 concurrent users.
 
 ## Frontend UX (Svelte)
 
-- Listings page
-  - Fetches `GET /listings?limit=100` on mount; staged periodic refresh (default 30s) updates only when the user scrolls to top to avoid viewport jumps.
-  - Displays a single image per row (2560px width local assets per mint); price includes fees and links to marketplace.
+- Grid/Gallery browser
+  - Starts in Grid mode, then enters the horizontal Gallery for focused browsing.
+  - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
+  - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
+  - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
   - Computes final price = nominal + maker fee (2%) + royalty (5%), using integer arithmetic in base units and renders in SOL (rounded up to 2 decimals).
 - Exploration mode (fullscreen viewer)
@@ -105,13 +108,12 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Positioning hotkeys:
     - S: fit‑to‑width centered
     - W/Q/E: fit entire image height (middle/left/right), capped at 1:1
-    - 1/2/3: fit a 1006px‑tall band (vertically aligned by tuned offset) to viewport height (no 1:1 cap)
-    - G: toggle debug overlay (cyan rectangle) for the 1006px band
+    - 1/2/3: fit a 1007px‑tall band (vertically aligned by tuned offset) to viewport height (no 1:1 cap)
+    - O: toggle debug overlay (cyan rectangle) for the 1007px band
   - Pixel‑accurate swapping between images; double‑click resets view; ESC closes.
 - Grid mode (default homepage)
   - Vertical 3‑column grid; press `G` or `Esc` to enter from Gallery/Explore; click any image to return to Gallery centered on that token.
   - Infinite scroll up/down with user‑interaction arming for paging; press `F` in Grid to refocus the last anchored token.
-  - Data source toggle `T` switches between current Listings and canon Tokens; both sources support identical filtering, anchoring, and paging.
 
 ## Operating Characteristics
 
@@ -132,20 +134,18 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
   - `DRIFELLASCAPE_PORT` (default: 3000)
 - Frontend
-  - `VITE_API_BASE` (default: same‑origin; http://localhost:3000 in dev)
-  - `VITE_POLL_MS` (default: 30000)
+  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*` and `/tokens*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
+  - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)
 
 ## Roadmap & TBDs
 
-- Token metadata & traits (TBD)
-  - Normalize tokens and traits; design indexes for multi‑trait filtering; compute distributions and rarity surfaces.
-- Backend filtering
-  - Add server‑side filters (traits, price ranges, marketplace source) with efficient plans.
+- Search and filters
+  - Existing: token/trait normalization, value/trait filtering, and Listings/Tokens search endpoints.
+  - Remaining: price range, marketplace source, and token-number filters if the UI needs them.
 - Frontend UX
-  - Deep‑link for exploration mode (`/explore/:mint`), shareable links, wrap‑around navigation.
-  - Optional preload for next/prev images; light keyboard overlay help.
+  - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.
 - Observability
-  - Health endpoints; metrics for last sync, version id, page counts; minimal logs for failures.
+  - Health endpoint and metrics for last sync, version id, page counts, and failures.
 
 ## Onboarding Summary
 

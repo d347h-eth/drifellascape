@@ -6,7 +6,7 @@ This document covers the local database used by Drifellascape: schema, migration
 
 - Engine: SQLite (file‑based) with WAL enabled
 - Access: Node `better-sqlite3` (sync API, fast & simple)
-- Purpose: store a normalized, append‑only snapshot of current listings for a single collection and track snapshot versions
+- Purpose: store a normalized, append‑only snapshot of current listings, plus static token/trait tables for search and enrichment
 - Migrations: plain SQL files executed by a small runner at startup
 
 ## File Layout
@@ -93,8 +93,8 @@ Why append‑only?
 
 ## Migrations Runner
 
-- `database/src/migrations.ts` loads SQL files (sorted) from `database/migrations`
-- The runner executes statements individually and is idempotent
+- `database/src/migrations.ts` loads `.sql` files (sorted) from `database/migrations`
+- The runner tracks applied names in a `migrations` table and executes each SQL file inside one transaction
 - The backend calls `initializeDatabase()` on startup to ensure the schema is present before serving
 
 ## Indices & Query Patterns
@@ -104,7 +104,7 @@ Why append‑only?
 - `listings_current(version_id, created_at)` — coarse tracing/debug
 - `listings_current(version_id, token_num)` — optional ordering/filter by numeric token id
 
-For the single‑collection scope, these indices are sufficient for basic pagination and sorting. When trait filtering arrives, new tables and indices will be added (see TBD).
+For the single‑collection scope, these indices are sufficient for the in-memory snapshot load and basic price/token ordering. Trait/value search uses the normalized tables from `002_traits_schema.sql` and the indexes listed below.
 
 ## Testing & DI
 
@@ -172,7 +172,7 @@ Duplicate images (expected): In this collection, multiple mints can reference th
 
 ## Future Work
 
-- Additional indices for server‑side filtering (price ranges, sources, compound trait filters)
+- Additional indices for future filters such as price ranges, marketplace sources, or token-number ranges
 - Optional numeric normalization for trait values that represent numbers (range filtering)
 - Lightweight integrity checks (e.g., counts consistency)
 

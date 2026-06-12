@@ -6,8 +6,8 @@ Principles
 
 - Keep behavior deterministic and identical across Listings/Tokens.
 - Do not trigger requests until real user interaction (keys/wheel/click).
-- Preserve viewport after prepends (no horizontal jump).
-- Reuse existing Pager (offset‑based) and avoid anchorMint for edge paging.
+- Preserve the focused token when fetching near either edge.
+- Recenter around the current mint with `anchorMint` for Gallery edge paging; keep offset-based up/down paging in Grid.
 
 Phased Steps
 
@@ -15,11 +15,11 @@ Phased Steps
    - Add threshold‑based detection in `GalleryScroller.svelte`.
    - Dispatch `loadPrev` / `loadMore` with a short cooldown.
    - Add a prop `galleryPagingEnabled` (default false) to guard dispatch.
-2. App wiring to Pager
-   - Handle `on:loadPrev` / `on:loadMore` in `App.svelte` using `loadPrevPage` / `loadNextPage`.
-   - Dedup items and update `baseOffset` like Grid.
-3. Preserve horizontal viewport on prepend
-   - After prepend, shift the scroller by the number of prepended slides to keep the same centered slide.
+2. App wiring
+   - Handle `on:loadPrev` / `on:loadMore` in `App.svelte` by re-querying the current source around the focused mint with `anchorMint`.
+   - Replace the current Gallery page with the server-centered page and update `baseOffset` from the returned effective `offset`.
+3. Preserve horizontal focus
+   - After the centered page arrives, scroll instantly to the same focused mint inside the new items.
 4. Interaction gating
    - Add a `galleryPagingArmed` flag (wheel/pointerdown/keydown) and pass it as `galleryPagingEnabled`.
    - Reset arming after anchorMint fetch and on Gallery entry.
@@ -29,7 +29,7 @@ Phased Steps
 Status
 
 - [x] Step 1 — Edge detection + events added in Scroller (guarded behind prop)
-- [x] Step 2 — Wire to Pager in App
+- [x] Step 2 — Wire `loadPrev` / `loadMore` in App via anchorMint requests
 - [x] Step 3 — Preserve horizontal viewport after prepend (superseded by KISS approach)
 - [x] Step 4 — Interaction gating for Gallery
 - [x] Step 5 — Docs

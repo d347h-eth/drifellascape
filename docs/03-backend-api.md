@@ -5,7 +5,8 @@ This document describes the Drifellascape backend API: its in‑memory caching m
 ## Purpose
 
 - Serve the current listings snapshot quickly and cheaply.
-- Decouple read performance from the database by keeping the active snapshot in memory.
+- Provide server-side trait/value search for active listings and the static token catalog.
+- Decouple the basic listings read path from the database by keeping the active snapshot in memory.
 - Reload the in‑memory snapshot only when the active version flips in the database.
 
 ## Architecture Overview
@@ -35,7 +36,7 @@ To avoid a race between reading the active version id and its rows while the wor
 
   - Query params:
     - `offset`: default 0, clamped to `>= 0`.
-    - `limit`: default 50, clamped to `[1, 200]`.
+    - `limit`: default 100, clamped to `[1, 200]`.
     - `sort`: `price_asc` (default) or `price_desc`.
   - Response (200):
     ```json
@@ -63,6 +64,7 @@ To avoid a race between reading the active version id and its rows while the wor
   - Notes:
     - Consistent read: results are anchored to the active snapshot id.
     - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
+    - If `DRIFELLASCAPE_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
   - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
   - See also: API details and sample payloads in `docs/06-api-reference.md`.
 
@@ -73,20 +75,22 @@ To avoid a race between reading the active version id and its rows while the wor
     - `offset`, `limit` (default 0/100; max 100), `sort` (`token_asc` | `token_desc`).
     - `anchorMint` (optional): exclusive with `offset`. Behavior mirrors listings search; response `offset` is the effective offset used.
   - Notes:
-    - Tokens are static; there is no `versionId` in the response.
+    - Tokens are static; the response uses `versionId: null`.
     - Excludes `trait_values.id = 217` ("None").
+    - If `DRIFELLASCAPE_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
 
 Notes:
 
-- Sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced; add secondary sort if needed.
+- `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
+- Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; dev uses `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*` and `/tokens*` requests to `http://localhost:3000`.
 
 ## Process Flow
 
 1. Server startup:
    - `initializeDatabase()` runs migrations (idempotent) and ensures schema.
-   - Starts refresh loop with interval `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s).
+   - Starts refresh loop with interval `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s; clamped to at least 5s).
 2. First request / cold start:
    - `ensureLoaded()` loads `{ versionId, items }` with a consistent DB read.
 3. Subsequent requests:
@@ -115,14 +119,15 @@ Notes:
 
 ## Configuration
 
-- `DRIFELLASCAPE_BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`).
+- `DRIFELLASCAPE_BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
 - `DRIFELLASCAPE_PORT` — server port (default `3000`).
+- `DRIFELLASCAPE_DEBUG` — when set, search responses include `anchorDebug`.
 
 ## Performance & Capacity
 
 - Memory footprint: `items.length` equals the currently listed tokens (typically far below 1,333). Each row is small; JSON serialization cost dominates at large `limit`.
 - Throughput: designed for ~100 concurrent users on modest hardware; pagination and sorting operate on in‑memory arrays.
-- Latency: no DB access on the hot path; only memory and JSON encoding.
+- Latency: `GET /listings` has no DB access on the hot path; search endpoints perform short DB transactions for filtering/enrichment.
 
 ## Error Handling
 
@@ -131,13 +136,13 @@ Notes:
 
 ## Security & CORS
 
-- No authentication; open `GET /listings`.
+- No authentication; open `GET /listings`, `POST /listings/search`, and `POST /tokens/search`.
 - CORS: permissive, suitable for single‑domain deployment; tighten as needed.
 
 ## Extensions & Roadmap
 
 - Add health endpoint (e.g., `/health`) with last refresh time, version id, and item count.
-- Add filters: price ranges, marketplace source, token number; later, trait filters (once traits are normalized in DB).
+- Add optional filters for price ranges, marketplace source, and token number if the UI needs them.
 - Improve sorting: tie‑breakers, then secondary fields.
 - Consider gzip/deflate if payloads grow (many listings); Vite dev already handles compression for frontend.
 
@@ -149,4 +154,4 @@ yarn backend:run
 DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to `VITE_API_BASE=http://localhost:3000` and consumes `/listings` for rendering.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*` and `/tokens*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

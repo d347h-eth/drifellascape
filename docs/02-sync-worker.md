@@ -47,7 +47,7 @@ Crash safety:
 ## Rate Limiting, Retries, Logging
 
 - Limiter: ≤ 2 RPS and ≤ 120 RPM using a minimalist token/timestamp window; sequential requests.
-- Retries: up to 3 attempts with exponential backoff (2s, 4s, 8s) on 429 and 5xx; request timeout 30s.
+- Retries: up to 3 attempts with exponential backoff (2s, 4s, 8s); 429/5xx responses are logged as retryable, and the current wrapper also retries thrown fetch/HTTP errors before failing the page. Request timeout is 30s.
 - Abort: if any page fails after retries, abort the cycle (don’t produce partial snapshots).
 - Logging: `logs/worker.log` captures page counts, skips, and summary (new version or no change) or failure cause.
 
@@ -157,7 +157,7 @@ Source layout (worker):
 - `worker/src/types.ts`
   - `NormalizedListing`, `SyncResult`, `PRICE_EPSILON = 10_000_000` (0.01 SOL).
 - `worker/src/index.ts`
-  - Infinite loop: fetch → sync → sleep. Interval via `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
+  - Infinite loop: fetch → sync → sleep. Interval via `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
 
 DB module (shared):
 
@@ -178,7 +178,7 @@ DB module (shared):
 
 ## Configuration
 
-- `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`.
+- `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
 - Marketplace base URL and params are currently in code (single collection); can be externalized later if needed.
 
 ## Testing Strategy

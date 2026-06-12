@@ -4,7 +4,7 @@
 
 - Tokens: 1,333 (Drifella III)
 - Artwork dimensions (original PNG): 3125 × 1327
-- Local display assets: `frontend/public/2560/{token_mint_addr}.jpg`
+- Display assets: `frontend/static/art/{2560,540h}/{token_mint_addr}.jpg` for the Caddy mount; current frontend image components request `https://app.drifellascape.art/static/art/...`.
 
 ## Keys & Fields
 
@@ -33,7 +33,8 @@
 ## Endpoints
 
 - `GET /listings?offset&limit&sort=price_asc|price_desc` — in‑memory snapshot
-- `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings
+- `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings from the active snapshot
+- `POST /tokens/search` — DB‑side filtering over the static canon token dataset (`versionId: null`)
 
 ## Frontend Hotkeys (Gallery)
 
@@ -57,7 +58,7 @@
 - Close exploration — `Esc` or `G`
 - Fit‑by‑width centered — `S`
 - Fit entire height (middle/left/right) — `W` / `Q` / `E` (capped at 1:1)
-- Fit 1006 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1006)/2 + 36`)
+- Fit 1007 px band (left/middle/right) — `1` / `2` / `3` (region top = `(IMG_HEIGHT−1007)/2 + 36`)
 - Reset to fit‑by‑width — Double‑click
 - Toggle debug overlay — `O`
 
@@ -99,7 +100,7 @@ Mobile specifics
 
 ## Static & Releases
 
-- Images are served from `/static/art/{2560,540h}/{mint}.jpg` mounted in Caddy.
+- Images are served from `/static/art/{2560,540h}/{mint}.jpg` by Caddy; Gallery/Grid currently use the absolute `https://app.drifellascape.art/static/...` base.
 - Frontend is a static bundle served by Caddy from `releases/current`. Use the `frontend-build` container and symlink flip; verify on `:8080` via the `caddy-verify` compose profile.
 
 ## Env Vars
@@ -112,8 +113,12 @@ Mobile specifics
 
 - Download metadata JSON (sequential, ≤1 req/s, retries):
   - `yarn tsx scripts/download-metadata.ts`
-- Download originals and produce 2560px JPGs (if needed locally):
+- Download originals and produce resized JPGs:
   - `yarn tsx scripts/download-images.ts`
-  - `yarn tsx scripts/resize-to-2560.ts`
+  - `yarn tsx scripts/resize-images.ts width`
+  - `yarn tsx scripts/resize-images.ts height`
+  - `yarn tsx scripts/resize-images.ts meta`
 - Ingest traits (CSV + metadata → DB):
   - `yarn tsx scripts/ingest-traits.ts`
+- Update trait type grouping/class labels:
+  - `yarn tsx scripts/update-trait-types.ts`

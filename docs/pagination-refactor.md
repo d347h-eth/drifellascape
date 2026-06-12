@@ -12,6 +12,8 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 
 ## Plan (Phased)
 
+Status note: the runtime contract is implemented today (exclusive `anchorMint`/`offset`, effective `offset` responses, Listings/Tokens symmetry, debug gated by `DRIFELLASCAPE_DEBUG`). The server rank/offset SQL is still duplicated across repo functions rather than extracted into a shared `computePageOffset` helper.
+
 1. Server: shared offset helper + exclusive params (Phase 1)
 
    - Extract `computePageOffset` helper used by all repo functions (listings/tokens; value/trait).
@@ -69,19 +71,21 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 
 ## Status
 
-- Current: plan staged; partial anchor + paging improvements exist in code; refactor will consolidate and simplify.
+- Current: contract behavior is live in `backend/src/server.ts`, `backend/src/repo.ts`, `frontend/src/lib/search.ts`, `frontend/src/lib/pager.ts`, and `frontend/src/lib/anchor.ts`. Remaining cleanup is mostly consolidation, tests, and reducing duplicated server rank SQL.
 
 ---
 
 ## Worklog / Progress
 
-- [ ] Phase 1 — Server helper + exclusive params + effective offset
-- [ ] Phase 2 — FE builder + unified postSearch
+- [x] Phase 1 behavior — exclusive params + effective offset + debug-gated `anchorDebug`
+- [ ] Phase 1 cleanup — extract shared server offset/rank helper
+- [x] Phase 2 — FE builder + unified postSearch
 - [x] Phase 3 — Pager module (next/prev, dedup, viewport anchor)
 - [x] Phase 4 — Anchor store; remove ad‑hoc branches
 - [x] Tokens‑only quick jump — search input and `?token=NUM` always anchor via Tokens; Gallery URL param updates during navigation and is removed when entering Grid
-- [ ] Phase 5 — Interactions/toggles cleanup
-- [ ] Phase 6 — Remove debug (prod) + docs update
+- [x] Phase 5 behavior — interaction-gated Grid/Gallery paging and mode toggles
+- [ ] Phase 5 cleanup — further simplify toggle/paging branches in `App.svelte`
+- [x] Phase 6 — Debug response fields gated behind `DRIFELLASCAPE_DEBUG`; docs updated
 
 Notes:
 

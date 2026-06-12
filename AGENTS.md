@@ -49,7 +49,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - DO keep queries simple (joins on keys; no CTE pyramids). DON’T add an ORM.
 - DO ensure one writer (the worker) and short transactions. DON’T hold long transactions in the backend.
 - DO align any new endpoints with `docs/06-api-reference.md`. DON’T change response shapes silently.
-- DO keep public images under `frontend/public/2560/`. DON’T add heavy asset pipelines.
+- DO keep deploy image assets under `frontend/static/art/{2560,540h}/`. DON’T add heavy asset pipelines.
 - DO use `anchorMint` or `offset` exclusively in search calls; `anchorMint` takes precedence and the server returns the effective `offset`.
 
 ## Ingestion Notes

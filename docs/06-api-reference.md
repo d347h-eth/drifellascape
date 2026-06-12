@@ -1,6 +1,6 @@
 # API Reference — Listings
 
-Base URL: `http://localhost:3000`
+Base URL: `http://localhost:3000` in local backend dev, or `https://api.drifellascape.art` for the deployed API.
 
 ## GET /listings
 
@@ -9,7 +9,7 @@ Retrieve the current in‑memory snapshot of marketplace listings.
 Query parameters:
 
 - `offset` (int, default 0): starting index, `>= 0`
-- `limit` (int, default 50): number of items, `1..200`
+- `limit` (int, default 100): number of items, `1..200`
 - `sort` (string, default `price_asc`): `price_asc` | `price_desc`
 
 Response 200 (application/json):
@@ -38,7 +38,7 @@ Notes:
 
 - `price` is an integer in raw SOL units (9 decimals).
 - `versionId` changes only when a new snapshot is activated by the worker.
-- Sorting applies to `price` only; tie‑breakers may be added later.
+- Sorting applies to `price` only; `GET /listings` does not enforce a secondary tie-breaker.
 
 Errors:
 
@@ -103,6 +103,7 @@ Notes:
 - The backend excludes the special `None` value (`trait_values.id = 217`) from filtering and traits to reduce noise.
 - Consistent read: results are anchored to the active snapshot.
 - Exclusive params: provide either `anchorMint` or `offset`. When `anchorMint` is present, `offset` is ignored and the response `offset` reflects the computed effective offset.
+- Debug: if `DRIFELLASCAPE_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
 
 ## POST /tokens/search
 
@@ -120,8 +121,10 @@ Body (application/json):
 
 Notes:
 
-- `tokens` represents the canon dataset; server still returns an effective `offset` and honors `anchorMint`.
+- `tokens` represents the canon dataset; response `versionId` is always `null`.
+- The server still returns an effective `offset` and honors `anchorMint`.
 - Exclusive params: provide either `anchorMint` or `offset`.
+- Debug: if `DRIFELLASCAPE_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
 
 Errors:
 
