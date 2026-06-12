@@ -136,3 +136,37 @@ CORS & Preflight:
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET,POST,OPTIONS`
 - `Access-Control-Allow-Headers: content-type`
+
+## GET /traits/catalog
+
+Retrieve the static trait bucket/value catalog for the collection.
+
+Response 200 (application/json):
+
+```json
+{
+  "total_tokens": 1333,
+  "buckets": [
+    {
+      "type_id": 12,
+      "type_name": "Background",
+      "spatial_group": "middle",
+      "purpose_class": "decor",
+      "tokens_with_type": 1333,
+      "values": [
+        {
+          "value_id": 345,
+          "value": "Blue",
+          "tokens_with_type_value": 42,
+          "rarity_pct": 3.150787696924231
+        }
+      ]
+    }
+  ]
+}
+```
+
+Notes:
+
+- The special `None` value (`trait_values.id = 217`) is excluded.
+- The endpoint is read-only catalog data; applying filters still uses `POST /listings/search` or `POST /tokens/search` with `valueIds`.

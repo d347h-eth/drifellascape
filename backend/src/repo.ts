@@ -7,6 +7,7 @@ import type {
     ListingTrait,
     TokenRow,
     EnrichedTokenRow,
+    TraitCatalog,
 } from "./types.js";
 
 export function getActiveVersionId(): number | null {
@@ -412,6 +413,76 @@ export function attachTraitsGeneric<T extends { token_id: number }>(
         ...it,
         traits: byToken.get(it.token_id) ?? [],
     }));
+}
+
+export function loadTraitCatalog(): TraitCatalog {
+    const tx = db.raw.transaction((): TraitCatalog => {
+        const totalRow = db.raw
+            .prepare("SELECT COUNT(*) AS c FROM tokens")
+            .get() as { c: number };
+        const totalTokens = totalRow.c || 0;
+
+        const rows = db.raw
+            .prepare(
+                `SELECT ty.id AS type_id,
+                        ty.name AS type_name,
+                        ty.spatial_group,
+                        ty.purpose_class,
+                        ty.tokens_with_type,
+                        tv.id AS value_id,
+                        tv.value,
+                        tvv.tokens_with_type_value
+                 FROM trait_types ty
+                 JOIN trait_types_values tvv ON tvv.type_id = ty.id
+                 JOIN trait_values tv ON tv.id = tvv.value_id
+                 WHERE tv.id <> 217
+                 ORDER BY ty.name COLLATE NOCASE,
+                          COALESCE(ty.spatial_group, '') COLLATE NOCASE,
+                          tv.value COLLATE NOCASE`,
+            )
+            .all() as Array<{
+            type_id: number;
+            type_name: string;
+            spatial_group: string | null;
+            purpose_class: string | null;
+            tokens_with_type: number;
+            value_id: number;
+            value: string;
+            tokens_with_type_value: number;
+        }>;
+
+        const buckets = new Map<number, TraitCatalog["buckets"][number]>();
+        for (const row of rows) {
+            let bucket = buckets.get(row.type_id);
+            if (!bucket) {
+                bucket = {
+                    type_id: row.type_id,
+                    type_name: row.type_name,
+                    spatial_group: row.spatial_group ?? null,
+                    purpose_class: row.purpose_class ?? null,
+                    tokens_with_type: row.tokens_with_type,
+                    values: [],
+                };
+                buckets.set(row.type_id, bucket);
+            }
+            const rarity =
+                totalTokens > 0
+                    ? (row.tokens_with_type_value / totalTokens) * 100
+                    : 0;
+            bucket.values.push({
+                value_id: row.value_id,
+                value: row.value,
+                tokens_with_type_value: row.tokens_with_type_value,
+                rarity_pct: rarity,
+            });
+        }
+
+        return {
+            total_tokens: totalTokens,
+            buckets: Array.from(buckets.values()),
+        };
+    });
+    return tx();
 }
 
 // --- Tokens (static) search ---

@@ -13,6 +13,7 @@ import {
     searchTokensByTraits,
     searchTokensByValues,
     attachTraitsGeneric,
+    loadTraitCatalog,
 } from "./repo.js";
 
 function getEnvPort(): number {
@@ -291,9 +292,19 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
+async function handleTraitsCatalog(req: IncomingMessage, res: ServerResponse) {
+    try {
+        return sendJson(res, 200, loadTraitCatalog());
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
 function route(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
+    if (req.method === "GET" && url.startsWith("/traits/catalog"))
+        return void handleTraitsCatalog(req, res);
     if (req.method === "GET" && url.startsWith("/listings"))
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))
