@@ -26,21 +26,32 @@
   }
 
   // Paging state (fixed page size)
+  let traitBarEl: HTMLDivElement | null = null;
+  let resizeObserver: ResizeObserver | null = null;
   let visibleTraitSlots = 0;
   let traitBarOffset = 0;
   import { TRAIT_BOX_WIDTH as BOX_W, TRAIT_ARROW_PAD_TOTAL as ARROWS_W } from '../../lib/ui-constants';
 
   function recomputeVisibleTraitSlots() {
-    const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const w = traitBarEl?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 1280);
     const slots = Math.floor(Math.max(0, w - ARROWS_W) / BOX_W);
     visibleTraitSlots = Math.max(1, slots);
     // Clamp
     traitBarOffset = Math.min(traitBarOffset, Math.max(0, totalTraits - visibleTraitSlots));
   }
-  if (typeof window !== 'undefined') {
-    addEventListener('resize', () => recomputeVisibleTraitSlots());
-  }
-  onMount(() => setTimeout(recomputeVisibleTraitSlots, 0));
+  onMount(() => {
+    const onResize = () => recomputeVisibleTraitSlots();
+    setTimeout(recomputeVisibleTraitSlots, 0);
+    if (typeof ResizeObserver !== 'undefined' && traitBarEl) {
+      resizeObserver = new ResizeObserver(onResize);
+      resizeObserver.observe(traitBarEl);
+    }
+    if (typeof window !== 'undefined') window.addEventListener('resize', onResize);
+    return () => {
+      resizeObserver?.disconnect();
+      if (typeof window !== 'undefined') window.removeEventListener('resize', onResize);
+    };
+  });
 
   // Derived slice
   $: filtered = traits.filter(t => normalizedPurpose(t.purpose_class) === normalizedPurpose(selectedPurpose));
@@ -117,7 +128,7 @@
 </div>
 
 <!-- Trait bar row (bottom within trait stack) -->
-<div class="trait-bar" on:wheel|stopPropagation on:click|stopPropagation>
+<div class="trait-bar" bind:this={traitBarEl} on:wheel|stopPropagation on:click|stopPropagation>
   <div class="trait-strip">
     {#each filtered.slice(startIdx, endIdx) as tr, i (`${tr.type_id}-${tr.value_id}-${i}`)}
       <div class="trait-box {selectedValueIds?.has(tr.value_id) ? 'selected' : ''}" title={`${tr.type_name}: ${tr.value}`} on:click={() => emitToggleValue(tr.value_id)}>

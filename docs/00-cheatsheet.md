@@ -35,6 +35,7 @@
 - `GET /listings?offset&limit&sort=price_asc|price_desc` — in‑memory snapshot
 - `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings from the active snapshot
 - `POST /tokens/search` — DB‑side filtering over the static canon token dataset (`versionId: null`)
+- `GET /traits/catalog` — full trait bucket/value catalog with counts and rarity percentages
 
 ## Frontend Hotkeys (Gallery)
 
@@ -45,7 +46,7 @@
 - Enter grid view — `G` or `Esc`
 - Toggle data source (Listings/Tokens) — `T`
 - Toggle motion — `M`
-- Toggle trait bar — `V`
+- Toggle filter panel — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
 - Next trait page (wrap) — `X`
 - Jump to first/last — `Home` / `End`
@@ -76,7 +77,8 @@
 - Sorting — Price ↑/↓ (Listings), Token ↑/↓ (Tokens); resets to the first page
 - Animation — enable/disable snap animation
 - Autosnap — enable/disable auto finalize to center
-- Traits — show/hide the trait bar stack
+- Traits — show/hide the left traits explorer
+- Filter — show/hide the bottom filter panel
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
 - Token search — input accepts `#NUM` (0–1332). Enter jumps to the token (Tokens mode). Price and [ME]/[TS] links render in the bar; the Gallery image footer is removed.

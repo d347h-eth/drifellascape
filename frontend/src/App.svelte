@@ -8,10 +8,11 @@
     import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
-    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore } from "./lib/search";
+    import TraitsExplorer from "./components/TraitsExplorer.svelte";
+    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore, fetchTraitsCatalog } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
-    import type { Row, ListingTrait, DataSource } from "./lib/types";
+    import type { Row, ListingTrait, DataSource, TraitsCatalog } from "./lib/types";
 
     // Types moved to lib/types.ts
 
@@ -34,11 +35,16 @@
     let showHelp = false;
     let showAbout = false;
     let showTraitBar = false;
+    let showTraitsExplorer = false;
+    let traitsCatalog: TraitsCatalog | null = null;
+    let traitsCatalogLoading = false;
+    let traitsCatalogError: string | null = null;
     import { PURPOSES, type Purpose, normalizedPurpose } from './lib/purposes';
     let selectedPurpose: Purpose = "middle";
-    // Trait bar paging is encapsulated in TraitBar
+    // Bottom filter panel paging is encapsulated in TraitBar
     let selectedValueIds: Set<number> = new Set();
     // Map of selected trait value id -> display label (best-effort, derived from current items' traits)
+    let catalogValueMeta: Record<number, string> = {};
     let selectedValueMeta: Record<number, string> = {};
     let traitsForCurrent: ListingTrait[] = [];
     let currentRow: Row | null = null;
@@ -64,7 +70,7 @@
     let showGalleryEntryOverlay = false;
     let galleryEntryHeightPx = 0;
 
-    // Keep TraitBar in sync with the token in focus (gallery or exploration)
+    // Keep the bottom filter panel in sync with the token in focus (gallery or exploration)
     $: {
         const useExplore = exploreIndex !== null && !!exploreItems;
         if (useExplore) {
@@ -98,22 +104,29 @@
         return Math.floor(baseOffset / DEFAULT_SEARCH_LIMIT) + 1;
     }
 
-    // Best-effort resolution of selected value ids to labels from the current/in-focus token only
-    $: {
+    $: catalogValueMeta = (() => {
         const meta: Record<number, string> = {};
+        for (const bucket of traitsCatalog?.buckets ?? []) {
+            for (const value of bucket.values) {
+                meta[value.value_id] = `${bucket.type_name}: ${value.value}`;
+            }
+        }
+        return meta;
+    })();
+
+    // Best-effort resolution of selected value ids to labels from catalog/current token context
+    $: {
+        const meta: Record<number, string> = { ...catalogValueMeta };
         const ts = traitsForCurrent || [];
-        const lookup = new Map<number, { value: string; purpose: Purpose }>();
+        const lookup = new Map<number, { type: string; value: string }>();
         for (const t of ts) {
             if (!lookup.has(t.value_id)) {
-                lookup.set(t.value_id, { value: t.value, purpose: normalizedPurpose(t.purpose_class) });
+                lookup.set(t.value_id, { type: t.type_name, value: t.value });
             }
         }
         for (const id of selectedValueIds) {
             const info = lookup.get(id);
-            if (info) {
-                const label = info.purpose ? `${info.purpose}: ${info.value}` : info.value;
-                meta[id] = label;
-            }
+            if (info && !meta[id]) meta[id] = `${info.type}: ${info.value}`;
         }
         selectedValueMeta = meta;
     }
@@ -252,6 +265,24 @@
         } catch {
             // ignore transient errors
         }
+    }
+
+    async function ensureTraitsCatalog() {
+        if (traitsCatalog || traitsCatalogLoading) return;
+        traitsCatalogLoading = true;
+        traitsCatalogError = null;
+        try {
+            traitsCatalog = await fetchTraitsCatalog();
+        } catch (e: any) {
+            traitsCatalogError = e?.message || String(e);
+        } finally {
+            traitsCatalogLoading = false;
+        }
+    }
+
+    function toggleTraitsExplorer() {
+        showTraitsExplorer = !showTraitsExplorer;
+        if (showTraitsExplorer) void ensureTraitsCatalog();
     }
 
     onMount(() => {
@@ -407,12 +438,12 @@
                 applyValueFilterAndFetch();
                 return;
             }
-            // Trait/Main bar cycle — V (mobile cycles 3 states; desktop toggles traits)
+            // Filter/Main bar cycle — V (mobile cycles 3 states; desktop toggles filter panel)
             if (k === 'v' || k === 'V') {
                 e.preventDefault();
                 if (isMobile) {
                     const both = showMainBar && showTraitBar;
-                    const collapsed = !showMainBar; // trait bar hidden when collapsed
+                    const collapsed = !showMainBar; // filter panel hidden when collapsed
                     const mainOnly = showMainBar && !showTraitBar;
                     if (both) {
                         // both -> collapsed
@@ -427,7 +458,7 @@
                         showMainBar = true;
                         showTraitBar = true;
                     } else {
-                        // fallback: toggle traits
+                        // fallback: toggle filter panel
                         showTraitBar = !showTraitBar;
                     }
                 } else {
@@ -450,7 +481,7 @@
                 }
                 return;
             }
-            // Trait bar page next (wrap) — X (notify trait bar component)
+            // Filter panel page next (wrap) — X (notify filter panel component)
             if (k === 'x' || k === 'X') {
                 e.preventDefault();
                 window.dispatchEvent(new CustomEvent('traitbar:pageNext'));
@@ -517,13 +548,13 @@
 
     // Utilities moved inside GalleryScroller
 
-    // --- Trait bar helpers ---
+    // --- Bottom filter panel helpers ---
     function currentItem(): Row | null {
         if (exploreIndex !== null && exploreItems) return exploreItems[exploreIndex] || null;
         return items[activeIndex] || null;
     }
     // normalizedPurpose imported from lib/purposes
-    // Trait bar sizing, paging, and counts are implemented inside TraitBar
+    // Bottom filter panel sizing, paging, and counts are implemented inside TraitBar
     import { dbg } from "./debug";
 
     async function applyValueFilterAndFetch() {
@@ -602,13 +633,25 @@
             loading = false;
         }
     }
-    // Handlers for TraitBar component events (avoid TS in template expressions)
-    function handleToggleValue(e: CustomEvent<number>) {
-        const id = e.detail;
+    // Handlers for bottom filter panel component events (avoid TS in template expressions)
+    function applyValueSelection(valueId: number, replace = false) {
         const next = new Set<number>(selectedValueIds);
-        if (next.has(id)) next.delete(id); else next.add(id);
-        selectedValueIds = next; // reassign to trigger reactivity in TraitBar
+        if (replace) {
+            next.clear();
+            next.add(valueId);
+        } else if (next.has(valueId)) {
+            next.delete(valueId);
+        } else {
+            next.add(valueId);
+        }
+        selectedValueIds = next; // reassign to trigger reactivity in panels
         applyValueFilterAndFetch();
+    }
+    function handleToggleValue(e: CustomEvent<number>) {
+        applyValueSelection(e.detail);
+    }
+    function handleTraitsExplorerValueClick(e: CustomEvent<{ valueId: number; replace: boolean }>) {
+        applyValueSelection(e.detail.valueId, e.detail.replace);
     }
     function handlePurposeChange(e: CustomEvent<string>) {
         selectedPurpose = (e.detail as any as Purpose);
@@ -836,6 +879,7 @@
     }
 
     function openExploreByMint(mint: string) {
+        showTraitsExplorer = false;
         exploreItems = items.slice(); // freeze current page order
         const idx = exploreItems.findIndex((r) => r.token_mint_addr === mint);
         exploreIndex = idx >= 0 ? idx : 0;
@@ -927,6 +971,16 @@
         position: relative;
         margin: 0;
         padding: 0;
+        --traits-explorer-width: min(33vw, 480px);
+    }
+    .main-viewport {
+        min-height: 100vh;
+        width: 100%;
+        transition: margin-left 120ms ease, width 120ms ease;
+    }
+    .main-viewport.traitsOpen {
+        margin-left: var(--traits-explorer-width);
+        width: calc(100% - var(--traits-explorer-width));
     }
     .status { opacity: 0.8; font-size: 14px; padding: 8px 0 16px; }
     .error { color: #ff6b6b; }
@@ -935,6 +989,7 @@
     .edge { position: fixed; top: 0; height: 1087px; width: 25px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; transition: opacity 0.25s ease; }
     .edge:focus, .edge:focus-visible { outline: none; }
     .edge.left { left: 0; }
+    .edge.left.traitsOpen { left: var(--traits-explorer-width); }
     .edge.right { right: 0; }
     .edge:hover { background: linear-gradient(to right, rgba(255,255,255,0.04), transparent); }
     .edge.right:hover { background: linear-gradient(to left, rgba(255,255,255,0.04), transparent); }
@@ -947,8 +1002,8 @@
     /* Help overlay */
     /* help overlay styles moved to components/HelpOverlay.svelte */
 
-    /* Trait bar styles are scoped in TraitBar.svelte */
-    /* Trait bar styles live within TraitBar component */
+    /* Bottom filter panel styles are scoped in TraitBar.svelte */
+    /* Bottom filter panel styles live within TraitBar component */
     .mobile-mainbar-toggle {
         position: fixed; left: 12px; width: 50px; height: 50px;
         background: rgba(0,0,0,0.65); color: #e6e6e6; border: 0; border-radius: 6px;
@@ -965,6 +1020,9 @@
         z-index: 9500;
         pointer-events: auto;
     }
+    .bottom-stack.traitsOpen {
+        left: var(--traits-explorer-width);
+    }
     .gallery-entry-overlay { width: 100%; pointer-events: auto; }
     .overlay-msg {
         position: sticky; top: 40svh; left: 50%; transform: translateX(-50%);
@@ -973,55 +1031,81 @@
         font-size: 14px; padding: 8px 12px; border-radius: 8px;
         width: max-content; max-width: 90vw;
     }
+    @media (max-width: 900px), (hover: none) and (pointer: coarse) {
+        .main-viewport.traitsOpen {
+            margin-left: 0;
+            width: 100%;
+        }
+        .bottom-stack.traitsOpen {
+            left: 0;
+        }
+        .edge.left.traitsOpen {
+            left: 0;
+        }
+    }
     
 </style>
 
 <div class="container">
-    {#if !gridMode}
-        <!-- Horizontal scroller -->
-        {#if isMobile && showGalleryEntryOverlay}
-          <div class="gallery-entry-overlay" style={`height:${galleryEntryHeightPx}px`} aria-hidden="true">
-            <div class="overlay-msg">Keep scrolling down until you reach the gallery…</div>
-          </div>
-        {/if}
-        <!-- Gallery Scroller (extracted) -->
-        <GalleryScroller
-            bind:activeIndex
-            items={items}
-            showMeta={false}
-            motionEnabled={motionEnabled}
-            autoSnapEnabled={autoSnapEnabled}
-            galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
-            on:loadMore={() => handleLoadMoreGallery()}
-            on:loadPrev={() => handleLoadPrevGallery()}
-            on:enterExplore={(e) => openExploreByMint(e.detail)}
-            on:imageLoad={recomputeEdgeHeight}
-            on:manualScroll={() => {
-                if (!isMobile) return;
-                showEdgeHints = true;
-                if (edgeHintTimer) clearTimeout(edgeHintTimer);
-                edgeHintTimer = setTimeout(() => { showEdgeHints = false; }, 250);
-            }}
-            bind:this={scrollerRef}
-        />
+    <TraitsExplorer
+        visible={showTraitsExplorer}
+        {isMobile}
+        catalog={traitsCatalog}
+        loading={traitsCatalogLoading}
+        error={traitsCatalogError}
+        {selectedValueIds}
+        on:close={() => (showTraitsExplorer = false)}
+        on:valueClick={handleTraitsExplorerValueClick}
+    />
 
-        <!-- Edge click targets for mouse-only navigation -->
-        {#if !showGalleryEntryOverlay}
-            <button type="button" class="edge left" class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-            <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+    <div class="main-viewport" class:traitsOpen={showTraitsExplorer && !isMobile}>
+        {#if !gridMode}
+            <!-- Horizontal scroller -->
+            {#if isMobile && showGalleryEntryOverlay}
+              <div class="gallery-entry-overlay" style={`height:${galleryEntryHeightPx}px`} aria-hidden="true">
+                <div class="overlay-msg">Keep scrolling down until you reach the gallery…</div>
+              </div>
+            {/if}
+            <!-- Gallery Scroller (extracted) -->
+            <GalleryScroller
+                bind:activeIndex
+                items={items}
+                showMeta={false}
+                motionEnabled={motionEnabled}
+                autoSnapEnabled={autoSnapEnabled}
+                galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
+                on:loadMore={() => handleLoadMoreGallery()}
+                on:loadPrev={() => handleLoadPrevGallery()}
+                on:enterExplore={(e) => openExploreByMint(e.detail)}
+                on:imageLoad={recomputeEdgeHeight}
+                on:manualScroll={() => {
+                    if (!isMobile) return;
+                    showEdgeHints = true;
+                    if (edgeHintTimer) clearTimeout(edgeHintTimer);
+                    edgeHintTimer = setTimeout(() => { showEdgeHints = false; }, 250);
+                }}
+                bind:this={scrollerRef}
+            />
+
+            <!-- Edge click targets for mouse-only navigation -->
+            {#if !showGalleryEntryOverlay}
+                <button type="button" class="edge left" class:traitsOpen={showTraitsExplorer && !isMobile} class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+                <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+            {/if}
+        {:else}
+            <!-- Grid mode (vertical) -->
+            <GridView
+                items={items}
+                targetMint={gridTargetMint}
+                columns={showTraitsExplorer && !isMobile ? 2 : 3}
+                enablePaging={pagingArmed && !loading && (total ?? 0) > items.length}
+                loadingMore={isLoadingMore}
+                on:openGallery={(e) => openGalleryByMint(e.detail)}
+                on:loadMore={() => handleLoadMore()}
+                on:loadPrev={() => loadPrevGrid()}
+            />
         {/if}
-    {:else}
-        <!-- Grid mode (vertical) -->
-        <GridView
-            items={items}
-            targetMint={gridTargetMint}
-            enablePaging={pagingArmed && !loading && (total ?? 0) > items.length}
-            loadingMore={isLoadingMore}
-            on:openGallery={(e) => openGalleryByMint(e.detail)}
-            on:loadMore={() => handleLoadMore()}
-            on:loadPrev={() => loadPrevGrid()}
-        />
-    {/if}
+    </div>
 
     <!-- Overlays -->
     <HelpOverlay visible={showHelp} onClose={() => (showHelp = false)} />
@@ -1031,9 +1115,9 @@
       <LandscapeOverlay visible={true} onClose={() => (landscapeOverlayClosed = true)} />
     {/if}
     
-    <!-- Bottom stack: fixed container that stacks TraitBar (if visible) above StatusBar, with proper bottom offset -->
+    <!-- Bottom stack: fixed container that stacks the filter panel (if visible) above StatusBar, with proper bottom offset -->
     {#if !(isMobile && showGalleryEntryOverlay)}
-      <div class="bottom-stack" style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
+      <div class="bottom-stack" class:traitsOpen={showTraitsExplorer && !isMobile} style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
           {#if showTraitBar}
               <TraitBar
                   traits={traitsForCurrent}
@@ -1051,6 +1135,7 @@
               {motionEnabled}
               {autoSnapEnabled}
               {showTraitBar}
+              {showTraitsExplorer}
               gridMode={gridMode}
               inExplore={exploreIndex !== null}
               {activeIndex}
@@ -1091,6 +1176,7 @@
               }}
               on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
               on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+              on:toggleTraitsExplorer={toggleTraitsExplorer}
               on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
               on:toggleHelp={() => { showHelp = !showHelp; }}
               on:toggleAbout={() => { showAbout = !showAbout; }}

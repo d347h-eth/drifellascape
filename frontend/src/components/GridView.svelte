@@ -9,6 +9,7 @@
   export let flashDurationMs: number = 5625;
   export let enablePaging: boolean = false;
   export let loadingMore: boolean = false;
+  export let columns: number = 3;
 
   const dispatch = createEventDispatcher();
 
@@ -73,7 +74,7 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
 <style>
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
     gap: 12px;
     padding: 12px;
     box-sizing: border-box;
@@ -146,7 +147,7 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
   }
 </style>
 
-<div class="grid" role="list">
+<div class="grid" role="list" style={`--grid-columns:${Math.max(1, columns)}`}>
   <div class="sentinel-top" bind:this={topSentinelEl} />
   {#each items as it (it.token_mint_addr)}
     <div id={`cell-${it.token_mint_addr}`} class="cell" role="listitem" class:flash={flashMint === it.token_mint_addr}>

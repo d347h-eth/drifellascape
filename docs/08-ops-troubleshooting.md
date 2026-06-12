@@ -71,11 +71,12 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 7) 405 on `/listings/search` after switching to same-origin static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.
-- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*` and `/tokens*` to the backend (no path rewrite), e.g.:
+- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, and `/traits*` to the backend (no path rewrite), e.g.:
   ```
   route {
     handle /listings* { reverse_proxy backend:3000 }
     handle /tokens* { reverse_proxy backend:3000 }
+    handle /traits* { reverse_proxy backend:3000 }
     handle /static/* { root * /srv/static; file_server }
     handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
   }

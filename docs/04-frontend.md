@@ -16,7 +16,8 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components, URL token param integration)
 - `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap, near-edge Gallery paging events
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
-- `frontend/src/components/TraitBar/TraitBar.svelte` — purpose pills + trait strip (fixed paging)
+- `frontend/src/components/TraitBar/TraitBar.svelte` — bottom Filter panel purpose pills + trait strip (fixed paging)
+- `frontend/src/components/TraitsExplorer.svelte` — left-side trait catalog explorer
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
 - `frontend/static/` — git-ignored image tree mounted by Caddy in production
@@ -25,7 +26,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*` and `/tokens*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -35,6 +36,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - A periodic poll (default 30s) posts again for Listings only; if `versionId` changed, the result is staged and applied when Gallery focus is at index 0. Tokens are static and are not polled.
 - Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
+- The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -70,7 +72,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
   - Focus current — `F`
   - Enter exploration — `W`
   - Toggle motion — `M`
-  - Toggle trait bar — `V`
+  - Toggle filter panel — `V`
   - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
   - Next trait page (wrap) — `X`
   - Jump to first/last — `Home` / `End`
@@ -86,9 +88,9 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Works for both wheel and `A`/`D` hotkeys (trigger runs when an animation finishes or scroll idles).
 - The focused token remains in view after the fetch; the response includes the effective `offset` for subsequent paging symmetry with Grid.
 
-## Trait Bar (Bottom Overlay)
+## Filter Panel (Bottom Overlay)
 
-- Toggle: `V`. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
+- Toggle: `V` or the `Filter` status bar button. Semi‑transparent bar pinned slightly above the native scrollbar (bar height 50px; gap ~22px so the native scrollbar is fully accessible). A centered ▲/▼ toggle strip (fully transparent by default) is always visible and lights up on hover. The arrow attempts to invert against the backdrop via `mix-blend-mode: difference` (falls back to white where unsupported).
 - Purpose classes (pills) centered above the bar: `left`, `middle`, `right`, `decor`, `items`, `special`, `undefined`.
   - Default selected: `middle`.
   - Pills show counts for the current token (e.g., `middle (5)`); empty pills are disabled and skipped by keyboard nav.
@@ -99,6 +101,14 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
   - Fixed page size: a single right arrow (50×50) advances to the next page; hotkey `X` performs the same action. Pagination wraps to the start.
 - Clicking a box toggles value‑based filtering (adds/removes that `value_id`) and immediately refreshes the current source via `POST /listings/search` or `POST /tokens/search`.
   - The frontend keeps the same token in focus across filter changes (by mint), including when removing the last/only filter.
+
+## Traits Explorer
+
+- Toggle: `Traits` in the status bar.
+- Desktop: fixed left side-panel, roughly one third of the viewport width, full height. It pushes the main viewport right; Grid uses two columns while open.
+- Mobile: full-screen overlay so users can focus on trait exploration.
+- Content: all trait buckets sorted alpha-numerically, with expandable bucket headers and nested values. Values show token count and rarity percentage from `GET /traits/catalog`.
+- Click a value to add/remove it from the current value filter. Ctrl-click replaces the current filter set with only that value. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
 
 ## Gallery/Listings Rendering
 
@@ -196,14 +206,15 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 ## Main Bar (Reworked)
 
-- Persistent bottom strip stacked with the trait bar.
+- Persistent bottom strip stacked with the filter panel.
 - Buttons (left → right):
   - Source (Listings ⇄ Tokens)
   - Mode (Grid ⇄ Gallery). Enter Exploration from Gallery with `W`.
   - Sorting (Price ↑/↓ for Listings; Token ↑/↓ for Tokens). Resets to first page.
   - Animation (enable/disable snap animation)
   - Autosnap (enable/disable auto finalize to center). Default off on mobile.
-  - Traits (show/hide trait bar)
+  - Traits (show/hide left traits explorer)
+  - Filter (show/hide bottom filter panel)
   - Hotkeys (open helper overlay)
   - About (open about overlay)
 - Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
@@ -216,7 +227,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Page indicator renders at the right edge.
   - Bottom offset invariant: 15px in Gallery (to not block horizontal scroll), 0 in Grid/Exploration.
 
-## Trait Bar Stack (Reworked)
+## Filter Panel Stack (Reworked)
 
 - The trait stack now composes three rows in a vertical stack above the main bar:
   1. Selected filters (pills)

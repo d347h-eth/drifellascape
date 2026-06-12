@@ -2,13 +2,13 @@
 
 This document captures the plan to decompose `frontend/src/App.svelte` into focused, composable pieces with clear responsibilities. The goals are to keep behavior identical, improve maintainability, and enable faster iteration. The milestones below mirror a ROADMAP-style execution with progress tracking.
 
-Status: the refactor is mostly complete, but the final shape differs from the original target. The current API module is `frontend/src/lib/search.ts`, not `api.ts`; `TraitBar.svelte` owns purpose pills and the trait strip internally rather than splitting them into separate `PurposePills` / `TraitStrip` files.
+Status: the refactor is mostly complete, but the final shape differs from the original target. The current API module is `frontend/src/lib/search.ts`, not `api.ts`; `TraitBar.svelte` owns the bottom Filter panel purpose pills and trait strip internally rather than splitting them into separate `PurposePills` / `TraitStrip` files.
 
 ## Goals & Non-Goals
 
 - Goals
 
-  - Extract large concerns (gallery scroller, trait bar, help) into components.
+  - Extract large concerns (gallery scroller, filter panel, traits explorer, help) into components.
   - Centralize shared types, API access, and (optionally) state in a predictable place.
   - Isolate DOM-heavy logic (snap/finalize/scrollbar drag) in a dedicated component.
   - Preserve existing behavior and hotkeys; no visual changes.
@@ -21,7 +21,7 @@ Status: the refactor is mostly complete, but the final shape differs from the or
 ## Current Architecture (Summary)
 
 - `App.svelte` orchestrates data fetch + polling, hotkeys, mode/source/filter transitions, URL token param integration, and component wiring.
-- `GalleryScroller.svelte`, `GridView.svelte`, `StatusBar.svelte`, `TraitBar.svelte`, `HelpOverlay.svelte`, `AboutOverlay.svelte`, and `LandscapeOverlay.svelte` own the main UI surfaces.
+- `GalleryScroller.svelte`, `GridView.svelte`, `StatusBar.svelte`, `TraitBar.svelte`, `TraitsExplorer.svelte`, `HelpOverlay.svelte`, `AboutOverlay.svelte`, and `LandscapeOverlay.svelte` own the main UI surfaces.
 - `ImageExplorer.svelte` is isolated; uses Leaflet and its own exploration hotkeys.
 - `debug.ts` provides a global `DEBUG` flag and `dbg()` helper.
 
@@ -45,8 +45,9 @@ frontend/src/
     HelpOverlay.svelte            # Keyboard help
     AboutOverlay.svelte
     LandscapeOverlay.svelte
+    TraitsExplorer.svelte          # Full trait catalog explorer
     TraitBar/
-      TraitBar.svelte            # Selected filters, purpose pills, trait boxes, fixed paging
+      TraitBar.svelte            # Bottom Filter panel: selected filters, purpose pills, trait boxes, fixed paging
       ToggleButton.svelte        # ▲/▼ button centered; follows bar state
   App.svelte                      # Orchestrator (fetch, polling, filter apply, wiring)
   ImageExplorer.svelte            # (existing)
@@ -61,15 +62,21 @@ frontend/src/
   - Finalize snap on scroll idle (directional next/prev from last center) with threshold = 50% viewport width (immediate finalize, no debounce).
   - Native scrollbar drag disables snap; on release, snap to nearest slide center (threshold-based).
   - Prev/Next hotkeys (A/D, ←/→) act on keyup to avoid key-repeat flood.
-  - Other keys: F (focus), M (motion), V (toggle trait bar), Z/C (purpose), X (trait page next wrap), Home/End.
+  - Other keys: F (focus), M (motion), V (toggle filter panel), Z/C (purpose), X (filter panel page next wrap), Home/End.
   - W: enter exploration for current in-focus token.
 
-- Trait Bar
+- Filter Panel
 
   - Toggle via V (and centered ▲/▼ button near bottom), stays above native scrollbar (gap ~22 px). Toggle strip is fully transparent by default; only the arrow is visible; lights up subtly on hover.
   - Purpose pills with counts; disabled/greyed if zero; Z/C wrap and skip empty.
   - Trait boxes 150×50; 2-line wrapped value; fixed paging with a single right arrow (wraps on next). `X` performs the same action.
   - Clicking a trait toggles value-based filtering; the current token remains in focus across filter changes (by mint), even when the list grows back.
+
+- Traits Explorer
+
+  - Toggle via the `Traits` status bar button.
+  - Loads `GET /traits/catalog` and drives the same selected `valueIds` filter flow as the Filter panel.
+  - Desktop side-panel pushes the main viewport; mobile renders as a full-screen overlay.
 
 - Help Overlay
 
@@ -89,11 +96,11 @@ frontend/src/
   - Add `lib/stores.ts` skeleton (UI/Gallery/Filters) for gradual adoption.
   - Extract `HelpOverlay.svelte` and `TraitBar/ToggleButton.svelte`; wire props/events; remove inline CSS.
 
-- [x] PR2: TraitBar split
+- [x] PR2: Filter panel split
 - [x] PR3: GalleryScroller extraction — scroller logic/component extracted; scroller CSS moved; methods exposed. Optional: extract snap logic to a `useSnap` action (defer if not needed).
-- [x] PR4: Cleanup & constants — added `lib/ui-constants.ts`; removed dead helpers from App; moved scroller CSS; formalized trait bar numbers in code.
+- [x] PR4: Cleanup & constants — added `lib/ui-constants.ts`; removed dead helpers from App; moved scroller CSS; formalized filter panel numbers in code.
 
-  - Extract `TraitBar.svelte`; keep purpose pills, selected filters, and fixed trait paging inside that component.
+  - Extract `TraitBar.svelte`; keep purpose pills, selected filters, and fixed filter panel paging inside that component.
   - Emit `toggleValue` and `purposeChange`; App forwards to search/state handling.
 
 - [x] PR3: GalleryScroller — finalized component with wheel mapping, finalize snap, scrollbar release snap, and methods for App.
@@ -134,7 +141,7 @@ frontend/src/
   - Replace raw fetch with `postSearch` in load, poll, and filter apply.
   - Replace inline Help Overlay and Toggle Button with components.
 
-### PR2 — TraitBar split
+### PR2 — Filter panel split
 
 - TraitBar.svelte: container receiving current token traits, `selectedPurpose`, `selectedValueIds`; exposes events; composes subcomponents.
 - Final implementation note: `TraitBar.svelte` owns purpose counts/disabled state, fixed paging, arrows, box rendering, `X` wrap, and `toggleValue` / `purposeChange` events.

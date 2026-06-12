@@ -14,7 +14,7 @@
       <ul>
         <li>Toggle help — <span class="kbd">H</span> / <span class="kbd">F1</span></li>
         <li>Toggle data source (Listings/Tokens) — <span class="kbd">T</span></li>
-        <li>Toggle trait bar — <span class="kbd">V</span></li>
+        <li>Toggle filter panel — <span class="kbd">V</span></li>
         <li>Traits purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
         <li>Next trait page (wrap) — <span class="kbd">X</span></li>
         <li>Focus token search — <span class="kbd">E</span></li>
@@ -43,7 +43,7 @@
         <li>Close exploration — <span class="kbd">Esc</span> or <span class="kbd">G</span></li>
         <li>Fit‑by‑width centered — <span class="kbd">S</span> or Double‑click</li>
         <li>Fit entire height (middle/left/right) — <span class="kbd">W</span>/<span class="kbd">Q</span>/<span class="kbd">E</span></li>
-        <li>Fit 1006px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>
+        <li>Fit 1007px band (left/middle/right) — <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span></li>
         <li>Toggle debug overlay — <span class="kbd">O</span></li>
       </ul>
     </div>

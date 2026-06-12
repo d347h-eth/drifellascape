@@ -1,5 +1,11 @@
 import { writable } from "svelte/store";
-import type { ApiResponse, DataSource, ListingsSearchBody, Row } from "./types";
+import type {
+    ApiResponse,
+    DataSource,
+    ListingsSearchBody,
+    Row,
+    TraitsCatalog,
+} from "./types";
 
 const configuredBase = (import.meta as any).env?.VITE_API_BASE;
 const API_BASE =
@@ -65,6 +71,17 @@ export async function postSearch(
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as ApiResponse<Row>;
+    } finally {
+        decrementPending();
+    }
+}
+
+export async function fetchTraitsCatalog(): Promise<TraitsCatalog> {
+    incrementPending();
+    try {
+        const res = await fetch(`${API_BASE}/traits/catalog`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as TraitsCatalog;
     } finally {
         decrementPending();
     }
