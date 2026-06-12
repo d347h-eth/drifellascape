@@ -113,14 +113,17 @@ Mobile specifics
 
 ## Scripts
 
+- Run local dev stack:
+  - `yarn dev`
+  - Logs: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Download metadata JSON (sequential, ≤1 req/s, retries):
-  - `yarn tsx scripts/download-metadata.ts`
+  - `yarn tsx scripts/assets/download-metadata.ts`
 - Download originals and produce resized JPGs:
-  - `yarn tsx scripts/download-images.ts`
-  - `yarn tsx scripts/resize-images.ts width`
-  - `yarn tsx scripts/resize-images.ts height`
-  - `yarn tsx scripts/resize-images.ts meta`
+  - `yarn tsx scripts/assets/download-images.ts`
+  - `yarn tsx scripts/assets/resize-images.ts width`
+  - `yarn tsx scripts/assets/resize-images.ts height`
+  - `yarn tsx scripts/assets/resize-images.ts meta`
 - Ingest traits (CSV + metadata → DB):
-  - `yarn tsx scripts/ingest-traits.ts`
+  - `yarn tsx scripts/traits/ingest-traits.ts`
 - Update trait type grouping/class labels:
-  - `yarn tsx scripts/update-trait-types.ts`
+  - `yarn tsx scripts/traits/update-trait-types.ts`

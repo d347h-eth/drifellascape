@@ -155,6 +155,8 @@ Notes:
 ## Quick Start
 
 ```bash
+yarn dev
+# Backend only:
 yarn backend:run
 # Optional:
 DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run

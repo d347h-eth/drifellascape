@@ -151,6 +151,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - Monorepo, Yarn Berry (PnP), TypeScript across workspaces: `backend`, `worker`, `frontend`, `database`, `shared`.
 - Run locally:
+  - Full stack: `yarn dev` (logs in `tmp/logs/`)
   - Backend: `yarn backend:run`
   - Worker (loop): `yarn worker:run`
   - Frontend: `yarn workspace @drifellascape/frontend dev`

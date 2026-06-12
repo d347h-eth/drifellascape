@@ -4,12 +4,14 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Processes & Ports
 
+- Full local dev stack: `yarn dev` (writes `tmp/logs/{backend,worker,frontend}.log`)
 - Backend API: `yarn backend:run` (default port 3000)
 - Worker loop: `yarn worker:run` (default interval 30s)
 - Frontend dev: `yarn workspace @drifellascape/frontend dev` (port 5173)
 
 ## Logs
 
+- Local dev supervisor: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Worker: `logs/worker.log` — fetch attempts, skip counts, new version summaries or failures
 - Backend: stdout/stderr (server start, errors)
 
@@ -61,7 +63,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Run Sequences
 
-- Dev minimal: backend → worker → frontend; open http://localhost:5173
+- Dev minimal: `yarn dev`; open http://localhost:5173
 - Production: run worker as a service (single instance), backend as a simple Node service behind a reverse proxy, frontend static hosting
 - Sync static previews to a new host:
   ```bash

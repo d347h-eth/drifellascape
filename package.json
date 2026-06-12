@@ -40,6 +40,7 @@
     "scripts": {
         "format": "prettier . --write",
         "format:check": "prettier . --check",
+        "dev": "scripts/dev/run-local.sh",
         "worker:run": "yarn tsx worker/src/index.ts",
         "backend:run": "yarn tsx backend/src/server.ts"
     },

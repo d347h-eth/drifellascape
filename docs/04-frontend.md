@@ -191,6 +191,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 ## Build & Run
 
+- Full local stack: `yarn dev`
 - Dev: `yarn workspace @drifellascape/frontend dev`
 - Configure API base when bypassing the dev proxy: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
 - Optional poll override: `VITE_POLL_MS=15000`

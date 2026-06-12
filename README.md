@@ -17,7 +17,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 - `worker/` — periodic sync from marketplace → SQLite snapshot
 - `backend/` — Node HTTP server with in‑memory snapshot cache
 - `frontend/` — Vite + Svelte app (grid + gallery + exploration)
-- `scripts/` — utilities (metadata/images download, image resizing, trait ingestion)
+- `scripts/` — grouped utilities (`dev/`, `assets/`, `traits/`, `release/`)
 - `database/` — SQLite integration, pragmas, migrations
 - `docs/` — product & technical docs (start with `docs/01-product-overview.md`)
 
@@ -34,7 +34,15 @@ Install deps:
 yarn install
 ```
 
-Run backend API (port 3000):
+Run the full local stack:
+
+```bash
+yarn dev
+```
+
+This starts the backend, worker, and frontend. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
+
+Run backend API only (port 3000):
 
 ```bash
 yarn backend:run
@@ -78,7 +86,7 @@ Deep‑links
 - High‑resolution and grid images live outside the bundle under `frontend/static/art/2560/` and `frontend/static/art/540h/` (git‑ignored).
 - The current Gallery/Grid components request `https://app.drifellascape.art/static/art/{2560,540h}/{mint}.jpg`.
 - In production, `docker-compose.yml` mounts `frontend/static` into Caddy and the Caddyfile serves `/static/*` using `handle_path`, so `/static/art/...` maps to `/srv/static/art/...` on disk.
-- The resize helper is cwd‑relative: `yarn tsx scripts/resize-images.ts width|height|meta` reads `static/full` and writes `static/{2560,540h,meta}` from the directory where it is run. Move or sync generated assets into `frontend/static/art/...` for the current Caddy mount.
+- The resize helper is cwd‑relative: `yarn tsx scripts/assets/resize-images.ts width|height|meta` reads `static/full` and writes `static/{2560,540h,meta}` from the directory where it is run. Move or sync generated assets into `frontend/static/art/...` for the current Caddy mount.
 
 ## Deployment (VPS Workflow)
 
@@ -87,8 +95,8 @@ The VPS setup builds the frontend once per release and serves the static output 
 1. Pull the latest code: `git pull`
 2. Build a new frontend release:
    ```bash
-   ./scripts/build-frontend-release.sh
-   # optional custom ID: ./scripts/build-frontend-release.sh 20241021-frontend
+   ./scripts/release/build-frontend-release.sh
+   # optional custom ID: ./scripts/release/build-frontend-release.sh 20241021-frontend
    ```
    The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
    By default the build sets `VITE_API_BASE=https://api.drifellascape.art`; export `VITE_API_BASE` before running the script to override.
@@ -109,9 +117,9 @@ If you still have the legacy `frontend` container running, clean it up once with
 
 Traits & ingestion
 
-- Tokens/traits are normalized via `scripts/ingest-traits.ts` using `logs/mint_to_image.csv` and `metadata/`.
+- Tokens/traits are normalized via `scripts/traits/ingest-traits.ts` using `logs/mint_to_image.csv` and `metadata/`.
 - Duplicate images are expected — the script assigns `image_url → [mints...]` in FIFO order so all 1,333 mints are inserted (uniqueness enforced on `token_mint_addr` and `token_num`, not `image_url`).
-- Trait grouping maintenance: `yarn tsx scripts/update-trait-types.ts` reads `logs/trait_groups.csv`.
+- Trait grouping maintenance: `yarn tsx scripts/traits/update-trait-types.ts` reads `logs/trait_groups.csv`.
 
 ## Tests
 

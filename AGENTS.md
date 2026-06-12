@@ -32,7 +32,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 
 - Frontend build is a static bundle served by Caddy from `releases/current`.
 - Heavy images are mounted under `/static/art/{2560,540h}/…`; the app requests `/static/art/...` paths.
-- Use the one‑shot `frontend-build` container via `./scripts/build-frontend-release.sh`; flip `releases/current` symlink and `caddy reload`. A `caddy-verify` profile exists for side‑by‑side checks on `:8080` without touching live traffic.
+- Use the one‑shot `frontend-build` container via `./scripts/release/build-frontend-release.sh`; flip `releases/current` symlink and `caddy reload`. A `caddy-verify` profile exists for side‑by‑side checks on `:8080` without touching live traffic.
 
 ## URL & Navigation
 
@@ -54,11 +54,12 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 
 ## Ingestion Notes
 
-- `scripts/ingest-traits.ts` consumes `logs/mint_to_image.csv` and `metadata/`.
+- `scripts/traits/ingest-traits.ts` consumes `logs/mint_to_image.csv` and `metadata/`.
 - Duplicate images are expected: the script maps `image_url → [mints...]` and assigns in FIFO order so all 1,333 mints are inserted (uniqueness enforced on mint/num, not image_url).
 
 ## Quick Commands
 
+- Full local stack: `yarn dev`
 - Worker loop: `yarn worker:run`
 - Backend: `yarn backend:run`
 - Frontend (dev): `yarn workspace @drifellascape/frontend dev`
