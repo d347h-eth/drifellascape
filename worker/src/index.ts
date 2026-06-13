@@ -2,10 +2,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fetchAllListings } from "./fetcher.js";
 import { syncMarketEvents } from "./market-events.js";
+import { syncOwnershipIfDue } from "./ownership.js";
 import { syncListings } from "./sync.js";
 
 const LOGS_DIR = path.resolve(process.cwd(), "logs");
 const WORKER_LOG = path.join(LOGS_DIR, "worker.log");
+let ownershipMissingKeyLogged = false;
 
 async function ensureLogsDir(): Promise<void> {
     await fs.mkdir(LOGS_DIR, { recursive: true });
@@ -53,6 +55,32 @@ async function runOnce(): Promise<void> {
         const c = sync.counts!;
         await logLine(
             `No change (ins=${c.inserted}, upd=${c.updated}, del=${c.deleted}, total=${c.total}); pages=${res.pages}, skipped=${res.skipped}`,
+        );
+    }
+    try {
+        const ownership = await syncOwnershipIfDue(res.listings);
+        if (ownership.skipped) {
+            if (
+                ownership.reason === "missing_key" &&
+                !ownershipMissingKeyLogged
+            ) {
+                ownershipMissingKeyLogged = true;
+                await logLine("Ownership sync skipped: missing Helius API key");
+            }
+        } else if (ownership.changed) {
+            const c = ownership.counts!;
+            await logLine(
+                `Ownership sync applied version ${ownership.versionId} (ins=${c.inserted}, upd=${c.updated}, del=${c.deleted}, total=${c.total}); pages=${ownership.pages}, fetched=${ownership.fetched}, skipped=${ownership.skippedRows}`,
+            );
+        } else {
+            const c = ownership.counts!;
+            await logLine(
+                `Ownership sync no change (ins=${c.inserted}, upd=${c.updated}, del=${c.deleted}, total=${c.total}); pages=${ownership.pages}, fetched=${ownership.fetched}, skipped=${ownership.skippedRows}`,
+            );
+        }
+    } catch (err) {
+        await logLine(
+            `Ownership sync failed: ${String((err as any)?.message || err)}`,
         );
     }
     try {

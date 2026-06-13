@@ -20,6 +20,30 @@ export type SyncResult = {
 
 export const PRICE_EPSILON = 10_000_000; // 0.01 SOL in raw units
 
+export type NormalizedOwnership = {
+    token_mint_addr: string;
+    owner: string;
+    onchain_owner: string;
+    listed_owner?: string;
+};
+
+export type OwnershipSyncResult = {
+    changed: boolean;
+    skipped?: boolean;
+    reason?: "missing_key" | "interval";
+    versionId?: number;
+    counts?: {
+        inserted: number;
+        updated: number;
+        deleted: number;
+        total: number;
+    };
+    fetched?: number;
+    pages?: number;
+    skippedRows?: number;
+    nextRunInMs?: number;
+};
+
 export type MarketEventType = "listing" | "sale";
 
 export type NormalizedMarketEvent = {
