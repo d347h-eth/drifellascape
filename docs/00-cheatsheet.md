@@ -127,3 +127,10 @@ Mobile specifics
   - `yarn tsx scripts/traits/ingest-traits.ts`
 - Update trait type grouping/class labels:
   - `yarn tsx scripts/traits/update-trait-types.ts`
+
+## Tests
+
+- Unit tests:
+  - `yarn vitest run`
+- Frontend e2e:
+  - `yarn workspace @drifellascape/frontend test:e2e`

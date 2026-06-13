@@ -129,6 +129,12 @@ Traits & ingestion
 yarn vitest run
 ```
 
+- Frontend e2e tests (Playwright):
+
+```bash
+yarn workspace @drifellascape/frontend test:e2e
+```
+
 ## Documentation
 
 - Product overview: `docs/01-product-overview.md`

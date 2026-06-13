@@ -107,7 +107,8 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Toggle: `Traits` in the status bar.
 - Desktop: fixed left side-panel, roughly one third of the viewport width, full height. It pushes the main viewport right; Grid uses two columns while open.
 - Mobile: full-screen overlay so users can focus on trait exploration.
-- Content: all trait buckets sorted alpha-numerically, with expandable bucket headers and nested values. Values show token count and rarity percentage from `GET /traits/catalog`.
+- Content: trait buckets sorted alpha-numerically and closed by default. Root search filters visible buckets/values from the third character. Expanded buckets include a value search that filters from the first character and overrides root search for that bucket.
+- Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
 - Click a value to add/remove it from the current value filter. Ctrl-click replaces the current filter set with only that value. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
 
 ## Gallery/Listings Rendering
@@ -193,6 +194,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 - Full local stack: `yarn dev`
 - Dev: `yarn workspace @drifellascape/frontend dev`
+- E2E: `yarn workspace @drifellascape/frontend test:e2e`
 - Configure API base when bypassing the dev proxy: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
 - Optional poll override: `VITE_POLL_MS=15000`
 

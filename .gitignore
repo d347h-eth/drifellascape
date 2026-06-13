@@ -25,6 +25,8 @@ dist/
 build/
 *.tsbuildinfo
 tmp/
+test-results/
+playwright-report/
 
 # Logs
 logs/
