@@ -737,6 +737,7 @@
     }
     // Gallery paging arming (separate from Grid)
     let galleryPagingArmed = false;
+    let galleryLandingActive = false;
     let _prevExploreIndex: number | null = exploreIndex;
     let _prevGalleryMode = !gridMode && exploreIndex === null;
     $: {
@@ -772,6 +773,7 @@
     }
     if (typeof window !== 'undefined') {
         const arm = () => {
+            if (galleryLandingActive) return;
             if (gridMode) pagingArmed = true;
             else if (!gridMode && exploreIndex === null) galleryPagingArmed = true;
         };
@@ -838,6 +840,7 @@
 
     // --- Gallery near-edge paging ---
     async function handleLoadMoreGallery() {
+        if (galleryLandingActive) return;
         if (gridMode || exploreIndex !== null) return;
         if (isLoadingMore) return;
         const mint = items[activeIndex]?.token_mint_addr;
@@ -859,6 +862,7 @@
     }
 
     async function handleLoadPrevGallery() {
+        if (galleryLandingActive) return;
         if (gridMode || exploreIndex !== null) return;
         if (isLoadingPrev) return;
         const newOffset = Math.max(0, baseOffset - 100);
@@ -881,6 +885,8 @@
         }
     }
     async function openGalleryByMint(mint: string) {
+        galleryLandingActive = false;
+        galleryPagingArmed = false;
         const idx = items.findIndex((r) => r.token_mint_addr === mint);
         const i = idx >= 0 ? idx : 0;
         gridMode = false;
@@ -904,6 +910,8 @@
     }
 
     async function openMarketEventInGallery(mint: string) {
+        galleryLandingActive = true;
+        galleryPagingArmed = false;
         marketPanelMode = null;
         dataSource = 'tokens';
         if (selectedValueIds.size > 0) selectedValueIds = new Set();
@@ -912,6 +920,7 @@
         pagingSession++;
         isLoadingMore = false;
         isLoadingPrev = false;
+        let landed = false;
         try {
             const resp = await postSearch('tokens', buildSearchBody({
                 source: 'tokens',
@@ -927,7 +936,12 @@
             versionId = resp.versionId ?? versionId;
             gridCurrentPage = computeGridPageBackward();
             const idx = items.findIndex((r) => r.token_mint_addr === mint);
-            const i = idx >= 0 ? idx : 0;
+            if (idx < 0) throw new Error(`Token ${mint} not found in anchored response`);
+            const i = idx;
+            activeIndex = i;
+            gridTargetMint = mint;
+            galleryPagingArmed = false;
+            scrollerRef?.cancel?.();
             gridMode = false;
             if (isMobile) showMainBar = false;
             try {
@@ -943,11 +957,16 @@
             await tick();
             await new Promise((r) => requestAnimationFrame(() => r(null)));
             scrollerRef?.scrollToIndexInstant?.(i);
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+            scrollerRef?.scrollToIndexInstant?.(i);
             activeIndex = i;
+            galleryLandingActive = false;
+            landed = true;
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
             loading = false;
+            if (!landed) galleryLandingActive = false;
         }
     }
 
@@ -1068,6 +1087,12 @@
     .main-viewport.traitsOpen.marketOpen {
         width: calc(100% - var(--traits-explorer-width) - var(--market-explorer-width));
     }
+    .container.galleryLanding .main-viewport {
+        transition: none;
+    }
+    .main-viewport.galleryLanding :global(.scroller) {
+        visibility: hidden;
+    }
     .status { opacity: 0.8; font-size: 14px; padding: 8px 0 16px; }
     .error { color: #ff6b6b; }
     /* Scroller styles moved into GalleryScroller.svelte */
@@ -1154,7 +1179,7 @@
     
 </style>
 
-<div class="container">
+<div class="container" class:galleryLanding={galleryLandingActive}>
     <TraitsExplorer
         visible={showTraitsExplorer}
         {isMobile}
@@ -1181,6 +1206,7 @@
         class="main-viewport"
         class:traitsOpen={showTraitsExplorer && !isMobile}
         class:marketOpen={marketPanelVisible && !isMobile}
+        class:galleryLanding={galleryLandingActive}
     >
         {#if !gridMode}
             <!-- Horizontal scroller -->
@@ -1196,7 +1222,7 @@
                 showMeta={false}
                 motionEnabled={motionEnabled}
                 autoSnapEnabled={autoSnapEnabled}
-                galleryPagingEnabled={!gridMode && exploreIndex === null && galleryPagingArmed}
+                galleryPagingEnabled={!galleryLandingActive && !gridMode && exploreIndex === null && galleryPagingArmed}
                 on:loadMore={() => handleLoadMoreGallery()}
                 on:loadPrev={() => handleLoadPrevGallery()}
                 on:enterExplore={(e) => openExploreByMint(e.detail)}

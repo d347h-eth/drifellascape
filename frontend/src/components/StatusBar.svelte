@@ -226,14 +226,14 @@
           on:click={() => dispatch('toggleMarketPanel', 'sale')}
           title="Sales feed"
         >
-          sales
+          Sales
         </button>
         <button
           class="btn {marketPanelMode === 'listing' ? 'active' : ''}"
           on:click={() => dispatch('toggleMarketPanel', 'listing')}
           title="Listings feed"
         >
-          listings
+          Listings
         </button>
       </div>
     {/if}

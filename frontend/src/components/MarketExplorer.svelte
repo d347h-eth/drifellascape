@@ -135,7 +135,7 @@
     aria-label={mode === 'sale' ? 'Sales feed' : 'Listings feed'}
   >
     <div class="panel-top">
-      <div class="panel-title">{mode === 'sale' ? 'sales' : 'listings'}</div>
+      <div class="panel-title">{mode === 'sale' ? 'Sales' : 'Listings'}</div>
       <button
         type="button"
         class="close"

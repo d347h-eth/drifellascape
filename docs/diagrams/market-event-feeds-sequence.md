@@ -57,8 +57,8 @@ sequenceDiagram
     end
 
     rect rgb(65, 49, 65)
-        Note over User,DB: Read path, triggered from Grid via sales/listings status-bar buttons
-        User->>FE: Click sales or listings
+        Note over User,DB: Read path, triggered from Grid via Sales/Listings status-bar buttons
+        User->>FE: Click Sales or Listings
         FE->>FE: open right side-panel<br/>mode=sale|listing
         FE->>API: fetchMarketEvents(type=sale|listing, offset=0, limit=50)
         API->>API: clamp type/offset/limit
@@ -80,7 +80,7 @@ sequenceDiagram
         end
 
         opt user switches feed mode
-            User->>FE: Click sales or listings
+            User->>FE: Click Sales or Listings
             FE->>FE: reset items and offset
             FE->>API: fetchMarketEvents(new_type, offset=0, limit=50)
             API->>Repo: loadMarketEvents(new_type, 0, 50)
@@ -93,6 +93,7 @@ sequenceDiagram
         opt user opens token from event
             User->>FE: Click preview or #token
             FE->>FE: close market panel
+            FE->>FE: suppress Gallery paging and width transition
             FE->>FE: navigate to Gallery centered on token mint
         end
     end
