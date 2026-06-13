@@ -342,7 +342,7 @@ test("bucket search overrides root search and bucket sort toggles value ordering
     }
 });
 
-test("selected filters render as removable side-panel pills", async ({
+test("trait value clicks replace by default and ctrl-click adds side-panel pills", async ({
     page,
 }, testInfo) => {
     const diagnostics = capturePageDiagnostics(page);
@@ -353,12 +353,23 @@ test("selected filters render as removable side-panel pills", async ({
         await page.getByTestId("traits-bucket-header-1").click();
         await page.getByTestId("traits-value-101").click();
 
-        const pill = page.getByTestId("traits-filter-pill-101");
-        await expect(pill).toBeVisible();
-        await expect(pill).toContainText("Background: Blue");
+        const bluePill = page.getByTestId("traits-filter-pill-101");
+        await expect(bluePill).toBeVisible();
+        await expect(bluePill).toContainText("Background: Blue");
 
-        await pill.click();
+        await page.getByTestId("traits-value-103").click();
         await expect(page.getByTestId("traits-filter-pill-101")).toHaveCount(0);
+        await expect(page.getByTestId("traits-filter-pill-103")).toBeVisible();
+
+        await page
+            .getByTestId("traits-value-102")
+            .click({ modifiers: ["Control"] });
+        await expect(page.getByTestId("traits-filter-pill-103")).toBeVisible();
+        await expect(page.getByTestId("traits-filter-pill-102")).toBeVisible();
+
+        await page.getByTestId("traits-filter-pill-103").click();
+        await expect(page.getByTestId("traits-filter-pill-103")).toHaveCount(0);
+        await expect(page.getByTestId("traits-filter-pill-102")).toBeVisible();
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;

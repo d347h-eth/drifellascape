@@ -11,6 +11,7 @@
   export let selectedValueMeta: Record<number, string> = {};
 
   type SortMode = 'rarity' | 'alpha';
+  type ValueClickMode = 'replace' | 'add' | 'remove';
   type BucketView = TraitCatalogBucket & {
     label: string;
     visibleValues: TraitCatalogValue[];
@@ -22,9 +23,10 @@
   };
 
   const ROOT_SEARCH_MIN_LENGTH = 2;
+  const BUCKET_SEARCH_MIN_LENGTH = 1;
   const dispatch = createEventDispatcher<{
     close: void;
-    valueClick: { valueId: number; replace: boolean };
+    valueClick: { valueId: number; mode: ValueClickMode };
   }>();
 
   const collator = new Intl.Collator(undefined, {
@@ -102,7 +104,7 @@
   ): boolean {
     return (
       rootSearchValue.length >= ROOT_SEARCH_MIN_LENGTH ||
-      normalizeQuery(queries[typeId] ?? '').length > 0
+      normalizeQuery(queries[typeId] ?? '').length >= BUCKET_SEARCH_MIN_LENGTH
     );
   }
 
@@ -130,7 +132,7 @@
     const label = bucketLabel(bucket);
     const bucketQuery = queries[bucket.type_id] ?? '';
     const normalizedBucketQuery = normalizeQuery(bucketQuery);
-    const hasBucketQuery = normalizedBucketQuery.length > 0;
+    const hasBucketQuery = normalizedBucketQuery.length >= BUCKET_SEARCH_MIN_LENGTH;
     const rootSearchActive = rootSearchValue.length >= ROOT_SEARCH_MIN_LENGTH;
     const sortMode = sortModes[bucket.type_id] ?? 'rarity';
     const bucketMatchesRoot = rootSearchActive && matchesQuery(label, rootSearchValue);
@@ -231,7 +233,7 @@
   function handleBucketInput(event: Event, typeId: number) {
     const value = (event.currentTarget as HTMLInputElement).value;
     bucketQueries = { ...bucketQueries, [typeId]: value };
-    if (value.length > 0) {
+    if (normalizeQuery(value).length >= BUCKET_SEARCH_MIN_LENGTH) {
       const next = new Set(searchCollapsedTypeIds);
       next.delete(typeId);
       searchCollapsedTypeIds = next;
@@ -270,11 +272,11 @@
   }
 
   function handleValueClick(event: MouseEvent, valueId: number) {
-    dispatch('valueClick', { valueId, replace: event.ctrlKey });
+    dispatch('valueClick', { valueId, mode: event.ctrlKey ? 'add' : 'replace' });
   }
 
   function handleFilterPillClick(valueId: number) {
-    dispatch('valueClick', { valueId, replace: false });
+    dispatch('valueClick', { valueId, mode: 'remove' });
   }
 </script>
 
@@ -408,7 +410,7 @@
                       type="button"
                       class="value-row"
                       class:selected={selectedValueIds.has(value.value_id)}
-                      title="Ctrl-click to replace active filters with this value"
+                      title="Click to replace active filters; Ctrl-click to add this value"
                       data-testid={`traits-value-${value.value_id}`}
                       on:click={(event) => handleValueClick(event, value.value_id)}
                     >

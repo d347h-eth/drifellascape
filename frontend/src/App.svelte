@@ -638,11 +638,16 @@
         }
     }
     // Handlers for bottom filter panel component events (avoid TS in template expressions)
-    function applyValueSelection(valueId: number, replace = false) {
+    type ValueSelectionMode = 'toggle' | 'replace' | 'add' | 'remove';
+    function applyValueSelection(valueId: number, mode: ValueSelectionMode = 'toggle') {
         const next = new Set<number>(selectedValueIds);
-        if (replace) {
+        if (mode === 'replace') {
             next.clear();
             next.add(valueId);
+        } else if (mode === 'add') {
+            next.add(valueId);
+        } else if (mode === 'remove') {
+            next.delete(valueId);
         } else if (next.has(valueId)) {
             next.delete(valueId);
         } else {
@@ -654,8 +659,8 @@
     function handleToggleValue(e: CustomEvent<number>) {
         applyValueSelection(e.detail);
     }
-    function handleTraitsExplorerValueClick(e: CustomEvent<{ valueId: number; replace: boolean }>) {
-        applyValueSelection(e.detail.valueId, e.detail.replace);
+    function handleTraitsExplorerValueClick(e: CustomEvent<{ valueId: number; mode: ValueSelectionMode }>) {
+        applyValueSelection(e.detail.valueId, e.detail.mode);
     }
     function handlePurposeChange(e: CustomEvent<string>) {
         selectedPurpose = (e.detail as any as Purpose);

@@ -114,7 +114,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - The sticky top section displays selected filter pills under the root search. Pills use the same labels and remove-on-click behavior as the bottom Filter panel and wrap onto new rows inside the side panel.
 - Outside root-search mode, expanded buckets include a value search that filters from the first character.
 - Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
-- Click a value to add/remove it from the current value filter. Ctrl-click replaces the current filter set with only that value. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
+- Click a value to replace the current value filter with only that value. Ctrl-click adds that value to the current filter set. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
 
 ## Gallery/Listings Rendering
 
