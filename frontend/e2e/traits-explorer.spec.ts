@@ -1,6 +1,22 @@
 import { expect, test, type Page } from "playwright/test";
 import { attachDiagnostics, capturePageDiagnostics } from "./app";
 
+const fillerBuckets = Array.from({ length: 28 }, (_, index) => ({
+    type_id: 400 + index,
+    type_name: `Node ${String(index).padStart(2, "0")}`,
+    spatial_group: "zzfill",
+    purpose_class: "decor",
+    tokens_with_type: 10,
+    values: [
+        {
+            value_id: 500 + index,
+            value: `Stone ${String(index).padStart(2, "0")}`,
+            tokens_with_type_value: 1,
+            rarity_pct: 10,
+        },
+    ],
+}));
+
 const catalog = {
     total_tokens: 10,
     buckets: [
@@ -73,6 +89,28 @@ const catalog = {
                 },
             ],
         },
+        ...fillerBuckets,
+        {
+            type_id: 99,
+            type_name: "Tail",
+            spatial_group: "za",
+            purpose_class: "items",
+            tokens_with_type: 10,
+            values: [
+                {
+                    value_id: 901,
+                    value: "Tail Glow",
+                    tokens_with_type_value: 1,
+                    rarity_pct: 10,
+                },
+                {
+                    value_id: 902,
+                    value: "Tail Green",
+                    tokens_with_type_value: 2,
+                    rarity_pct: 20,
+                },
+            ],
+        },
     ],
 };
 
@@ -118,7 +156,7 @@ async function mockApi(page: Page): Promise<void> {
     });
 }
 
-async function openTraitsExplorer(page: Page): Promise<void> {
+async function gotoApp(page: Page): Promise<void> {
     await mockApi(page);
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
@@ -127,14 +165,21 @@ async function openTraitsExplorer(page: Page): Promise<void> {
         await page.mouse.click(8, 8);
         await expect(landscapeDismiss).toHaveCount(0);
     }
+}
 
+async function openMainBarIfCollapsed(page: Page): Promise<void> {
     const traitsButton = page.getByRole("button", { name: "Traits" });
-    if (!(await traitsButton.isVisible().catch(() => false))) {
-        const openButton = page.getByTitle("Open");
-        if (await openButton.isVisible().catch(() => false)) {
-            await openButton.click();
-        }
+    if (await traitsButton.isVisible().catch(() => false)) return;
+
+    const openButton = page.getByTitle("Open");
+    if (await openButton.isVisible().catch(() => false)) {
+        await openButton.click();
     }
+}
+
+async function openTraitsExplorer(page: Page): Promise<void> {
+    await gotoApp(page);
+    await openMainBarIfCollapsed(page);
 
     await page.getByRole("button", { name: "Traits" }).click();
     await expect(page.getByTestId("traits-root-search")).toBeVisible();
@@ -172,7 +217,7 @@ test("opens with buckets closed and toggles bucket content from the header", asy
     }
 });
 
-test("root search filters from the third character and reset restores closed buckets", async ({
+test("root search filters from the first character and reset restores closed buckets", async ({
     page,
 }, testInfo) => {
     const diagnostics = capturePageDiagnostics(page);
@@ -181,16 +226,19 @@ test("root search filters from the third character and reset restores closed buc
         await openTraitsExplorer(page);
 
         const rootSearch = page.getByTestId("traits-root-search");
-        await rootSearch.fill("la");
-        await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
-        await expect(page.getByTestId("traits-bucket-2")).toBeVisible();
-        await expect(page.getByTestId("traits-value-201")).toHaveCount(0);
+        await expect(rootSearch).toHaveAttribute("type", "text");
 
-        await rootSearch.fill("las");
-        await expect(page.getByTestId("traits-bucket-1")).toHaveCount(0);
-        await expect(page.getByTestId("traits-bucket-2")).toBeVisible();
-        await expect(page.getByTestId("traits-value-201")).toBeVisible();
-        await expect(page.getByTestId("traits-value-202")).toHaveCount(0);
+        await rootSearch.fill("z");
+        await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
+        await expect(page.getByTestId("traits-value-103")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-2")).toHaveCount(0);
+
+        await rootSearch.fill("back");
+        await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-jump-1")).toBeVisible();
+        await expect(page.getByTestId("traits-value-101")).toHaveCount(0);
+        await expect(page.getByTestId("traits-value-102")).toHaveCount(0);
+        await expect(page.getByTestId("traits-value-103")).toHaveCount(0);
 
         await page.getByTestId("traits-root-reset").click();
         await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
@@ -198,6 +246,46 @@ test("root search filters from the third character and reset restores closed buc
             page.getByTestId("traits-bucket-header-1"),
         ).toHaveAttribute("aria-expanded", "false");
         await expect(page.getByTestId("traits-value-201")).toHaveCount(0);
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("root search jump transfers input into one bucket and scrolls to its header", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await openTraitsExplorer(page);
+
+        const rootSearch = page.getByTestId("traits-root-search");
+        await rootSearch.fill("tail");
+        await expect(page.getByTestId("traits-bucket-99")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-jump-99")).toBeVisible();
+
+        await page.getByTestId("traits-bucket-jump-99").click();
+        await expect(rootSearch).toHaveValue("");
+        await expect(page.getByTestId("traits-bucket-search-99")).toHaveValue(
+            "tail",
+        );
+        await expect(
+            page.getByTestId("traits-bucket-header-99"),
+        ).toHaveAttribute("aria-expanded", "true");
+        await expect(
+            page.getByTestId("traits-bucket-header-1"),
+        ).toHaveAttribute("aria-expanded", "false");
+        await expect(page.getByTestId("traits-value-901")).toBeVisible();
+        await expect(page.getByTestId("traits-value-902")).toBeVisible();
+
+        const headerTop = await page
+            .getByTestId("traits-bucket-header-99")
+            .evaluate((element) => element.getBoundingClientRect().top);
+        const bodyTop = await page
+            .locator(".panel-body")
+            .evaluate((element) => element.getBoundingClientRect().top);
+        expect(Math.abs(headerTop - bodyTop)).toBeLessThanOrEqual(1);
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;
@@ -233,6 +321,65 @@ test("bucket search overrides root search and bucket sort toggles value ordering
         await background.getByTestId("traits-bucket-search-1").fill("z");
         await expect(background.locator(".value-name")).toHaveText(["Zebra"]);
         await expect(page.getByTestId("traits-value-101")).toHaveCount(0);
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("F toggles traits explorer and clicked explorer buttons do not paint focus rings", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await gotoApp(page);
+
+        await page.keyboard.press("F");
+        await expect(page.getByTestId("traits-root-search")).toBeVisible();
+
+        const backgroundHeader = page.getByTestId("traits-bucket-header-1");
+        await backgroundHeader.click();
+        await expect(backgroundHeader).toHaveAttribute("aria-expanded", "true");
+        await expect(backgroundHeader).toHaveCSS("box-shadow", "none");
+
+        await page.keyboard.press("F");
+        await expect(page.getByTestId("traits-root-search")).toHaveCount(0);
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("desktop main bar labels show the current state", async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== "desktop",
+        "desktop status labels only",
+    );
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await gotoApp(page);
+
+        await expect(page.getByRole("button", { name: "Grid" })).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Listings" }),
+        ).toBeVisible();
+
+        await page.getByRole("button", { name: "Listings" }).click();
+        await expect(
+            page.getByRole("button", { name: "Tokens" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Sort #↑" }),
+        ).toBeVisible();
+
+        await page.getByRole("button", { name: "Grid" }).click();
+        await expect(
+            page.getByRole("button", { name: "Gallery" }),
+        ).toBeVisible();
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;
