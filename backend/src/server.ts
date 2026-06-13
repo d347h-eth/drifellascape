@@ -14,7 +14,9 @@ import {
     searchTokensByValues,
     attachTraitsGeneric,
     loadTraitCatalog,
+    loadMarketEvents,
 } from "./repo.js";
+import type { MarketEventFilter } from "./types.js";
 
 function getEnvPort(): number {
     const raw = process.env.DRIFELLASCAPE_PORT;
@@ -300,11 +302,34 @@ async function handleTraitsCatalog(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
+function normalizeMarketEventFilter(raw: string | null): MarketEventFilter {
+    const type = (raw || "all").toLowerCase();
+    if (type === "listing" || type === "sale") return type;
+    return "all";
+}
+
+async function handleMarketEvents(req: IncomingMessage, res: ServerResponse) {
+    try {
+        const params = parseQuery(req.url || "/market/events");
+        const type = normalizeMarketEventFilter(params.get("type"));
+        const offset = clamp(Number(params.get("offset")) || 0, 0, 1_000_000);
+        const limit = clamp(Number(params.get("limit")) || 50, 1, 100);
+        return sendJson(res, 200, {
+            type,
+            ...loadMarketEvents(type, offset, limit),
+        });
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
 function route(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
     if (req.method === "GET" && url.startsWith("/traits/catalog"))
         return void handleTraitsCatalog(req, res);
+    if (req.method === "GET" && url.startsWith("/market/events"))
+        return void handleMarketEvents(req, res);
     if (req.method === "GET" && url.startsWith("/listings"))
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))

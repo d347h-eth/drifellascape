@@ -1,13 +1,20 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { NormalizedListing } from "./types.js";
+import type {
+    MarketEventType,
+    NormalizedListing,
+    NormalizedMarketEvent,
+} from "./types.js";
 
 const LOGS_DIR = path.resolve(process.cwd(), "logs");
 const WORKER_LOG = path.join(LOGS_DIR, "worker.log");
 
 const COLLECTION = "drifella_iii";
-const BASE_URL = `https://api-mainnet.magiceden.dev/v2/collections/${COLLECTION}/listings`;
-const PAGE_LIMIT = 100; // per API contract
+const COLLECTION_BASE_URL = `https://api-mainnet.magiceden.dev/v2/collections/${COLLECTION}`;
+const LISTINGS_URL = `${COLLECTION_BASE_URL}/listings`;
+const ACTIVITIES_URL = `${COLLECTION_BASE_URL}/activities`;
+export const PAGE_LIMIT = 100; // per API contract
+const SOL_LAMPORTS = 1_000_000_000;
 
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 2000; // 2s
@@ -114,13 +121,29 @@ async function fetchWithRetry(url: URL): Promise<any[]> {
     throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-function buildUrl(offset: number, limit = PAGE_LIMIT): URL {
-    const url = new URL(BASE_URL);
+function buildListingsUrl(offset: number, limit = PAGE_LIMIT): URL {
+    const url = new URL(LISTINGS_URL);
     url.searchParams.set("offset", String(offset));
     url.searchParams.set("limit", String(limit));
     url.searchParams.set("sort", "listPrice");
     url.searchParams.set("listingAggMode", "true");
     url.searchParams.set("sort_direction", "asc");
+    return url;
+}
+
+function remoteActivityType(eventType: MarketEventType): "list" | "buyNow" {
+    return eventType === "sale" ? "buyNow" : "list";
+}
+
+function buildActivitiesUrl(
+    eventType: MarketEventType,
+    offset: number,
+    limit = PAGE_LIMIT,
+): URL {
+    const url = new URL(ACTIVITIES_URL);
+    url.searchParams.set("offset", String(offset));
+    url.searchParams.set("limit", String(limit));
+    url.searchParams.set("type", remoteActivityType(eventType));
     return url;
 }
 
@@ -161,6 +184,69 @@ export function normalizeItem(item: any): NormalizedListing | null {
     };
 }
 
+function normalizeActivityPrice(item: any): number | null {
+    const price = item?.price;
+    if (typeof price === "number" && Number.isFinite(price) && price >= 0) {
+        return Math.round(price * SOL_LAMPORTS);
+    }
+
+    const raw = item?.priceInfo?.solPrice?.rawAmount;
+    if (typeof raw !== "string" || !/^\d+$/.test(raw)) return null;
+    try {
+        let amount = BigInt(raw);
+        // Magic Eden activities currently return rawAmount at 1e18 scale while
+        // listings return lamports. Store all prices as 1e9 SOL base units.
+        if (amount > 1_000_000_000_000_000n) {
+            amount = (amount + 500_000_000n) / 1_000_000_000n;
+        }
+        if (amount > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+        return Number(amount);
+    } catch {
+        return null;
+    }
+}
+
+export function normalizeMarketEvent(
+    item: any,
+    eventType: MarketEventType,
+): NormalizedMarketEvent | null {
+    if (item?.type !== remoteActivityType(eventType)) return null;
+
+    const signature = item?.signature;
+    const source = item?.source;
+    const tokenMint = item?.tokenMint;
+    const slot = item?.slot;
+    const blockTime = item?.blockTime;
+    const seller = item?.seller;
+    const buyer = item?.buyer;
+    const image = item?.image;
+    const price = normalizeActivityPrice(item);
+
+    if (!signature || typeof signature !== "string") return null;
+    if (!source || typeof source !== "string") return null;
+    if (!tokenMint || typeof tokenMint !== "string") return null;
+    if (!Number.isInteger(slot) || slot < 0) return null;
+    if (!Number.isInteger(blockTime) || blockTime < 0) return null;
+    if (price === null) return null;
+    if (!seller || typeof seller !== "string") return null;
+    if (eventType === "sale" && (!buyer || typeof buyer !== "string")) {
+        return null;
+    }
+
+    return {
+        event_type: eventType,
+        signature,
+        source,
+        slot,
+        block_time: blockTime,
+        token_mint_addr: tokenMint,
+        price,
+        seller,
+        buyer: typeof buyer === "string" ? buyer : undefined,
+        image_url: typeof image === "string" ? image : undefined,
+    };
+}
+
 export type FetchListingsResult =
     | {
           ok: true;
@@ -177,7 +263,7 @@ export async function fetchAllListings(): Promise<FetchListingsResult> {
     let page = 0;
     try {
         for (;;) {
-            const url = buildUrl(offset, PAGE_LIMIT);
+            const url = buildListingsUrl(offset, PAGE_LIMIT);
             const arr = await fetchWithRetry(url);
             page += 1;
             for (const item of arr) {
@@ -199,5 +285,47 @@ export async function fetchAllListings(): Promise<FetchListingsResult> {
         const msg = `Fetch listings failed after page=${page}, offset=${offset}: ${String((err as any)?.message || err)}`;
         await logLine(msg);
         return { ok: false, error: msg };
+    }
+}
+
+export type FetchMarketEventsPageResult =
+    | {
+          ok: true;
+          eventType: MarketEventType;
+          events: NormalizedMarketEvent[];
+          rawCount: number;
+          skipped: number;
+      }
+    | { ok: false; eventType: MarketEventType; error: string };
+
+export async function fetchMarketEventsPage(
+    eventType: MarketEventType,
+    offset: number,
+    limit = PAGE_LIMIT,
+): Promise<FetchMarketEventsPageResult> {
+    try {
+        const url = buildActivitiesUrl(eventType, offset, limit);
+        const arr = await fetchWithRetry(url);
+        const events: NormalizedMarketEvent[] = [];
+        let skipped = 0;
+        for (const item of arr) {
+            const norm = normalizeMarketEvent(item, eventType);
+            if (!norm) {
+                skipped += 1;
+                continue;
+            }
+            events.push(norm);
+        }
+        return {
+            ok: true,
+            eventType,
+            events,
+            rawCount: arr.length,
+            skipped,
+        };
+    } catch (err) {
+        const msg = `Fetch ${eventType} events failed at offset=${offset}: ${String((err as any)?.message || err)}`;
+        await logLine(msg);
+        return { ok: false, eventType, error: msg };
     }
 }

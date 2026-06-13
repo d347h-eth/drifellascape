@@ -8,6 +8,8 @@ import type {
     TokenRow,
     EnrichedTokenRow,
     TraitCatalog,
+    MarketEventFilter,
+    MarketEventRow,
 } from "./types.js";
 
 export function getActiveVersionId(): number | null {
@@ -757,6 +759,45 @@ export function searchTokensByTraits(
             token_name: string | null;
         })[];
         return { total: countRow.c, usedOffset: pageOffset, items };
+    });
+    return tx();
+}
+
+export function loadMarketEvents(
+    eventType: MarketEventFilter,
+    offset: number,
+    limit: number,
+): { total: number; offset: number; limit: number; items: MarketEventRow[] } {
+    const typeFilter = eventType === "listing" || eventType === "sale";
+    const where = typeFilter ? "WHERE me.event_type = ?" : "";
+    const params = typeFilter ? [eventType] : [];
+    const tx = db.raw.transaction(() => {
+        const countRow = db.raw
+            .prepare(`SELECT COUNT(*) AS c FROM market_events me ${where}`)
+            .get(...params) as { c: number };
+        const items = db.raw
+            .prepare(
+                `SELECT me.id,
+                        me.event_type,
+                        me.signature,
+                        me.source,
+                        me.slot,
+                        me.block_time,
+                        me.token_mint_addr,
+                        t.token_num,
+                        t.name AS token_name,
+                        me.price,
+                        me.seller,
+                        me.buyer,
+                        COALESCE(me.image_url, t.image_url) AS image_url
+                 FROM market_events me
+                 LEFT JOIN tokens t ON t.token_mint_addr = me.token_mint_addr
+                 ${where}
+                 ORDER BY me.block_time DESC, me.slot DESC, me.id DESC
+                 LIMIT ? OFFSET ?`,
+            )
+            .all(...params, limit, offset) as MarketEventRow[];
+        return { total: countRow.c, offset, limit, items };
     });
     return tx();
 }
