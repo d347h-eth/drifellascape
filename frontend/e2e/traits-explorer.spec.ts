@@ -230,6 +230,7 @@ test("root search filters from the first character and reset restores closed buc
 
         await rootSearch.fill("z");
         await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-jump-1")).toBeVisible();
         await expect(page.getByTestId("traits-value-103")).toBeVisible();
         await expect(page.getByTestId("traits-bucket-2")).toHaveCount(0);
 
@@ -242,6 +243,7 @@ test("root search filters from the first character and reset restores closed buc
 
         await page.getByTestId("traits-root-reset").click();
         await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-jump-1")).toHaveCount(0);
         await expect(
             page.getByTestId("traits-bucket-header-1"),
         ).toHaveAttribute("aria-expanded", "false");

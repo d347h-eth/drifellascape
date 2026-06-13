@@ -109,7 +109,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Desktop: fixed left side-panel, roughly one third of the viewport width, full height. It pushes the main viewport right; Grid uses two columns while open.
 - Mobile: full-screen overlay so users can focus on trait exploration.
 - Content: trait buckets sorted alpha-numerically and closed by default. Root search filters visible buckets/values from the first character. Bucket-name root matches show only values that also match the root query.
-- When root search matches a bucket name, the bucket header shows an inline `jump` button. Clicking it copies the root query into that bucket search, clears root search, collapses every other bucket, and scrolls to that bucket header.
+- While root search is active, every visible bucket header shows an inline `jump` button regardless of whether the match came from the bucket name or a value. The button is a navigation handoff: it copies the root query into that bucket search, clears root search, collapses every other bucket, and scrolls to that bucket header so the user can inspect the bucket-specific matches or clear the bucket search to explore all values in that bucket.
 - Expanded buckets include a value search that filters from the first character and overrides root search for that bucket.
 - Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
 - Click a value to add/remove it from the current value filter. Ctrl-click replaces the current filter set with only that value. Both paths reuse the same selected-value filtering flow as the bottom filter panel.

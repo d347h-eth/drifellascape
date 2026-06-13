@@ -17,7 +17,7 @@
     bucketQuery: string;
     sortMode: SortMode;
     expanded: boolean;
-    rootBucketMatch: boolean;
+    showJump: boolean;
   };
 
   const ROOT_SEARCH_MIN_LENGTH = 1;
@@ -169,7 +169,7 @@
         expandedIds,
         searchCollapsedIds,
       ),
-      rootBucketMatch: bucketMatchesRoot,
+      showJump: rootSearchActive,
     };
   }
 
@@ -339,7 +339,7 @@
                 <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
                 <span class="bucket-name">{bucket.label}</span>
               </button>
-              {#if bucket.rootBucketMatch}
+              {#if bucket.showJump}
                 <button
                   type="button"
                   class="jump-button"
