@@ -3,6 +3,8 @@ import type {
     ApiResponse,
     DataSource,
     ListingsSearchBody,
+    MarketEventFilter,
+    MarketEventsResponse,
     Row,
     TraitsCatalog,
 } from "./types";
@@ -30,6 +32,7 @@ export function defaultSortForSource(source: DataSource): string {
 
 // Single source of truth for default page size in search requests
 export const DEFAULT_SEARCH_LIMIT = 50;
+export const DEFAULT_MARKET_EVENTS_LIMIT = 50;
 
 export type BuildParams = {
     source: DataSource;
@@ -82,6 +85,26 @@ export async function fetchTraitsCatalog(): Promise<TraitsCatalog> {
         const res = await fetch(`${API_BASE}/traits/catalog`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as TraitsCatalog;
+    } finally {
+        decrementPending();
+    }
+}
+
+export async function fetchMarketEvents(
+    type: MarketEventFilter,
+    offset = 0,
+    limit = DEFAULT_MARKET_EVENTS_LIMIT,
+): Promise<MarketEventsResponse> {
+    const params = new URLSearchParams({
+        type,
+        offset: String(offset),
+        limit: String(limit),
+    });
+    incrementPending();
+    try {
+        const res = await fetch(`${API_BASE}/market/events?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as MarketEventsResponse;
     } finally {
         decrementPending();
     }

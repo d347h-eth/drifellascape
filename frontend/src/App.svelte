@@ -6,6 +6,7 @@
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import AboutOverlay from "./components/AboutOverlay.svelte";
     import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
+    import MarketFeed from "./components/MarketFeed.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import TraitsExplorer from "./components/TraitsExplorer.svelte";
@@ -34,6 +35,7 @@
     let exploreItems: Row[] | null = null;
     let showHelp = false;
     let showAbout = false;
+    let showMarketFeed = false;
     let showTraitBar = false;
     let showTraitsExplorer = false;
     let traitsCatalog: TraitsCatalog | null = null;
@@ -1153,6 +1155,10 @@
     <!-- Bottom stack: fixed container that stacks the filter panel (if visible) above StatusBar, with proper bottom offset -->
     {#if !(isMobile && showGalleryEntryOverlay)}
       <div class="bottom-stack" class:traitsOpen={showTraitsExplorer && !isMobile} style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
+          <MarketFeed
+              visible={showMarketFeed}
+              on:close={() => (showMarketFeed = false)}
+          />
           {#if showTraitBar}
               <TraitBar
                   traits={traitsForCurrent}
@@ -1171,6 +1177,7 @@
               {autoSnapEnabled}
               {showTraitBar}
               {showTraitsExplorer}
+              {showMarketFeed}
               gridMode={gridMode}
               inExplore={exploreIndex !== null}
               {activeIndex}
@@ -1206,6 +1213,7 @@
               }}
               on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
               on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
+              on:toggleMarketFeed={() => { showMarketFeed = !showMarketFeed; }}
               on:toggleTraitsExplorer={toggleTraitsExplorer}
               on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
               on:toggleHelp={() => { showHelp = !showHelp; }}

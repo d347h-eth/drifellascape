@@ -12,6 +12,7 @@
   export let collapsed: boolean = false;
   export let showTraitBar: boolean = false;
   export let showTraitsExplorer: boolean = false;
+  export let showMarketFeed: boolean = false;
   export let activeIndex: number = 0; // gallery
   export let baseOffset: number = 0;   // gallery/grid
   export let itemsLength: number = 0;  // gallery/grid
@@ -134,6 +135,9 @@
           </button>
           <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
             Filter
+          </button>
+          <button class="btn {showMarketFeed ? 'active' : ''}" on:click={() => dispatch('toggleMarketFeed')} title="Show/Hide market feed">
+            Market
           </button>
           <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
             {#if gridMode}

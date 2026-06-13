@@ -70,3 +70,30 @@ export type TraitsCatalog = {
     total_tokens: number;
     buckets: TraitCatalogBucket[];
 };
+
+export type MarketEventType = "listing" | "sale";
+export type MarketEventFilter = MarketEventType | "all";
+
+export type MarketEventRow = {
+    id: number;
+    event_type: MarketEventType;
+    signature: string;
+    source: string;
+    slot: number;
+    block_time: number;
+    token_mint_addr: string;
+    token_num: number | null;
+    token_name: string | null;
+    price: number;
+    seller: string | null;
+    buyer: string | null;
+    image_url: string | null;
+};
+
+export type MarketEventsResponse = {
+    type: MarketEventFilter;
+    total: number;
+    offset: number;
+    limit: number;
+    items: MarketEventRow[];
+};
