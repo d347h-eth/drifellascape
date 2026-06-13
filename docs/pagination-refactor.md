@@ -12,14 +12,14 @@ Goal: make pagination, anchoring, and grid/gallery interactions deterministic, D
 
 ## Plan (Phased)
 
-Status note: the runtime contract is implemented today (exclusive `anchorMint`/`offset`, effective `offset` responses, Listings/Tokens symmetry, debug gated by `DRIFELLASCAPE_DEBUG`). The server rank/offset SQL is still duplicated across repo functions rather than extracted into a shared `computePageOffset` helper.
+Status note: the runtime contract is implemented today (exclusive `anchorMint`/`offset`, effective `offset` responses, Listings/Tokens symmetry, debug gated by `BACKEND_DEBUG`). The server rank/offset SQL is still duplicated across repo functions rather than extracted into a shared `computePageOffset` helper.
 
 1. Server: shared offset helper + exclusive params (Phase 1)
 
    - Extract `computePageOffset` helper used by all repo functions (listings/tokens; value/trait).
    - Implement rank calculation with identical WHERE/JOIN shape as the items query and deterministic tie‑breaker (mint) for ties.
    - Exclusive params: when `anchorMint` present, ignore `offset` and use anchor; otherwise use `offset`.
-   - Response: always return effective `offset` used; add optional debug `{ anchorMint, effectiveOffset, pageContainsAnchor }` behind `DRIFELLASCAPE_DEBUG=1`.
+   - Response: always return effective `offset` used; add optional debug `{ anchorMint, effectiveOffset, pageContainsAnchor }` behind `BACKEND_DEBUG=1`.
 
 2. FE API: single request builder (Phase 2)
 
@@ -46,7 +46,7 @@ Status note: the runtime contract is implemented today (exclusive `anchorMint`/`
    - Consolidate Grid/Gallery toggle into one function (keeps last focused mint).
 
 6. Cleanup & Docs (Phase 6)
-   - Remove debug from server responses unless `DRIFELLASCAPE_DEBUG=1`.
+   - Remove debug from server responses unless `BACKEND_DEBUG=1`.
    - Update API comments (“either `anchorMint` or `offset`; response returns effective `offset`”).
    - Short client README on Pager + SearchBody builder + Anchor store.
 
@@ -85,7 +85,7 @@ Status note: the runtime contract is implemented today (exclusive `anchorMint`/`
 - [x] Tokens‑only quick jump — search input and `?token=NUM` always anchor via Tokens; Gallery URL param updates during navigation and is removed when entering Grid
 - [x] Phase 5 behavior — interaction-gated Grid/Gallery paging and mode toggles
 - [ ] Phase 5 cleanup — further simplify toggle/paging branches in `App.svelte`
-- [x] Phase 6 — Debug response fields gated behind `DRIFELLASCAPE_DEBUG`; docs updated
+- [x] Phase 6 — Debug response fields gated behind `BACKEND_DEBUG`; docs updated
 
 Notes:
 

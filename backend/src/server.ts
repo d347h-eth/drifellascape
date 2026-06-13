@@ -19,7 +19,7 @@ import {
 import type { MarketEventFilter } from "./types.js";
 
 function getEnvPort(): number {
-    const raw = process.env.DRIFELLASCAPE_PORT;
+    const raw = process.env.BACKEND_PORT;
     const n = raw ? Number(raw) : NaN;
     return Number.isFinite(n) ? n : 3000;
 }
@@ -158,7 +158,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -192,7 +192,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -261,7 +261,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -294,7 +294,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -361,7 +361,7 @@ function route(req: IncomingMessage, res: ServerResponse) {
 
 async function startRefreshLoop() {
     const interval = Number(
-        process.env.DRIFELLASCAPE_BACKEND_REFRESH_MS || 30000,
+        process.env.BACKEND_REFRESH_MS || 30000,
     );
     // Priming load
     await cache.ensureLoaded().catch(() => {});

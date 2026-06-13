@@ -159,15 +159,15 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 Start from root `.env.example`; copy it to `.env` for local dev and Docker Compose.
 
 - Worker
-  - `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default: 30000)
-  - `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default: 2)
-  - `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default: 5)
-  - `HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY` for optional ownership sync
-  - `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS` (default: 600000)
+  - `WORKER_SYNC_INTERVAL_MS` (default: 30000)
+  - `MARKET_EVENT_RECENT_PAGES` (default: 2)
+  - `MARKET_EVENT_BACKFILL_PAGES` (default: 5)
+  - `HELIUS_KEY` for optional ownership sync
+  - `OWNERSHIP_SYNC_INTERVAL_MS` (default: 600000)
 - Backend
-  - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
-  - `DRIFELLASCAPE_PORT` (default: 3000)
-  - `DRIFELLASCAPE_DEBUG` for optional search response debug fields
+  - `BACKEND_REFRESH_MS` (default: 30000)
+  - `BACKEND_PORT` (default: 3000)
+  - `BACKEND_DEBUG` for optional search response debug fields
 - Frontend
   - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
   - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)

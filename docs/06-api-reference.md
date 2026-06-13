@@ -108,7 +108,7 @@ Notes:
 - The backend excludes the special `None` value (`trait_values.id = 217`) from filtering and traits to reduce noise.
 - Consistent read: results are anchored to the active snapshot.
 - Exclusive params: provide either `anchorMint` or `offset`. When `anchorMint` is present, `offset` is ignored and the response `offset` reflects the computed effective offset.
-- Debug: if `DRIFELLASCAPE_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
+- Debug: if `BACKEND_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
 
 ## POST /tokens/search
 
@@ -131,7 +131,7 @@ Notes:
 - Search rows include `owner`, `onchain_owner`, and `listed_owner` when ownership data exists.
 - The server still returns an effective `offset` and honors `anchorMint`.
 - Exclusive params: provide either `anchorMint` or `offset`.
-- Debug: if `DRIFELLASCAPE_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
+- Debug: if `BACKEND_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.
 
 Errors:
 

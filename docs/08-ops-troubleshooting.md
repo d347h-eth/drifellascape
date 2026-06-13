@@ -40,7 +40,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 3) Backend Serving Old Data
 
 - Symptoms: frontend versionId doesn’t change after confirmed worker flip
-- Action: check backend refresh interval `DRIFELLASCAPE_BACKEND_REFRESH_MS`; verify backend process restarted; inspect DB active version id
+- Action: check backend refresh interval `BACKEND_REFRESH_MS`; verify backend process restarted; inspect DB active version id
 
 ### 4) DB Locked Errors
 
@@ -60,11 +60,11 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ## Environment Variables
 
 - Copy `.env.example` to `.env` for local dev and Docker Compose. `yarn backend:run`, `yarn worker:run`, and `yarn dev` load root `.env` as local defaults; already-set env vars still take precedence. Compose passes the same values into backend, worker, and frontend-build containers with defaults.
-- Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30000, min 5000)
-- Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30000, min 5000), `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
+- Worker: `WORKER_SYNC_INTERVAL_MS` (default 30000, min 5000)
+- Backend: `BACKEND_REFRESH_MS` (default 30000, min 5000), `BACKEND_PORT`, `BACKEND_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS` (default 30000, min 5000 at runtime)
-- Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default 2), `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default 5)
-- Ownership: `HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY`; `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS` (default 600000, min 60000)
+- Market events: `MARKET_EVENT_RECENT_PAGES` (default 2), `MARKET_EVENT_BACKFILL_PAGES` (default 5)
+- Ownership: `HELIUS_KEY`; `OWNERSHIP_SYNC_INTERVAL_MS` (default 600000, min 60000)
 
 ## Run Sequences
 
@@ -108,4 +108,4 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 11) Owner filter is empty
 
 - Symptoms: searching an owner address returns no Grid rows.
-- Action: Check whether `HELIUS_KEY` / `DRIFELLASCAPE_HELIUS_KEY` is configured. Then inspect `logs/worker.log` for `Ownership sync` lines and `ownership_sync_state.last_success_at`. If listings are present, listed tokens should use the listing seller as the effective owner.
+- Action: Check whether `HELIUS_KEY` is configured. Then inspect `logs/worker.log` for `Ownership sync` lines and `ownership_sync_state.last_success_at`. If listings are present, listed tokens should use the listing seller as the effective owner.

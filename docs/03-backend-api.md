@@ -67,7 +67,7 @@ To avoid a race between reading the active version id and its rows while the wor
     - Consistent read: results are anchored to the active snapshot id.
     - Owner filtering uses the active ownership snapshot. If ownership sync has not run or no matching owner exists, results are empty.
     - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
-    - If `DRIFELLASCAPE_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
+    - If `BACKEND_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
   - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
   - See also: API details and sample payloads in `docs/06-api-reference.md`.
 
@@ -83,7 +83,7 @@ To avoid a race between reading the active version id and its rows while the wor
     - Tokens are static; the response uses `versionId: null`.
     - Owner filtering still depends on the active ownership snapshot produced by the worker.
     - Excludes `trait_values.id = 217` ("None").
-    - If `DRIFELLASCAPE_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
+    - If `BACKEND_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
 
 - `GET /traits/catalog`
 
@@ -138,7 +138,7 @@ Notes:
 
 1. Server startup:
    - `initializeDatabase()` runs migrations (idempotent) and ensures schema.
-   - Starts refresh loop with interval `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s; clamped to at least 5s).
+   - Starts refresh loop with interval `BACKEND_REFRESH_MS` (default 30s; clamped to at least 5s).
 2. First request / cold start:
    - `ensureLoaded()` loads `{ versionId, items }` with a consistent DB read.
 3. Subsequent requests:
@@ -170,9 +170,9 @@ Notes:
 
 In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaults before starting the backend; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
 
-- `DRIFELLASCAPE_BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
-- `DRIFELLASCAPE_PORT` — server port (default `3000`).
-- `DRIFELLASCAPE_DEBUG` — when set, search responses include `anchorDebug`.
+- `BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
+- `BACKEND_PORT` — server port (default `3000`).
+- `BACKEND_DEBUG` — when set, search responses include `anchorDebug`.
 
 ## Performance & Capacity
 
@@ -205,7 +205,7 @@ yarn dev
 # Backend only:
 yarn backend:run
 # Optional:
-DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
+BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
 The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

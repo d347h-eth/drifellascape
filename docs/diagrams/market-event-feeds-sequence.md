@@ -103,7 +103,7 @@ Key properties:
 
 - Listing snapshots remain versioned and atomically flipped; market events are independent append-only facts.
 - The worker samples recent activity pages every cycle so new events appear without waiting for full historical backfill.
-- Historical backfill is bounded per cycle by `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`.
+- Historical backfill is bounded per cycle by `MARKET_EVENT_BACKFILL_PAGES`.
 - The backend reads are short SQLite transactions and never touch the in-memory listings cache.
 - The frontend market feed is available in Grid and Gallery; opening a token from a row keeps the side-panel open and enters Gallery centered on that mint.
 - The frontend market feed uses the shared API helper, so the existing network activity dot reflects feed loads.

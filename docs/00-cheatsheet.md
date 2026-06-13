@@ -29,9 +29,9 @@
 ## Rate Limits & Intervals
 
 - Marketplace limits: ≤ 2 requests/second, ≤ 120 requests/minute
-- Worker interval: default 30s (`DRIFELLASCAPE_SYNC_INTERVAL_MS`)
-- Ownership sync: optional Helius snapshot every 10 minutes by default (`HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY`)
-- Backend refresh: default 30s (`DRIFELLASCAPE_BACKEND_REFRESH_MS`)
+- Worker interval: default 30s (`WORKER_SYNC_INTERVAL_MS`)
+- Ownership sync: optional Helius snapshot every 10 minutes by default (`HELIUS_KEY`)
+- Backend refresh: default 30s (`BACKEND_REFRESH_MS`)
 
 ## Endpoints
 
@@ -114,9 +114,9 @@ Mobile specifics
 ## Env Vars
 
 - Start from root `.env.example`; copy it to `.env` for local dev and Compose.
-- Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS`, `HELIUS_KEY`, `DRIFELLASCAPE_HELIUS_KEY`, `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS`
-- Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES`, `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`
-- Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS`, `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
+- Worker: `WORKER_SYNC_INTERVAL_MS`, `HELIUS_KEY`, `OWNERSHIP_SYNC_INTERVAL_MS`
+- Market events: `MARKET_EVENT_RECENT_PAGES`, `MARKET_EVENT_BACKFILL_PAGES`
+- Backend: `BACKEND_REFRESH_MS`, `BACKEND_PORT`, `BACKEND_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS`
 
 ## Scripts

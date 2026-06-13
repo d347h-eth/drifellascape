@@ -76,9 +76,9 @@ Operational notes:
 
 ## Ownership Flow
 
-Ownership sync runs in the same worker cycle after the Magic Eden listings snapshot has been applied. It is optional: when neither `HELIUS_KEY` nor `DRIFELLASCAPE_HELIUS_KEY` is configured, the worker skips ownership sync and the rest of the app continues normally.
+Ownership sync runs in the same worker cycle after the Magic Eden listings snapshot has been applied. It is optional: when `HELIUS_KEY` is not configured, the worker skips ownership sync and the rest of the app continues normally.
 
-1. Enforce the ownership interval (`DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS`, default 10 minutes; clamped to at least 1 minute) using `ownership_sync_state.last_attempt_at`.
+1. Enforce the ownership interval (`OWNERSHIP_SYNC_INTERVAL_MS`, default 10 minutes; clamped to at least 1 minute) using `ownership_sync_state.last_attempt_at`.
 2. Fetch all Drifella III assets from Helius DAS `getAssetsByGroup` with `groupKey=collection`, `groupValue=ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ`, and `limit=1000`.
 3. Normalize `id` as `token_mint_addr` and `ownership.owner` as `onchain_owner`.
 4. Merge with the fresh Magic Eden listings from the same cycle:
@@ -206,7 +206,7 @@ Source layout (worker):
 - `worker/src/types.ts`
   - `NormalizedListing`, `SyncResult`, `PRICE_EPSILON = 10_000_000` (0.01 SOL).
 - `worker/src/index.ts`
-  - Infinite loop: fetch → sync → sleep. Interval via `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
+  - Infinite loop: fetch → sync → sleep. Interval via `WORKER_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
 
 DB module (shared):
 
@@ -229,11 +229,11 @@ DB module (shared):
 
 In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local defaults before starting the worker; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
 
-- `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
-- `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
-- `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
-- `HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY` — optional Helius API key for ownership sync.
-- `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS` — ownership snapshot interval, default `600000`, clamped to at least `60000`.
+- `WORKER_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
+- `MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
+- `MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
+- `HELIUS_KEY` — optional Helius API key for ownership sync.
+- `OWNERSHIP_SYNC_INTERVAL_MS` — ownership snapshot interval, default `600000`, clamped to at least `60000`.
 - Marketplace base URL and params are currently in code (single collection); can be externalized later if needed.
 
 ## Testing Strategy
@@ -263,7 +263,7 @@ In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local default
 ```bash
 yarn worker:run
 # optional interval override
-DRIFELLASCAPE_SYNC_INTERVAL_MS=60000 yarn worker:run
+WORKER_SYNC_INTERVAL_MS=60000 yarn worker:run
 ```
 
 - Single‑cycle (programmatic): import `fetchAllListings()` → `syncListings(listings)`.

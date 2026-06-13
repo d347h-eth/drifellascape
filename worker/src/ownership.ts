@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { initializeDatabase } from "@drifellascape/database";
 import {
     activateOwnershipVersion,
@@ -38,41 +36,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 function getOwnershipIntervalMs(): number {
-    const raw = process.env.DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS;
+    const raw = process.env.OWNERSHIP_SYNC_INTERVAL_MS;
     const parsed = raw ? Number(raw) : NaN;
     if (!Number.isFinite(parsed)) return DEFAULT_OWNERSHIP_SYNC_INTERVAL_MS;
     return Math.max(MIN_OWNERSHIP_SYNC_INTERVAL_MS, Math.floor(parsed));
 }
 
-function readEnvFileKey(): string | null {
-    try {
-        const envPath = path.resolve(process.cwd(), ".env");
-        const raw = readFileSync(envPath, "utf8");
-        for (const line of raw.split(/\r?\n/)) {
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith("#")) continue;
-            const idx = trimmed.indexOf("=");
-            if (idx <= 0) continue;
-            const key = trimmed.slice(0, idx).trim();
-            if (key !== "HELIUS_KEY" && key !== "DRIFELLASCAPE_HELIUS_KEY")
-                continue;
-            const value = trimmed
-                .slice(idx + 1)
-                .trim()
-                .replace(/^['"]|['"]$/g, "");
-            if (value) return value;
-        }
-    } catch {
-        // Optional local convenience only.
-    }
-    return null;
-}
-
 function getHeliusKey(): string | null {
-    const raw =
-        process.env.HELIUS_KEY ||
-        process.env.DRIFELLASCAPE_HELIUS_KEY ||
-        readEnvFileKey();
+    const raw = process.env.HELIUS_KEY;
     return raw && raw.trim().length > 0 ? raw.trim() : null;
 }
 

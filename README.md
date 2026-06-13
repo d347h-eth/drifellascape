@@ -56,7 +56,7 @@ Run backend API only (port 3000):
 ```bash
 yarn backend:run
 # Optional envs:
-#   DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
+#   BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
 Run worker (infinite loop, default 30s interval):
@@ -64,7 +64,7 @@ Run worker (infinite loop, default 30s interval):
 ```bash
 yarn worker:run
 # Optional env:
-#   DRIFELLASCAPE_SYNC_INTERVAL_MS=60000 yarn worker:run
+#   WORKER_SYNC_INTERVAL_MS=60000 yarn worker:run
 #   HELIUS_KEY=... yarn worker:run
 ```
 
