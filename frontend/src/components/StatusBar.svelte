@@ -219,10 +219,11 @@
   {/if}
   {#if !collapsed}
   <div class="right">
-    {#if !isMobile && gridMode && !inExplore}
+    {#if !isMobile && !inExplore}
       <div class="market-buttons" aria-label="Market feeds">
         <button
           class="btn {marketPanelMode === 'sale' ? 'active' : ''}"
+          aria-label="Sales feed"
           on:click={() => dispatch('toggleMarketPanel', 'sale')}
           title="Sales feed"
         >
@@ -230,6 +231,7 @@
         </button>
         <button
           class="btn {marketPanelMode === 'listing' ? 'active' : ''}"
+          aria-label="Listings feed"
           on:click={() => dispatch('toggleMarketPanel', 'listing')}
           title="Listings feed"
         >

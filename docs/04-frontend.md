@@ -18,7 +18,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — bottom Filter panel purpose pills + trait strip (fixed paging)
 - `frontend/src/components/TraitsExplorer.svelte` — left-side trait catalog explorer
-- `frontend/src/components/MarketExplorer.svelte` — right-side Grid-only Sales/Listings event feed panel
+- `frontend/src/components/MarketExplorer.svelte` — right-side Grid/Gallery Sales/Listings event feed panel
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
 - `frontend/static/` — git-ignored image tree mounted by Caddy in production
@@ -120,10 +120,10 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 ## Market Feed
 
-- Toggle: `Sales` and `Listings` buttons in the right section of the status bar, visible only in Grid mode. Clicking the active button closes the side-panel; clicking the other button switches feeds.
-- Position: fixed right side-panel, roughly one third of the desktop viewport width and full viewport height. It pushes Grid content left while open and never renders in Gallery or Exploration mode.
+- Toggle: `Sales` and `Listings` buttons in the right section of the status bar, visible in Grid and Gallery mode. Clicking the active button closes the side-panel; clicking the other button switches feeds.
+- Position: fixed right side-panel, roughly one third of the desktop viewport width and full viewport height. It pushes Grid/Gallery content left while open and never renders in Exploration mode.
 - Data: `GET /market/events` with `type=sale|listing`, offset paging, and newest-first ordering.
-- Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode.
+- Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode while keeping the market side-panel open.
 - Listing rows use the same panel and image treatment, with the seller address in the compact detail line.
 - Prices are event prices as recorded by the activity API; the frontend does not apply listing maker/royalty fee display math to sale/list event rows.
 - The panel fetches through the shared frontend API helper, so the existing network activity dot reflects market feed loads.
@@ -239,8 +239,8 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Hotkeys (open helper overlay)
   - About (open about overlay)
 - Right section buttons:
-  - Sales (show/hide sales side-panel in Grid)
-  - Listings (show/hide listings side-panel in Grid)
+  - Sales (show/hide sales side-panel in Grid/Gallery)
+  - Listings (show/hide listings side-panel in Grid/Gallery)
 - Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)

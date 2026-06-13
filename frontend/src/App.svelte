@@ -54,8 +54,8 @@
     let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
     let statusBarRef: any = null;
-    $: marketPanelVisible = gridMode && exploreIndex === null && marketPanelMode !== null;
-    $: if ((!gridMode || exploreIndex !== null) && marketPanelMode !== null) marketPanelMode = null;
+    $: marketPanelVisible = exploreIndex === null && marketPanelMode !== null;
+    $: if (exploreIndex !== null && marketPanelMode !== null) marketPanelMode = null;
     $: gridColumns = !isMobile
         ? Math.max(1, 3 - (showTraitsExplorer ? 1 : 0) - (marketPanelVisible ? 1 : 0))
         : 3;
@@ -912,7 +912,6 @@
     async function openMarketEventInGallery(mint: string) {
         galleryLandingActive = true;
         galleryPagingArmed = false;
-        marketPanelMode = null;
         dataSource = 'tokens';
         if (selectedValueIds.size > 0) selectedValueIds = new Set();
         loading = true;
@@ -971,7 +970,7 @@
     }
 
     function handleMarketPanelToggle(nextMode: MarketEventType) {
-        if (!gridMode || exploreIndex !== null) return;
+        if (exploreIndex !== null) return;
         marketPanelMode = marketPanelMode === nextMode ? null : nextMode;
     }
 
@@ -1114,6 +1113,7 @@
     .edge.left { left: 0; }
     .edge.left.traitsOpen { left: var(--traits-explorer-width); }
     .edge.right { right: 0; }
+    .edge.right.marketOpen { right: var(--market-explorer-width); }
     .edge:hover { background: linear-gradient(to right, rgba(255,255,255,0.04), transparent); }
     .edge.right:hover { background: linear-gradient(to left, rgba(255,255,255,0.04), transparent); }
     .edge.hint-l { opacity: 0.9; background: linear-gradient(to right, rgba(255,255,255,0.08), transparent); }
@@ -1174,6 +1174,9 @@
         }
         .edge.left.traitsOpen {
             left: 0;
+        }
+        .edge.right.marketOpen {
+            right: 0;
         }
     }
     
@@ -1239,7 +1242,7 @@
             <!-- Edge click targets for mouse-only navigation -->
             {#if !showGalleryEntryOverlay}
                 <button type="button" class="edge left" class:traitsOpen={showTraitsExplorer && !isMobile} class:hint-l={isMobile} title="Previous" aria-label="Previous" on:click={prevSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
-                <button type="button" class="edge right" class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
+                <button type="button" class="edge right" class:marketOpen={marketPanelVisible && !isMobile} class:hint-r={isMobile} title="Next" aria-label="Next" on:click={nextSlide} on:wheel|preventDefault={handleWheel} style={`height:${edgeHeight}px; top: 0px;`}></button>
             {/if}
         {:else}
             <!-- Grid mode (vertical) -->

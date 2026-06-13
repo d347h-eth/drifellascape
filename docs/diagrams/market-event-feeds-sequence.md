@@ -1,6 +1,6 @@
 # Market Event Feeds — E2E Sequence
 
-This diagram shows how listing and sale activity moves from Magic Eden into the local append-only feed and then into the Grid-only right-side market panel.
+This diagram shows how listing and sale activity moves from Magic Eden into the local append-only feed and then into the Grid/Gallery right-side market panel.
 
 ```mermaid
 sequenceDiagram
@@ -57,7 +57,7 @@ sequenceDiagram
     end
 
     rect rgb(65, 49, 65)
-        Note over User,DB: Read path, triggered from Grid via Sales/Listings status-bar buttons
+        Note over User,DB: Read path, triggered from Grid or Gallery via Sales/Listings status-bar buttons
         User->>FE: Click Sales or Listings
         FE->>FE: open right side-panel<br/>mode=sale|listing
         FE->>API: fetchMarketEvents(type=sale|listing, offset=0, limit=50)
@@ -92,7 +92,7 @@ sequenceDiagram
 
         opt user opens token from event
             User->>FE: Click preview or #token
-            FE->>FE: close market panel
+            FE->>FE: keep market panel open
             FE->>FE: suppress Gallery paging and width transition
             FE->>FE: navigate to Gallery centered on token mint
         end
@@ -105,5 +105,5 @@ Key properties:
 - The worker samples recent activity pages every cycle so new events appear without waiting for full historical backfill.
 - Historical backfill is bounded per cycle by `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`.
 - The backend reads are short SQLite transactions and never touch the in-memory listings cache.
-- The frontend market feed is Grid-only; opening a token from a row closes the side-panel and enters Gallery centered on that mint.
+- The frontend market feed is available in Grid and Gallery; opening a token from a row keeps the side-panel open and enters Gallery centered on that mint.
 - The frontend market feed uses the shared API helper, so the existing network activity dot reflects feed loads.

@@ -110,7 +110,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Starts in Grid mode, then enters the horizontal Gallery for focused browsing.
   - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
   - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
-  - Market feed: Grid-only right side-panel for newest-first sales and listing events, opened by separate `Sales` and `Listings` status-bar buttons.
+  - Market feed: Grid/Gallery right side-panel for newest-first sales and listing events, opened by separate `Sales` and `Listings` status-bar buttons.
   - Traits explorer toggle `F` opens the left trait catalog panel; focus/refocus uses `B`.
   - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
