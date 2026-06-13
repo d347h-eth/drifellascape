@@ -130,14 +130,25 @@ async function mockApi(page: Page) {
 }
 
 async function currentGalleryToken(page: Page): Promise<string | null> {
+    return (await currentGalleryPosition(page)).label;
+}
+
+async function currentGalleryPosition(
+    page: Page,
+): Promise<{ label: string | null; ratio: number; snapped: boolean }> {
     return await page.locator(".scroller").evaluate((element) => {
         const scroller = element as HTMLElement;
         const width = scroller.clientWidth || 1;
-        const index = Math.max(0, Math.round(scroller.scrollLeft / width));
+        const ratio = scroller.scrollLeft / width;
+        const index = Math.max(0, Math.round(ratio));
         const slides = Array.from(
             scroller.querySelectorAll<HTMLElement>("section.slide"),
         );
-        return slides[index]?.getAttribute("aria-label") ?? null;
+        return {
+            label: slides[index]?.getAttribute("aria-label") ?? null,
+            ratio,
+            snapped: Math.abs(ratio - Math.round(ratio)) < 0.02,
+        };
     });
 }
 
@@ -186,6 +197,34 @@ test("market feed stays open in Gallery and event clicks land on the exact token
         await page.waitForTimeout(700);
         expect(api.tokenSearches()).toBe(1);
         expect(api.tokenSearchBodies()[0]?.anchorMint).toBe(soldMint);
+
+        await page.getByRole("button", { name: "Sales feed" }).click();
+        await expect(
+            page.getByRole("dialog", { name: "Sales feed" }),
+        ).toHaveCount(0);
+        await expect
+            .poll(async () => {
+                const position = await currentGalleryPosition(page);
+                return `${position.label}:${position.snapped ? "snapped" : "loose"}`;
+            }, {
+                message: "gallery stays snapped after closing market panel",
+            })
+            .toBe("Token 319:snapped");
+
+        await page.getByRole("button", { name: "Sales feed" }).click();
+        await expect(
+            page.getByRole("dialog", { name: "Sales feed" }),
+        ).toBeVisible();
+        await expect
+            .poll(async () => {
+                const position = await currentGalleryPosition(page);
+                return `${position.label}:${position.snapped ? "snapped" : "loose"}`;
+            }, {
+                message: "gallery stays snapped after reopening market panel",
+            })
+            .toBe("Token 319:snapped");
+        await page.waitForTimeout(700);
+        expect(api.tokenSearches()).toBe(1);
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;

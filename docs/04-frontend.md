@@ -122,6 +122,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 
 - Toggle: `Sales` and `Listings` buttons in the right section of the status bar, visible in Grid and Gallery mode. Clicking the active button closes the side-panel; clicking the other button switches feeds.
 - Position: fixed right side-panel, roughly one third of the desktop viewport width and full viewport height. It pushes Grid/Gallery content left while open and never renders in Exploration mode.
+- In Gallery, opening or closing the side-panel suppresses scroll reactions and re-snaps the horizontal viewport to the current token after the width change.
 - Data: `GET /market/events` with `type=sale|listing`, offset paging, and newest-first ordering.
 - Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode while keeping the market side-panel open.
 - Listing rows use the same panel and image treatment, with the seller address in the compact detail line.

@@ -738,6 +738,8 @@
     // Gallery paging arming (separate from Grid)
     let galleryPagingArmed = false;
     let galleryLandingActive = false;
+    let galleryLayoutMutationActive = false;
+    let galleryLayoutMutationNonce = 0;
     let _prevExploreIndex: number | null = exploreIndex;
     let _prevGalleryMode = !gridMode && exploreIndex === null;
     $: {
@@ -773,7 +775,7 @@
     }
     if (typeof window !== 'undefined') {
         const arm = () => {
-            if (galleryLandingActive) return;
+            if (galleryLandingActive || galleryLayoutMutationActive) return;
             if (gridMode) pagingArmed = true;
             else if (!gridMode && exploreIndex === null) galleryPagingArmed = true;
         };
@@ -840,7 +842,7 @@
 
     // --- Gallery near-edge paging ---
     async function handleLoadMoreGallery() {
-        if (galleryLandingActive) return;
+        if (galleryLandingActive || galleryLayoutMutationActive) return;
         if (gridMode || exploreIndex !== null) return;
         if (isLoadingMore) return;
         const mint = items[activeIndex]?.token_mint_addr;
@@ -862,7 +864,7 @@
     }
 
     async function handleLoadPrevGallery() {
-        if (galleryLandingActive) return;
+        if (galleryLandingActive || galleryLayoutMutationActive) return;
         if (gridMode || exploreIndex !== null) return;
         if (isLoadingPrev) return;
         const newOffset = Math.max(0, baseOffset - 100);
@@ -971,7 +973,41 @@
 
     function handleMarketPanelToggle(nextMode: MarketEventType) {
         if (exploreIndex !== null) return;
-        marketPanelMode = marketPanelMode === nextMode ? null : nextMode;
+        const nextPanelMode = marketPanelMode === nextMode ? null : nextMode;
+        if (!gridMode) {
+            void applyMarketPanelModeInGallery(nextPanelMode);
+            return;
+        }
+        marketPanelMode = nextPanelMode;
+    }
+
+    async function applyMarketPanelModeInGallery(nextPanelMode: MarketEventType | null) {
+        const targetMint = items[activeIndex]?.token_mint_addr ?? null;
+        const fallbackIndex = activeIndex;
+        const nonce = ++galleryLayoutMutationNonce;
+        galleryLayoutMutationActive = true;
+        galleryPagingArmed = false;
+        scrollerRef?.cancel?.();
+        marketPanelMode = nextPanelMode;
+        try {
+            await tick();
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+            const targetIndex = targetMint
+                ? items.findIndex((r) => r.token_mint_addr === targetMint)
+                : fallbackIndex;
+            const i = targetIndex >= 0
+                ? targetIndex
+                : Math.min(fallbackIndex, Math.max(0, items.length - 1));
+            activeIndex = i;
+            scrollerRef?.scrollToIndexInstant?.(i);
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+            scrollerRef?.scrollToIndexInstant?.(i);
+            activeIndex = i;
+        } finally {
+            if (nonce === galleryLayoutMutationNonce) {
+                galleryLayoutMutationActive = false;
+            }
+        }
     }
 
     function openExploreByMint(mint: string) {
@@ -1086,7 +1122,8 @@
     .main-viewport.traitsOpen.marketOpen {
         width: calc(100% - var(--traits-explorer-width) - var(--market-explorer-width));
     }
-    .container.galleryLanding .main-viewport {
+    .container.galleryLanding .main-viewport,
+    .container.galleryLayoutMutation .main-viewport {
         transition: none;
     }
     .main-viewport.galleryLanding :global(.scroller) {
@@ -1182,7 +1219,7 @@
     
 </style>
 
-<div class="container" class:galleryLanding={galleryLandingActive}>
+<div class="container" class:galleryLanding={galleryLandingActive} class:galleryLayoutMutation={galleryLayoutMutationActive}>
     <TraitsExplorer
         visible={showTraitsExplorer}
         {isMobile}
@@ -1225,7 +1262,8 @@
                 showMeta={false}
                 motionEnabled={motionEnabled}
                 autoSnapEnabled={autoSnapEnabled}
-                galleryPagingEnabled={!galleryLandingActive && !gridMode && exploreIndex === null && galleryPagingArmed}
+                suppressScrollReactions={galleryLandingActive || galleryLayoutMutationActive}
+                galleryPagingEnabled={!galleryLandingActive && !galleryLayoutMutationActive && !gridMode && exploreIndex === null && galleryPagingArmed}
                 on:loadMore={() => handleLoadMoreGallery()}
                 on:loadPrev={() => handleLoadPrevGallery()}
                 on:enterExplore={(e) => openExploreByMint(e.detail)}
