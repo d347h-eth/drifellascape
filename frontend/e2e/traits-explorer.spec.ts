@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "playwright/test";
+import { expect, test, type Page, type Route } from "playwright/test";
 import { attachDiagnostics, capturePageDiagnostics } from "./app";
 
 const fillerBuckets = Array.from({ length: 28 }, (_, index) => ({
@@ -144,20 +144,67 @@ const searchResponse = {
     ],
 };
 
-async function mockApi(page: Page): Promise<void> {
+const emptySearchResponse = {
+    versionId: 1,
+    total: 0,
+    offset: 0,
+    limit: 50,
+    sort: "price_asc",
+    items: [],
+};
+
+type MockSearchResponder =
+    | Record<string, unknown>
+    | ((
+          body: Record<string, unknown>,
+      ) => Record<string, unknown> | Promise<Record<string, unknown>>);
+
+type MockApiOptions = {
+    listingsSearch?: MockSearchResponder;
+    tokensSearch?: MockSearchResponder;
+};
+
+async function fulfillSearch(
+    route: Route,
+    responder: MockSearchResponder,
+): Promise<void> {
+    let body: Record<string, unknown> = {};
+    try {
+        body = route.request().postDataJSON() as Record<string, unknown>;
+    } catch {
+        body = {};
+    }
+    const json =
+        typeof responder === "function" ? await responder(body) : responder;
+    await route.fulfill({ json });
+}
+
+async function mockApi(
+    page: Page,
+    options: MockApiOptions = {},
+): Promise<void> {
+    const listingsSearch = options.listingsSearch ?? searchResponse;
+    const tokensSearch = options.tokensSearch ?? {
+        ...searchResponse,
+        versionId: null,
+    };
+
     await page.route("**/traits/catalog", async (route) => {
         await route.fulfill({ json: catalog });
     });
     await page.route("**/listings/search", async (route) => {
-        await route.fulfill({ json: searchResponse });
+        await fulfillSearch(route, listingsSearch);
     });
     await page.route("**/tokens/search", async (route) => {
-        await route.fulfill({ json: { ...searchResponse, versionId: null } });
+        await fulfillSearch(route, tokensSearch);
     });
 }
 
-async function gotoApp(page: Page): Promise<void> {
-    await mockApi(page);
+async function gotoApp(
+    page: Page,
+    options: MockApiOptions = {},
+): Promise<void> {
+    await mockApi(page, options);
     await page.goto("/", { waitUntil: "domcontentloaded" });
 
     const landscapeDismiss = page.getByText("Tap anywhere to dismiss");
@@ -177,8 +224,11 @@ async function openMainBarIfCollapsed(page: Page): Promise<void> {
     }
 }
 
-async function openTraitsExplorer(page: Page): Promise<void> {
-    await gotoApp(page);
+async function openTraitsExplorer(
+    page: Page,
+    options: MockApiOptions = {},
+): Promise<void> {
+    await gotoApp(page, options);
     await openMainBarIfCollapsed(page);
 
     await page.getByRole("button", { name: "Traits" }).click();
@@ -370,6 +420,68 @@ test("trait value clicks replace by default and ctrl-click adds side-panel pills
         await page.getByTestId("traits-filter-pill-103").click();
         await expect(page.getByTestId("traits-filter-pill-103")).toHaveCount(0);
         await expect(page.getByTestId("traits-filter-pill-102")).toBeVisible();
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("empty listings state links to tokens browsing without filter hint when no filters are applied", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await gotoApp(page, {
+            listingsSearch: emptySearchResponse,
+            tokensSearch: {
+                ...searchResponse,
+                versionId: null,
+                sort: "token_asc",
+            },
+        });
+
+        await expect(page.getByText("No listings found.")).toBeVisible();
+        await expect(
+            page.getByText("Try to change the applied trait filters."),
+        ).toHaveCount(0);
+
+        await page.getByRole("button", { name: "tokens browsing" }).click();
+        await expect(page.getByText("No listings found.")).toHaveCount(0);
+        await expect(
+            page.getByRole("button", { name: "Open 1 in gallery" }),
+        ).toBeVisible();
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("empty tokens state includes the filter hint only when filters are applied", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await openTraitsExplorer(page, {
+            tokensSearch: {
+                ...emptySearchResponse,
+                versionId: null,
+                sort: "token_asc",
+            },
+        });
+
+        await page.getByTestId("traits-bucket-header-1").click();
+        await page.getByTestId("traits-value-101").click();
+        await page
+            .getByRole("button", { name: "Close traits explorer" })
+            .click();
+        await page.keyboard.press("T");
+
+        await expect(page.getByText("No tokens found.")).toBeVisible();
+        await expect(
+            page.getByText("Try to change the applied trait filters."),
+        ).toBeVisible();
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;

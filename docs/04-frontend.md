@@ -176,6 +176,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Images — grid uses downsized assets from `https://app.drifellascape.art/static/art/540h/{mint}.jpg` for faster loads.
 - Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
+- Empty results — Listings mode shows a link to switch to Tokens browsing (`T` does the same). The filter-change hint appears only when trait filters are currently applied; Tokens mode shows the same filter hint only when filters are applied.
 
 ### Image Swapping & Flicker Control
 

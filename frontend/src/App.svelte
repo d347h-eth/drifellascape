@@ -92,6 +92,19 @@
         if (dataSource === 'tokens') return sortAscTokens ? 'token_asc' : 'token_desc';
         return sortAscListings ? 'price_asc' : 'price_desc';
     }
+    function toggleDataSource() {
+        const cur = currentItem();
+        gridTargetMint = cur?.token_mint_addr ?? null;
+        dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+        applyValueFilterAndFetch();
+    }
+    function switchToTokensSource() {
+        if (dataSource === 'tokens') return;
+        const cur = currentItem();
+        gridTargetMint = cur?.token_mint_addr ?? null;
+        dataSource = 'tokens';
+        applyValueFilterAndFetch();
+    }
 
     let pagingSession = 0;
     let gridCurrentPage = 1;
@@ -438,11 +451,7 @@
             // Toggle data source — T (listings <-> tokens)
             if (k === 't' || k === 'T') {
                 e.preventDefault();
-                const cur = currentItem();
-                gridTargetMint = cur?.token_mint_addr ?? null;
-                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
-                // Reload with current filters and try to keep focus by mint
-                applyValueFilterAndFetch();
+                toggleDataSource();
                 return;
             }
             // Filter/Main bar cycle — V (mobile cycles 3 states; desktop toggles filter panel)
@@ -1118,6 +1127,9 @@
             <!-- Grid mode (vertical) -->
             <GridView
                 items={items}
+                {dataSource}
+                filtersApplied={selectedValueIds.size > 0}
+                {loading}
                 targetMint={gridTargetMint}
                 columns={showTraitsExplorer && !isMobile ? 2 : 3}
                 enablePaging={pagingArmed && !loading && (total ?? 0) > items.length}
@@ -1125,6 +1137,7 @@
                 on:openGallery={(e) => openGalleryByMint(e.detail)}
                 on:loadMore={() => handleLoadMore()}
                 on:loadPrev={() => loadPrevGrid()}
+                on:switchToTokens={switchToTokensSource}
             />
         {/if}
     </div>
@@ -1173,12 +1186,7 @@
               collapsed={!showMainBar}
               {currentRow}
               on:tokenSearch={(e) => handleTokenSearch(e.detail)}
-              on:toggleSource={() => {
-                const cur = currentItem();
-                gridTargetMint = cur?.token_mint_addr ?? null;
-                dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
-                applyValueFilterAndFetch();
-              }}
+              on:toggleSource={toggleDataSource}
               on:nextMode={() => {
                   if (gridMode) exitToGallery();
                   else if (exploreIndex !== null) closeExplore();
