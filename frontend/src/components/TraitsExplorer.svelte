@@ -9,6 +9,17 @@
   export let error: string | null = null;
   export let selectedValueIds: Set<number> = new Set();
 
+  type SortMode = 'rarity' | 'alpha';
+  type BucketView = TraitCatalogBucket & {
+    label: string;
+    visibleValues: TraitCatalogValue[];
+    valueCount: number;
+    bucketQuery: string;
+    sortMode: SortMode;
+    expanded: boolean;
+  };
+
+  const ROOT_SEARCH_MIN_LENGTH = 3;
   const dispatch = createEventDispatcher<{
     close: void;
     valueClick: { valueId: number; replace: boolean };
@@ -19,46 +30,210 @@
     sensitivity: 'base',
   });
 
-  let collapsedTypeIds: Set<number> = new Set();
+  let expandedTypeIds: Set<number> = new Set();
+  let searchCollapsedTypeIds: Set<number> = new Set();
+  let lastRootSearchKey = '';
+  let rootQuery = '';
+  let rootSearch = '';
+  let buckets: BucketView[] = [];
+  let bucketQueries: Record<number, string> = {};
+  let bucketSortModes: Record<number, SortMode> = {};
 
   function compareText(a: string | null | undefined, b: string | null | undefined): number {
     return collator.compare(a ?? '', b ?? '');
   }
 
-  function compareBuckets(a: TraitCatalogBucket, b: TraitCatalogBucket): number {
-    return (
-      compareText(a.type_name, b.type_name) ||
-      compareText(a.spatial_group, b.spatial_group) ||
-      a.type_id - b.type_id
-    );
+  function normalizeQuery(value: string): string {
+    return value.trim().toLocaleLowerCase();
   }
 
-  function compareValues(a: TraitCatalogValue, b: TraitCatalogValue): number {
-    return compareText(a.value, b.value) || a.value_id - b.value_id;
+  function matchesQuery(value: string | null | undefined, query: string): boolean {
+    if (!query) return true;
+    return (value ?? '').toLocaleLowerCase().includes(query);
   }
-
-  $: buckets = (catalog?.buckets ?? [])
-    .slice()
-    .sort(compareBuckets)
-    .map((bucket) => ({
-      ...bucket,
-      values: bucket.values.slice().sort(compareValues),
-    }));
 
   function bucketLabel(bucket: TraitCatalogBucket): string {
     const group = bucket.spatial_group?.trim();
     return group ? `${group.toUpperCase()}. ${bucket.type_name}` : bucket.type_name;
   }
 
-  function toggleBucket(typeId: number) {
-    const next = new Set(collapsedTypeIds);
-    if (next.has(typeId)) next.delete(typeId);
-    else next.add(typeId);
-    collapsedTypeIds = next;
+  function compareBuckets(a: TraitCatalogBucket, b: TraitCatalogBucket): number {
+    return (
+      compareText(bucketLabel(a), bucketLabel(b)) ||
+      compareText(a.type_name, b.type_name) ||
+      a.type_id - b.type_id
+    );
   }
 
-  function isCollapsed(typeId: number): boolean {
-    return collapsedTypeIds.has(typeId);
+  function compareValuesAlpha(a: TraitCatalogValue, b: TraitCatalogValue): number {
+    return compareText(a.value, b.value) || a.value_id - b.value_id;
+  }
+
+  function compareValuesRarity(a: TraitCatalogValue, b: TraitCatalogValue): number {
+    return (
+      a.rarity_pct - b.rarity_pct ||
+      a.tokens_with_type_value - b.tokens_with_type_value ||
+      compareValuesAlpha(a, b)
+    );
+  }
+
+  function sortedValues(values: TraitCatalogValue[], sortMode: SortMode): TraitCatalogValue[] {
+    return values
+      .slice()
+      .sort(sortMode === 'alpha' ? compareValuesAlpha : compareValuesRarity);
+  }
+
+  function getBucketQuery(typeId: number): string {
+    return bucketQueries[typeId] ?? '';
+  }
+
+  function getBucketSortMode(typeId: number): SortMode {
+    return bucketSortModes[typeId] ?? 'rarity';
+  }
+
+  function bucketIsInSearchMode(
+    typeId: number,
+    rootSearchValue: string,
+    queries: Record<number, string>,
+  ): boolean {
+    return (
+      rootSearchValue.length >= ROOT_SEARCH_MIN_LENGTH ||
+      normalizeQuery(queries[typeId] ?? '').length > 0
+    );
+  }
+
+  function bucketIsExpanded(
+    typeId: number,
+    rootSearchValue: string,
+    queries: Record<number, string>,
+    expandedIds: Set<number>,
+    searchCollapsedIds: Set<number>,
+  ): boolean {
+    if (bucketIsInSearchMode(typeId, rootSearchValue, queries)) {
+      return !searchCollapsedIds.has(typeId);
+    }
+    return expandedIds.has(typeId);
+  }
+
+  function buildBucketView(
+    bucket: TraitCatalogBucket,
+    rootSearchValue: string,
+    queries: Record<number, string>,
+    sortModes: Record<number, SortMode>,
+    expandedIds: Set<number>,
+    searchCollapsedIds: Set<number>,
+  ): BucketView | null {
+    const label = bucketLabel(bucket);
+    const bucketQuery = queries[bucket.type_id] ?? '';
+    const normalizedBucketQuery = normalizeQuery(bucketQuery);
+    const hasBucketQuery = normalizedBucketQuery.length > 0;
+    const rootSearchActive = rootSearchValue.length >= ROOT_SEARCH_MIN_LENGTH;
+    const sortMode = sortModes[bucket.type_id] ?? 'rarity';
+    const bucketMatchesRoot = rootSearchActive && matchesQuery(label, rootSearchValue);
+    const valuesMatchingRoot = rootSearchActive
+      ? bucket.values.filter((value) => matchesQuery(value.value, rootSearchValue))
+      : bucket.values;
+
+    if (
+      !hasBucketQuery &&
+      rootSearchActive &&
+      !bucketMatchesRoot &&
+      valuesMatchingRoot.length === 0
+    ) {
+      return null;
+    }
+
+    let visibleValues = bucket.values;
+    if (hasBucketQuery) {
+      visibleValues = bucket.values.filter((value) =>
+        matchesQuery(value.value, normalizedBucketQuery),
+      );
+    } else if (rootSearchActive && !bucketMatchesRoot) {
+      visibleValues = valuesMatchingRoot;
+    }
+
+    return {
+      ...bucket,
+      label,
+      values: bucket.values,
+      visibleValues: sortedValues(visibleValues, sortMode),
+      valueCount: visibleValues.length,
+      bucketQuery,
+      sortMode,
+      expanded: bucketIsExpanded(
+        bucket.type_id,
+        rootSearchValue,
+        queries,
+        expandedIds,
+        searchCollapsedIds,
+      ),
+    };
+  }
+
+  $: rootSearch = normalizeQuery(rootQuery);
+  $: {
+    const nextRootSearchKey = rootSearch.length >= ROOT_SEARCH_MIN_LENGTH ? rootSearch : '';
+    if (nextRootSearchKey !== lastRootSearchKey) {
+      lastRootSearchKey = nextRootSearchKey;
+      searchCollapsedTypeIds = new Set();
+    }
+  }
+  $: buckets = (catalog?.buckets ?? [])
+    .slice()
+    .sort(compareBuckets)
+    .map((bucket) =>
+      buildBucketView(
+        bucket,
+        rootSearch,
+        bucketQueries,
+        bucketSortModes,
+        expandedTypeIds,
+        searchCollapsedTypeIds,
+      ),
+    )
+    .filter((bucket): bucket is BucketView => bucket !== null);
+
+  function isSearchMode(typeId: number): boolean {
+    return bucketIsInSearchMode(typeId, rootSearch, bucketQueries);
+  }
+
+  function toggleBucket(typeId: number) {
+    if (isSearchMode(typeId)) {
+      const next = new Set(searchCollapsedTypeIds);
+      if (next.has(typeId)) next.delete(typeId);
+      else next.add(typeId);
+      searchCollapsedTypeIds = next;
+      return;
+    }
+
+    const next = new Set(expandedTypeIds);
+    if (next.has(typeId)) next.delete(typeId);
+    else next.add(typeId);
+    expandedTypeIds = next;
+  }
+
+  function handleRootInput(event: Event) {
+    rootQuery = (event.currentTarget as HTMLInputElement).value;
+  }
+
+  function resetRootSearch() {
+    rootQuery = '';
+    searchCollapsedTypeIds = new Set();
+  }
+
+  function handleBucketInput(event: Event, typeId: number) {
+    const value = (event.currentTarget as HTMLInputElement).value;
+    bucketQueries = { ...bucketQueries, [typeId]: value };
+    if (value.length > 0) {
+      const next = new Set(searchCollapsedTypeIds);
+      next.delete(typeId);
+      searchCollapsedTypeIds = next;
+    }
+  }
+
+  function toggleSortMode(typeId: number) {
+    const nextMode: SortMode = getBucketSortMode(typeId) === 'rarity' ? 'alpha' : 'rarity';
+    bucketSortModes = { ...bucketSortModes, [typeId]: nextMode };
   }
 
   function formatPercent(value: number): string {
@@ -73,55 +248,112 @@
 </script>
 
 {#if visible}
-  <aside class="traits-explorer" class:mobile={isMobile} role="dialog" aria-modal={isMobile ? 'true' : 'false'} aria-label="Traits explorer">
-    <header class="panel-header">
-      <div>
-        <div class="panel-title">Traits</div>
-        {#if catalog}
-          <div class="panel-subtitle">{catalog.total_tokens} tokens</div>
+  <aside
+    class="traits-explorer"
+    class:mobile={isMobile}
+    role="dialog"
+    aria-modal={isMobile ? 'true' : 'false'}
+    aria-label="Traits explorer"
+  >
+    <div class="panel-top">
+      <form class="root-search" role="search" on:submit|preventDefault>
+        <input
+          type="search"
+          class="search-input"
+          aria-label="Search traits"
+          data-testid="traits-root-search"
+          value={rootQuery}
+          autocomplete="off"
+          spellcheck="false"
+          on:input={handleRootInput}
+        />
+        {#if rootQuery.length > 0}
+          <button
+            type="button"
+            class="root-reset"
+            aria-label="Reset trait search"
+            data-testid="traits-root-reset"
+            on:click={resetRootSearch}
+          >
+            x
+          </button>
         {/if}
-      </div>
-      <button type="button" class="close" aria-label="Close traits explorer" title="Close" on:click={() => dispatch('close')}>×</button>
-    </header>
+      </form>
+      <button
+        type="button"
+        class="close"
+        aria-label="Close traits explorer"
+        title="Close"
+        on:click={() => dispatch('close')}
+      >
+        x
+      </button>
+    </div>
 
     <div class="panel-body">
       {#if loading}
-        <div class="state">Loading traits…</div>
+        <div class="state" aria-label="Loading traits">...</div>
       {:else if error}
-        <div class="state error">{error}</div>
+        <div class="state error" aria-label={error}>!</div>
       {:else if buckets.length === 0}
-        <div class="state">No traits found.</div>
+        <div class="state" aria-label="No traits found">-</div>
       {:else}
         {#each buckets as bucket (bucket.type_id)}
-          {@const collapsed = isCollapsed(bucket.type_id)}
-          <section class="bucket">
+          <section class="bucket" data-testid={`traits-bucket-${bucket.type_id}`}>
             <button
               type="button"
               class="bucket-header"
-              aria-expanded={!collapsed}
+              aria-expanded={bucket.expanded}
+              aria-label={bucket.label}
+              data-testid={`traits-bucket-header-${bucket.type_id}`}
               on:click={() => toggleBucket(bucket.type_id)}
             >
-              <span class="chevron">{collapsed ? '›' : '⌄'}</span>
-              <span class="bucket-name">{bucketLabel(bucket)}</span>
-              <span class="bucket-count">{bucket.values.length}</span>
+              <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
+              <span class="bucket-name">{bucket.label}</span>
+              <span class="bucket-count">{bucket.valueCount}</span>
             </button>
-            {#if !collapsed}
-              <div class="values">
-                {#each bucket.values as value (value.value_id)}
+            {#if bucket.expanded}
+              <div class="bucket-body">
+                <form class="bucket-controls" role="search" on:submit|preventDefault>
+                  <input
+                    type="search"
+                    class="search-input bucket-search"
+                    aria-label={`Search ${bucket.label}`}
+                    data-testid={`traits-bucket-search-${bucket.type_id}`}
+                    value={bucket.bucketQuery}
+                    autocomplete="off"
+                    spellcheck="false"
+                    on:input={(event) => handleBucketInput(event, bucket.type_id)}
+                  />
                   <button
                     type="button"
-                    class="value-row"
-                    class:selected={selectedValueIds.has(value.value_id)}
-                    title="Ctrl-click to replace active filters with this value"
-                    on:click={(event) => handleValueClick(event, value.value_id)}
+                    class="sort-toggle"
+                    aria-label={bucket.sortMode === 'rarity' ? 'Sort trait names alpha-numeric ascending' : 'Sort by rarity ascending'}
+                    title={bucket.sortMode === 'rarity' ? 'A-Z' : '%'}
+                    data-testid={`traits-bucket-sort-${bucket.type_id}`}
+                    on:click={() => toggleSortMode(bucket.type_id)}
                   >
-                    <span class="value-name">{value.value}</span>
-                    <span class="value-meta">
-                      <span>{value.tokens_with_type_value}</span>
-                      <span>{formatPercent(value.rarity_pct)}</span>
-                    </span>
+                    {bucket.sortMode === 'rarity' ? '%' : 'A'}
                   </button>
-                {/each}
+                </form>
+                <div class="values">
+                  {#each bucket.visibleValues as value (value.value_id)}
+                    <button
+                      type="button"
+                      class="value-row"
+                      class:selected={selectedValueIds.has(value.value_id)}
+                      title="Ctrl-click to replace active filters with this value"
+                      data-testid={`traits-value-${value.value_id}`}
+                      on:click={(event) => handleValueClick(event, value.value_id)}
+                    >
+                      <span class="value-name">{value.value}</span>
+                      <span class="value-meta">
+                        <span>{value.tokens_with_type_value}</span>
+                        <span>{formatPercent(value.rarity_pct)}</span>
+                      </span>
+                    </button>
+                  {/each}
+                </div>
               </div>
             {/if}
           </section>
@@ -150,36 +382,68 @@
     min-width: 0;
     border-right: 0;
   }
-  .panel-header {
-    height: 56px;
-    display: flex;
+  .panel-top {
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 12px 0 16px;
+    gap: 8px;
+    padding: 8px 10px 8px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-sizing: border-box;
   }
-  .panel-title {
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.2;
+  .root-search {
+    position: relative;
+    min-width: 0;
   }
-  .panel-subtitle {
-    margin-top: 2px;
-    font-size: 11px;
-    opacity: 0.68;
+  .search-input {
+    width: 100%;
+    height: 30px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.35);
+    color: inherit;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 4px;
+    padding: 0 28px 0 9px;
+    outline: none;
   }
-  .close {
+  .search-input:focus,
+  .search-input:focus-visible {
+    border-color: rgba(0, 208, 255, 0.75);
+    box-shadow: 0 0 0 1px rgba(0, 208, 255, 0.4);
+  }
+  .root-reset {
+    position: absolute;
+    top: 50%;
+    right: 2px;
+    width: 26px;
+    height: 26px;
+    transform: translateY(-50%);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.75;
+  }
+  .root-reset:hover {
+    opacity: 1;
+  }
+  .close,
+  .sort-toggle {
     width: 28px;
     height: 28px;
     border: 1px solid rgba(255, 255, 255, 0.16);
     background: rgba(0, 0, 0, 0.35);
     color: inherit;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 13px;
     line-height: 1;
+    padding: 0;
   }
-  .close:hover {
+  .close:hover,
+  .sort-toggle:hover {
     background: rgba(255, 255, 255, 0.08);
   }
   .close:focus,
@@ -187,7 +451,11 @@
   .bucket-header:focus,
   .bucket-header:focus-visible,
   .value-row:focus,
-  .value-row:focus-visible {
+  .value-row:focus-visible,
+  .root-reset:focus,
+  .root-reset:focus-visible,
+  .sort-toggle:focus,
+  .sort-toggle:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 1px rgba(0, 208, 255, 0.75);
   }
@@ -195,7 +463,7 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 8px 0 20px;
+    padding: 4px 0 20px;
   }
   .state {
     padding: 20px 16px;
@@ -228,7 +496,7 @@
   }
   .chevron {
     opacity: 0.7;
-    font-size: 16px;
+    font-size: 13px;
   }
   .bucket-name {
     overflow: hidden;
@@ -244,8 +512,22 @@
     opacity: 0.62;
     font-variant-numeric: tabular-nums;
   }
-  .values {
+  .bucket-body {
     padding: 0 0 6px 38px;
+  }
+  .bucket-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    gap: 6px;
+    padding: 0 10px 6px 0;
+  }
+  .bucket-search {
+    height: 28px;
+    padding-right: 9px;
+  }
+  .values {
+    display: flex;
+    flex-direction: column;
   }
   .value-row {
     width: 100%;
