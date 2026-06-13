@@ -44,6 +44,27 @@ export type EnrichedListingRow = ListingRow & {
     traits?: ListingTrait[];
 };
 
+export type TraitCatalogValue = {
+    value_id: number;
+    value: string;
+    tokens_with_type_value: number;
+    rarity_pct: number;
+};
+
+export type TraitCatalogBucket = {
+    type_id: number;
+    type_name: string;
+    spatial_group: string | null;
+    purpose_class: string | null;
+    tokens_with_type: number;
+    values: TraitCatalogValue[];
+};
+
+export type TraitCatalog = {
+    total_tokens: number;
+    buckets: TraitCatalogBucket[];
+};
+
 // Tokens (static canon dataset — no price/seller/source/version)
 export type TokenRow = {
     token_mint_addr: string;

@@ -33,7 +33,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc` from memory.
   - Exposes DB-side `POST /listings/search` over the active snapshot and `POST /tokens/search` over the static canon token dataset.
 - Frontend (Vite + Svelte)
-  - Lists the current snapshot with fast pagination and price display. Trait Bar enables trait/value filtering and purpose‑based browsing with fixed paging.
+  - Lists the current snapshot with fast pagination and price display. The bottom Filter panel enables current-token trait/value filtering and purpose‑based browsing with fixed paging; the Traits explorer provides full-catalog trait browsing.
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
   - Main bar: token quick search (Enter to jump), price + [ME]/[TS] links in the bar; Gallery footer removed. On mobile, the bar wraps sections (☰ → toggles → → pagination/search → ✕).
   - Deep link: `?token=NUM` (0–1332) opens Gallery centered on the token (Tokens mode). Param updates as you browse; removed when entering Grid.
@@ -98,6 +98,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Starts in Grid mode, then enters the horizontal Gallery for focused browsing.
   - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
   - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
+  - Traits explorer toggle `F` opens the left trait catalog panel; focus/refocus uses `B`.
   - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
   - Computes final price = nominal + maker fee (2%) + royalty (5%), using integer arithmetic in base units and renders in SOL (rounded up to 2 decimals).
@@ -113,7 +114,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Pixel‑accurate swapping between images; double‑click resets view; ESC closes.
 - Grid mode (default homepage)
   - Vertical 3‑column grid; press `G` or `Esc` to enter from Gallery/Explore; click any image to return to Gallery centered on that token.
-  - Infinite scroll up/down with user‑interaction arming for paging; press `F` in Grid to refocus the last anchored token.
+  - Infinite scroll up/down with user‑interaction arming for paging; press `B` in Grid to refocus the last anchored token.
 
 ## Operating Characteristics
 
@@ -134,7 +135,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
   - `DRIFELLASCAPE_PORT` (default: 3000)
 - Frontend
-  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*` and `/tokens*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
+  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
   - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)
 
 ## Roadmap & TBDs
@@ -151,6 +152,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - Monorepo, Yarn Berry (PnP), TypeScript across workspaces: `backend`, `worker`, `frontend`, `database`, `shared`.
 - Run locally:
+  - Full stack: `yarn dev` (logs in `tmp/logs/`)
   - Backend: `yarn backend:run`
   - Worker (loop): `yarn worker:run`
   - Frontend: `yarn workspace @drifellascape/frontend dev`

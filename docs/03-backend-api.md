@@ -69,6 +69,7 @@ To avoid a race between reading the active version id and its rows while the wor
   - See also: API details and sample payloads in `docs/06-api-reference.md`.
 
 - `POST /tokens/search`
+
   - Server‑side filtering over the canon tokens dataset; returns enriched tokens by default.
   - Body:
     - `mode`, `valueIds`, `traits`, `includeTraits` same as listings.
@@ -79,12 +80,17 @@ To avoid a race between reading the active version id and its rows while the wor
     - Excludes `trait_values.id = 217` ("None").
     - If `DRIFELLASCAPE_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
 
+- `GET /traits/catalog`
+  - Returns all non-`None` trait buckets and values from the static token metadata catalog.
+  - Response includes `total_tokens`, bucket metadata, per-value token counts, and per-value `rarity_pct`.
+  - Used by the frontend traits explorer; filtering still goes through the existing Listings/Tokens search endpoints with `valueIds`.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
 - Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*` and `/tokens*` requests to `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, and `/traits*` requests to `http://localhost:3000`.
 
 ## Process Flow
 
@@ -136,7 +142,7 @@ Notes:
 
 ## Security & CORS
 
-- No authentication; open `GET /listings`, `POST /listings/search`, and `POST /tokens/search`.
+- No authentication; open `GET /listings`, `POST /listings/search`, `POST /tokens/search`, and `GET /traits/catalog`.
 - CORS: permissive, suitable for single‑domain deployment; tighten as needed.
 
 ## Extensions & Roadmap
@@ -149,9 +155,11 @@ Notes:
 ## Quick Start
 
 ```bash
+yarn dev
+# Backend only:
 yarn backend:run
 # Optional:
 DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*` and `/tokens*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, and `/traits*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

@@ -13,7 +13,7 @@ export default defineConfig({
         strictPort: true,
         host: true,
         proxy: {
-            "^/(listings|tokens)": {
+            "^/(listings|tokens|traits)": {
                 target: "http://localhost:3000",
                 changeOrigin: true,
             },

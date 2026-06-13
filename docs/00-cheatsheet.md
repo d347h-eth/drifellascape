@@ -35,17 +35,19 @@
 - `GET /listings?offset&limit&sort=price_asc|price_desc` — in‑memory snapshot
 - `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings from the active snapshot
 - `POST /tokens/search` — DB‑side filtering over the static canon token dataset (`versionId: null`)
+- `GET /traits/catalog` — full trait bucket/value catalog with counts and rarity percentages
 
 ## Frontend Hotkeys (Gallery)
 
 - Previous/Next image — Left/Right or `A`/`D`
-- Focus current — `F`
+- Focus current — `B`
 - Focus token search — `E`
 - Enter exploration — `W`
 - Enter grid view — `G` or `Esc`
 - Toggle data source (Listings/Tokens) — `T`
+- Toggle traits explorer — `F`
 - Toggle motion — `M`
-- Toggle trait bar — `V`
+- Toggle filter panel — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
 - Next trait page (wrap) — `X`
 - Jump to first/last — `Home` / `End`
@@ -64,19 +66,21 @@
 
 ## Frontend Hotkeys (Grid)
 
-- Refocus last anchored token — `F`
+- Refocus last anchored token — `B`
 - Enter gallery — `G`
 - Focus token search — `E`
 - Toggle data source (Listings/Tokens) — `T`
+- Toggle traits explorer — `F`
 
 ## Main Bar (Toggles & Indicators)
 
-- Source toggle — Listings ⇄ Tokens
-- Mode toggle — Grid ⇄ Gallery (Exploration is entered from Gallery with `W`)
-- Sorting — Price ↑/↓ (Listings), Token ↑/↓ (Tokens); resets to the first page
+- Source toggle — displays the current source, Listings or Tokens
+- Mode toggle — displays the current mode, Grid/Gallery/Explore
+- Sorting — Price ↑/↓ (Listings), Sort #↑/#↓ (Tokens); resets to the first page
 - Animation — enable/disable snap animation
 - Autosnap — enable/disable auto finalize to center
-- Traits — show/hide the trait bar stack
+- Traits — show/hide the left traits explorer
+- Filter — show/hide the bottom filter panel
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
 - Token search — input accepts `#NUM` (0–1332). Enter jumps to the token (Tokens mode). Price and [ME]/[TS] links render in the bar; the Gallery image footer is removed.
@@ -111,14 +115,24 @@ Mobile specifics
 
 ## Scripts
 
+- Run local dev stack:
+  - `yarn dev`
+  - Logs: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Download metadata JSON (sequential, ≤1 req/s, retries):
-  - `yarn tsx scripts/download-metadata.ts`
+  - `yarn tsx scripts/assets/download-metadata.ts`
 - Download originals and produce resized JPGs:
-  - `yarn tsx scripts/download-images.ts`
-  - `yarn tsx scripts/resize-images.ts width`
-  - `yarn tsx scripts/resize-images.ts height`
-  - `yarn tsx scripts/resize-images.ts meta`
+  - `yarn tsx scripts/assets/download-images.ts`
+  - `yarn tsx scripts/assets/resize-images.ts width`
+  - `yarn tsx scripts/assets/resize-images.ts height`
+  - `yarn tsx scripts/assets/resize-images.ts meta`
 - Ingest traits (CSV + metadata → DB):
-  - `yarn tsx scripts/ingest-traits.ts`
+  - `yarn tsx scripts/traits/ingest-traits.ts`
 - Update trait type grouping/class labels:
-  - `yarn tsx scripts/update-trait-types.ts`
+  - `yarn tsx scripts/traits/update-trait-types.ts`
+
+## Tests
+
+- Unit tests:
+  - `yarn vitest run`
+- Frontend e2e:
+  - `yarn workspace @drifellascape/frontend test:e2e`

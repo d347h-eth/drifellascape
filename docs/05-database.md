@@ -138,7 +138,7 @@ Migration `002_traits_schema.sql` adds normalized tables for static token metada
 
 Maintenance:
 
-- A helper script (`scripts/update-trait-types.ts`) can populate or adjust `spatial_group` and `purpose_class` from a CSV (e.g., `logs/trait_groups.csv`) by id.
+- A helper script (`scripts/traits/update-trait-types.ts`) can populate or adjust `spatial_group` and `purpose_class` from a CSV (e.g., `logs/trait_groups.csv`) by id.
 
 Operational note:
 
@@ -166,7 +166,7 @@ Operational note:
   - Primary key: `(token_id, type_id)` — one value per raw type per token
   - Indexes: `(type_id, value_id, token_id)`, `(value_id, token_id)`, `(token_id)`
 
-Ingestion script (`scripts/ingest-traits.ts`) populates these tables from the local metadata dump and a CSV mapping of mint ↔ image URL. All strings are ingested exactly as they appear in metadata (no normalization). The script recomputes counts for types, values, and type/value pairs.
+Ingestion script (`scripts/traits/ingest-traits.ts`) populates these tables from the local metadata dump and a CSV mapping of mint ↔ image URL. All strings are ingested exactly as they appear in metadata (no normalization). The script recomputes counts for types, values, and type/value pairs.
 
 Duplicate images (expected): In this collection, multiple mints can reference the same `image_url`. The ingest script handles this by treating the CSV mapping as `image_url → queue of mints` and assigns each occurrence of the same image to the next mint in FIFO order. This guarantees all 1,333 mints are inserted into `tokens` even when only ~1,263 unique image URLs exist. The schema enforces uniqueness only on `token_mint_addr` and `token_num`, not on `image_url`.
 

@@ -51,9 +51,9 @@
 - Rationale: Keep the API uniform and explicit, expose the DB “as is” for exploration, and avoid GET query limits.
 - Notes: Unknown IDs are ignored; consistent reads on active snapshot; value `trait_values.id=217` (None) is excluded from filters and attached traits.
 
-## ADR-010: Trait Bar UX & Token Focus
+## ADR-010: Filter Panel UX & Token Focus
 
-- Decision: Show a bottom trait bar toggled by `V` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
+- Decision: Show a bottom Filter panel toggled by `V` with fixed‑size boxes and purpose pills. Filtering by clicking a box always keeps the same token in focus across list changes (anchored by mint).
 - Rationale: Provide fast, bottom‑up value discovery while preserving user context; avoid disorientation when list size changes.
 
 ## ADR-011: Anchor-based Pagination & Exclusive Params
@@ -81,3 +81,8 @@
 
 - Decision: The main bar on mobile is split into two sections (toggles; pagination/search) navigated by a 28px control button: ☰ → → → ✕.
 - Rationale: Avoid overlap and maintain a compact, touch‑friendly interface.
+
+## ADR-016: Traits Explorer Drives Existing Value Filters
+
+- Decision: Add a left-side Traits explorer backed by `GET /traits/catalog`, but keep filtering behavior owned by the existing selected `valueIds` search flow.
+- Rationale: Users can browse the full trait catalog without creating a second filtering model. The bottom Filter panel remains viewport/current-token context; the explorer is an orchestrator over the same filter state.

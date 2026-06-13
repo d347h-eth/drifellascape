@@ -4,12 +4,14 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Processes & Ports
 
+- Full local dev stack: `yarn dev` (writes `tmp/logs/{backend,worker,frontend}.log`)
 - Backend API: `yarn backend:run` (default port 3000)
 - Worker loop: `yarn worker:run` (default interval 30s)
 - Frontend dev: `yarn workspace @drifellascape/frontend dev` (port 5173)
 
 ## Logs
 
+- Local dev supervisor: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Worker: `logs/worker.log` — fetch attempts, skip counts, new version summaries or failures
 - Backend: stdout/stderr (server start, errors)
 
@@ -61,7 +63,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Run Sequences
 
-- Dev minimal: backend → worker → frontend; open http://localhost:5173
+- Dev minimal: `yarn dev`; open http://localhost:5173
 - Production: run worker as a service (single instance), backend as a simple Node service behind a reverse proxy, frontend static hosting
 - Sync static previews to a new host:
   ```bash
@@ -71,11 +73,12 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 7) 405 on `/listings/search` after switching to same-origin static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.
-- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*` and `/tokens*` to the backend (no path rewrite), e.g.:
+- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, and `/traits*` to the backend (no path rewrite), e.g.:
   ```
   route {
     handle /listings* { reverse_proxy backend:3000 }
     handle /tokens* { reverse_proxy backend:3000 }
+    handle /traits* { reverse_proxy backend:3000 }
     handle /static/* { root * /srv/static; file_server }
     handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
   }

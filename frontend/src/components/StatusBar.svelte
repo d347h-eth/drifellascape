@@ -11,6 +11,7 @@
   export let isMobile: boolean = false;
   export let collapsed: boolean = false;
   export let showTraitBar: boolean = false;
+  export let showTraitsExplorer: boolean = false;
   export let activeIndex: number = 0; // gallery
   export let baseOffset: number = 0;   // gallery/grid
   export let itemsLength: number = 0;  // gallery/grid
@@ -43,7 +44,7 @@
   }
 
   $: sortLabel = dataSource === 'tokens'
-    ? `Token ${sortAscTokens ? '↑' : '↓'}`
+    ? `Sort #${sortAscTokens ? '↑' : '↓'}`
     : `Price ${sortAscListings ? '↑' : '↓'}`;
 
   // Numbers
@@ -128,20 +129,23 @@
     {#if !collapsed}
       <div class="toggle-strip">
         {#if !isMobile || section === 0}
-          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
+          <button class="btn {showTraitsExplorer ? 'active' : ''}" on:click={() => dispatch('toggleTraitsExplorer')} title="Show/Hide traits explorer">
             Traits
+          </button>
+          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
+            Filter
           </button>
           <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
             {#if gridMode}
-              Gallery
-            {:else if inExplore}
-              Gallery
-            {:else}
               Grid
+            {:else if inExplore}
+              Explore
+            {:else}
+              Gallery
             {/if}
           </button>
           <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
-            {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
+            {dataSource === 'tokens' ? 'Tokens' : 'Listings'}
           </button>
           <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
             {sortLabel}
@@ -159,8 +163,8 @@
             About
           </button>
         {:else}
-          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide traits bar">
-            Traits
+          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
+            Filter
           </button>
         {/if}
       </div>

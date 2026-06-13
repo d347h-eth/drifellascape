@@ -24,7 +24,7 @@
     left: 12px;
     width: 50px; height: 50px; /* match next-page button size */
     z-index: 9002;
-    /* Match trait bar fill color */
+    /* Match filter panel fill color */
     background: rgba(0,0,0,0.6);
     color: #e6e6e6;
     border: none;

@@ -1,14 +1,18 @@
 <script lang="ts">
   import { createEventDispatcher, onMount, tick } from 'svelte';
-  import type { Row } from '../lib/types';
+  import type { DataSource, Row } from '../lib/types';
   import PriceTag from './PriceTag.svelte';
 
   export let items: Row[] = [];
+  export let dataSource: DataSource = 'listings';
+  export let filtersApplied: boolean = false;
+  export let loading: boolean = false;
   export let targetMint: string | null = null;
   // Beat 6 times; 0.9375s per beat (half duration; twice as fast) → total ≈ 5625ms
   export let flashDurationMs: number = 5625;
   export let enablePaging: boolean = false;
   export let loadingMore: boolean = false;
+  export let columns: number = 3;
 
   const dispatch = createEventDispatcher();
 
@@ -73,7 +77,7 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
 <style>
   .grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(var(--grid-columns, 3), 1fr);
     gap: 12px;
     padding: 12px;
     box-sizing: border-box;
@@ -87,6 +91,30 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
   .dot { width: 6px; height: 6px; margin: 0 3px; background: rgba(255,255,255,0.6); border-radius: 50%; animation: pulse 0.9s ease-in-out infinite; }
   .dot:nth-child(2) { animation-delay: 0.15s; }
   .dot:nth-child(3) { animation-delay: 0.3s; }
+  .empty-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px;
+    padding: 24px;
+    color: rgba(255,255,255,0.82);
+  }
+  .empty-link {
+    appearance: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: #8bdcff;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .empty-link:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
   @keyframes pulse { 0%, 100% { transform: scale(0.85); opacity: 0.6; } 50% { transform: scale(1); opacity: 1; } }
   .cell {
     position: relative;
@@ -146,7 +174,7 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
   }
 </style>
 
-<div class="grid" role="list">
+<div class="grid" role="list" style={`--grid-columns:${Math.max(1, columns)}`}>
   <div class="sentinel-top" bind:this={topSentinelEl} />
   {#each items as it (it.token_mint_addr)}
     <div id={`cell-${it.token_mint_addr}`} class="cell" role="listitem" class:flash={flashMint === it.token_mint_addr}>
@@ -160,8 +188,29 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
       {/if}
     </div>
   {/each}
-  {#if items.length === 0}
-    <div style="grid-column: 1 / -1; opacity: 0.7; padding: 24px;">No items to display.</div>
+  {#if !loading && items.length === 0}
+    <div class="empty-state" role="status">
+      {#if dataSource === 'listings'}
+        <span>No listings found.</span>
+        <span>
+          Try switching to
+          <button
+            type="button"
+            class="empty-link"
+            on:click={() => dispatch('switchToTokens')}
+          >tokens browsing</button>
+          (press T).
+        </span>
+        {#if filtersApplied}
+          <span>Or try to change the applied trait filters.</span>
+        {/if}
+      {:else}
+        <span>No tokens found.</span>
+        {#if filtersApplied}
+          <span>Try to change the applied trait filters.</span>
+        {/if}
+      {/if}
+    </div>
   {/if}
   <!-- Spacer to ease centering with scrollIntoView -->
   <div class="sentinel" bind:this={bottomSentinelEl} />

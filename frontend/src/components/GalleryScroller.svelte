@@ -246,7 +246,7 @@
     }
   }
   .slide {
-    flex: 0 0 100vw;
+    flex: 0 0 100%;
     display: flex;
     flex-direction: column;
     align-items: stretch;
