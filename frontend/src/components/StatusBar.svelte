@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { DEFAULT_SEARCH_LIMIT } from '../lib/search';
-  import type { DataSource, Row } from '../lib/types';
+  import type { DataSource, MarketEventType, Row } from '../lib/types';
 
   export let dataSource: DataSource = 'listings';
   export let gridMode: boolean = true;
@@ -12,6 +12,7 @@
   export let collapsed: boolean = false;
   export let showTraitBar: boolean = false;
   export let showTraitsExplorer: boolean = false;
+  export let marketPanelMode: MarketEventType | null = null;
   export let activeIndex: number = 0; // gallery
   export let baseOffset: number = 0;   // gallery/grid
   export let itemsLength: number = 0;  // gallery/grid
@@ -218,6 +219,26 @@
   {/if}
   {#if !collapsed}
   <div class="right">
+    {#if !isMobile && !inExplore}
+      <div class="market-buttons" aria-label="Market feeds">
+        <button
+          class="btn {marketPanelMode === 'sale' ? 'active' : ''}"
+          aria-label="Sales feed"
+          on:click={() => dispatch('toggleMarketPanel', 'sale')}
+          title="Sales feed"
+        >
+          Sales
+        </button>
+        <button
+          class="btn {marketPanelMode === 'listing' ? 'active' : ''}"
+          aria-label="Listings feed"
+          on:click={() => dispatch('toggleMarketPanel', 'listing')}
+          title="Listings feed"
+        >
+          Listings
+        </button>
+      </div>
+    {/if}
     {#if isMobile && section === 1}
       {#if gridMode}
         <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
@@ -283,6 +304,7 @@
   .right { min-width: 40px; justify-content: flex-end; display: flex; align-items: center; white-space: nowrap; }
   .statusbar.collapsed .left { min-width: 0; }
   .toggle-strip { display: flex; align-items: center; gap: 8px; }
+  .market-buttons { display: flex; align-items: center; gap: 8px; }
   .btn {
     height: 20px; padding: 0 8px; font-size: 12px; line-height: 1; color: #e6e6e6;
     background: rgba(12,12,14,0.85); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px;

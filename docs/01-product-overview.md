@@ -6,6 +6,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - Create a fast, dependable explorer for a single NFT collection (Drifella III, 1,333 tokens) that:
   - Periodically syncs authoritative listings from a remote marketplace API under strict rate limits.
+  - Indexes listing and sale activity into an append-only market event feed.
   - Maintains an accurate, query‑friendly local state (normalized, append‑only snapshots) for reliability and performance.
   - Serves users quickly and economically by keeping the current snapshot in memory.
   - Provides a crisp, high‑fidelity “image exploration” experience of original token artwork with precise pixel rendering.
@@ -25,6 +26,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Fetches all pages of current listings from the marketplace API within 2 RPS / 120 RPM.
   - Normalizes and stages data into a temp table; computes diffs; creates a new snapshot only if inserts/updates/deletes exist.
   - Flips the active version atomically; cleans up stale rows.
+  - Fetches Magic Eden collection activities for listing (`type=list`) and sale (`type=buyNow`) events, inserting them idempotently.
 - Database (SQLite + better‑sqlite3, WAL)
   - Tables: `listing_versions` (one active), `listings_current` (append‑only snapshot rows).
   - Concurrency: WAL enables concurrent reads while the worker writes short transactions.
@@ -32,6 +34,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Loads and keeps the active listings snapshot in memory; background loop reloads if version changes.
   - Exposes `GET /listings?offset&limit&sort=price_asc|price_desc` from memory.
   - Exposes DB-side `POST /listings/search` over the active snapshot and `POST /tokens/search` over the static canon token dataset.
+  - Exposes `GET /market/events` for newest-first listing/sale activity.
 - Frontend (Vite + Svelte)
   - Lists the current snapshot with fast pagination and price display. The bottom Filter panel enables current-token trait/value filtering and purpose‑based browsing with fixed paging; the Traits explorer provides full-catalog trait browsing.
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
@@ -42,6 +45,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 1. Worker → DB
    - Marketplace API → normalized rows → temp table → diff → new version → flip → cleanup
+   - Marketplace activities → normalized market events → append-only idempotent inserts
 2. DB → Backend
    - Backend on startup: migration + load active snapshot → in‑memory cache → periodic refresh if version changes
 3. Backend → Frontend
@@ -58,7 +62,12 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - `tokenMint` (canonical token identifier on Solana) — used as primary key for listings.
   - `priceInfo.solPrice.rawAmount` (string, integer in base units, 9 decimals) — stored as integer; displayed as SOL.
   - `seller` (address), `extra.img` (image URL), `listingSource` (marketplace source enum).
-- Activity endpoints (future): also reference `tokenMint`; reinforces using mint over name parsing.
+- Activity endpoint:
+  - `GET https://api-mainnet.magiceden.dev/v2/collections/drifella_iii/activities?offset=0&limit=100&type=list`
+  - `GET https://api-mainnet.magiceden.dev/v2/collections/drifella_iii/activities?offset=0&limit=100&type=buyNow`
+  - Listing rows use remote `type=list`; sale rows use remote `type=buyNow`.
+  - Fields of interest: `signature`, `source`, `tokenMint`, `slot`, `blockTime`, `seller`, `buyer`, numeric `price`, and `image`.
+  - Activity `priceInfo.solPrice.rawAmount` is not stored at the same scale as listing rows, so the worker normalizes activity prices from numeric SOL `price` into the project’s 9-decimal integer convention.
 
 ## Local Data Model
 
@@ -71,6 +80,9 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 - Token metadata & traits
   - Current: normalized tables for tokens and traits exist (`tokens`, `trait_types` with `spatial_group` and `purpose_class`, `trait_values`, `trait_types_values`, `token_traits`). A helper script updates type groupings/classes from CSV.
   - Ingestion: raw metadata ingested “as is”; counts maintained per type/value; special `trait_values.id=217` (None) is excluded from filters/attachments in API.
+- Market events
+  - `market_events` stores append-only listing/sale rows keyed idempotently by `(event_type, signature, token_mint_addr)`.
+  - `market_event_sync_state` tracks per-type historical backfill progress while every worker cycle still samples recent pages.
 
 ## Synchronization Strategy (Worker)
 
@@ -98,6 +110,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Starts in Grid mode, then enters the horizontal Gallery for focused browsing.
   - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
   - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
+  - Market feed: Grid/Gallery right side-panel for newest-first sales and listing events, opened by separate `Sales` and `Listings` status-bar buttons.
   - Traits explorer toggle `F` opens the left trait catalog panel; focus/refocus uses `B`.
   - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
@@ -131,6 +144,8 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - Worker
   - `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default: 30000)
+  - `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default: 2)
+  - `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default: 5)
 - Backend
   - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
   - `DRIFELLASCAPE_PORT` (default: 3000)
@@ -142,7 +157,8 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - Search and filters
   - Existing: token/trait normalization, value/trait filtering, and Listings/Tokens search endpoints.
-  - Remaining: price range, marketplace source, and token-number filters if the UI needs them.
+  - Existing: market listing/sale event feed from Magic Eden activities.
+  - Remaining: price range, marketplace source, token-number filters, and richer event types if the UI needs them.
 - Frontend UX
   - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.
 - Observability

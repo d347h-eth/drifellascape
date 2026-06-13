@@ -5,6 +5,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 ## Features
 
 - Slow & steady sync worker (rate‑limited; resilient), append‑only snapshots with atomic activation
+- Market event indexing for listing and sale feeds from Magic Eden collection activities
 - Normalized SQLite schema (WAL); concurrent reads while syncing
 - Backend API with an in‑memory listings cache plus DB‑side search for listings/tokens
 - Frontend (Svelte) with:

@@ -11,6 +11,7 @@
 - Canonical key: `token_mint_addr` (Solana mint, ≤ 44 chars)
 - Optional: `token_num` (parsed from name; best‑effort)
 - Listing fields of interest: `seller`, `priceInfo.solPrice.rawAmount`, `extra.img`, `listingSource`
+- Market event fields: `type=list|buyNow`, `signature`, `tokenMint`, `blockTime`, `slot`, `seller`, `buyer`, numeric `price`, `image`
 
 ## Pricing
 
@@ -36,6 +37,7 @@
 - `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings from the active snapshot
 - `POST /tokens/search` — DB‑side filtering over the static canon token dataset (`versionId: null`)
 - `GET /traits/catalog` — full trait bucket/value catalog with counts and rarity percentages
+- `GET /market/events?type=all|listing|sale&offset&limit` — listing/sale event feed, newest first
 
 ## Frontend Hotkeys (Gallery)
 
@@ -110,6 +112,7 @@ Mobile specifics
 ## Env Vars
 
 - Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS`
+- Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES`, `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`
 - Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS`, `DRIFELLASCAPE_PORT`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS`
 

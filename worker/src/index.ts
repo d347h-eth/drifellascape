@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fetchAllListings } from "./fetcher.js";
+import { syncMarketEvents } from "./market-events.js";
 import { syncListings } from "./sync.js";
 
 const LOGS_DIR = path.resolve(process.cwd(), "logs");
@@ -52,6 +53,18 @@ async function runOnce(): Promise<void> {
         const c = sync.counts!;
         await logLine(
             `No change (ins=${c.inserted}, upd=${c.updated}, del=${c.deleted}, total=${c.total}); pages=${res.pages}, skipped=${res.skipped}`,
+        );
+    }
+    try {
+        const marketSummaries = await syncMarketEvents();
+        for (const summary of marketSummaries) {
+            await logLine(
+                `Market ${summary.type} events: pages=${summary.pages}, fetched=${summary.fetched}, inserted=${summary.inserted}, skipped=${summary.skipped}, backfillOffset=${summary.backfillOffset}, backfillComplete=${summary.backfillComplete ? 1 : 0}`,
+            );
+        }
+    } catch (err) {
+        await logLine(
+            `Market event sync failed: ${String((err as any)?.message || err)}`,
         );
     }
     const tookMs = Date.now() - started;

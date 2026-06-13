@@ -1,5 +1,9 @@
 import { db } from "@drifellascape/database";
-import type { NormalizedListing } from "./types.js";
+import type {
+    MarketEventType,
+    NormalizedListing,
+    NormalizedMarketEvent,
+} from "./types.js";
 
 export function createTempTable(): void {
     db.exec(`
@@ -160,4 +164,79 @@ export function cleanupNonActive(newVersionId: number): void {
 export function deleteVersionCascade(versionId: number): void {
     // listings_current rows will be removed via ON DELETE CASCADE
     db.raw.prepare("DELETE FROM listing_versions WHERE id = ?").run(versionId);
+}
+
+export type MarketEventSyncState = {
+    eventType: MarketEventType;
+    backfillOffset: number;
+    backfillComplete: boolean;
+};
+
+export function ensureMarketEventSyncState(
+    eventType: MarketEventType,
+): MarketEventSyncState {
+    db.raw
+        .prepare(
+            `INSERT OR IGNORE INTO market_event_sync_state
+               (event_type, backfill_offset, backfill_complete, updated_at)
+             VALUES (?, 0, 0, unixepoch('now'))`,
+        )
+        .run(eventType);
+    const row = db.raw
+        .prepare(
+            `SELECT backfill_offset, backfill_complete
+             FROM market_event_sync_state
+             WHERE event_type = ?`,
+        )
+        .get(eventType) as
+        | { backfill_offset: number; backfill_complete: number }
+        | undefined;
+    if (!row) throw new Error(`Missing market event sync state: ${eventType}`);
+    return {
+        eventType,
+        backfillOffset: row.backfill_offset,
+        backfillComplete: row.backfill_complete === 1,
+    };
+}
+
+export function updateMarketEventSyncState(
+    eventType: MarketEventType,
+    backfillOffset: number,
+    backfillComplete: boolean,
+): void {
+    db.raw
+        .prepare(
+            `UPDATE market_event_sync_state
+             SET backfill_offset = ?,
+                 backfill_complete = ?,
+                 updated_at = unixepoch('now')
+             WHERE event_type = ?`,
+        )
+        .run(backfillOffset, backfillComplete ? 1 : 0, eventType);
+}
+
+export function insertMarketEvents(events: NormalizedMarketEvent[]): number {
+    if (events.length === 0) return 0;
+    const stmt = db.raw.prepare(
+        `INSERT OR IGNORE INTO market_events
+           (event_type, signature, source, slot, block_time, token_mint_addr,
+            price, seller, buyer, image_url, created_at)
+         VALUES
+           (@event_type, @signature, @source, @slot, @block_time, @token_mint_addr,
+            @price, @seller, @buyer, @image_url, unixepoch('now'))`,
+    );
+    let inserted = 0;
+    const insertMany = db.raw.transaction((batch: NormalizedMarketEvent[]) => {
+        for (const event of batch) {
+            const res = stmt.run({
+                ...event,
+                seller: event.seller ?? null,
+                buyer: event.buyer ?? null,
+                image_url: event.image_url ?? null,
+            });
+            inserted += res.changes | 0;
+        }
+    });
+    insertMany(events);
+    return inserted;
 }

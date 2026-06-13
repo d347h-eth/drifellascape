@@ -18,6 +18,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — bottom Filter panel purpose pills + trait strip (fixed paging)
 - `frontend/src/components/TraitsExplorer.svelte` — left-side trait catalog explorer
+- `frontend/src/components/MarketExplorer.svelte` — right-side Grid/Gallery Sales/Listings event feed panel
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
 - `frontend/static/` — git-ignored image tree mounted by Caddy in production
@@ -26,7 +27,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -37,6 +38,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 - The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
+- The market event side-panel loads `GET /market/events` for the active `Sales` or `Listings` feed mode.
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -115,6 +117,17 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Outside root-search mode, expanded buckets include a value search that filters from the first character.
 - Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
 - Click a value to replace the current value filter with only that value. Ctrl-click adds that value to the current filter set. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
+
+## Market Feed
+
+- Toggle: `Sales` and `Listings` buttons in the right section of the status bar, visible in Grid and Gallery mode. Clicking the active button closes the side-panel; clicking the other button switches feeds.
+- Position: fixed right side-panel, roughly one third of the desktop viewport width and full viewport height. It pushes Grid/Gallery content left while open and never renders in Exploration mode.
+- In Gallery, opening or closing the side-panel suppresses scroll reactions and re-snaps the horizontal viewport to the current token after the width change.
+- Data: `GET /market/events` with `type=sale|listing`, offset paging, and newest-first ordering.
+- Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode while keeping the market side-panel open.
+- Listing rows use the same panel and image treatment, with the seller address in the compact detail line.
+- Prices are event prices as recorded by the activity API; the frontend does not apply listing maker/royalty fee display math to sale/list event rows.
+- The panel fetches through the shared frontend API helper, so the existing network activity dot reflects market feed loads.
 
 ## Gallery/Listings Rendering
 
@@ -226,11 +239,14 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Filter (show/hide bottom filter panel)
   - Hotkeys (open helper overlay)
   - About (open about overlay)
+- Right section buttons:
+  - Sales (show/hide sales side-panel in Grid/Gallery)
+  - Listings (show/hide listings side-panel in Grid/Gallery)
 - Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)
   - Grid: Page X/Y and Total N (always for Listings; for Tokens only when filtered)
-  - Network activity dot on the right
+  - Market feed buttons and network activity dot on the right
 - Mobile:
   - The bar uses wrap‑around sections: ☰ (collapsed) → toggles → → pagination/search → ✕ (collapse). The control button is a 28px square.
   - Page indicator renders at the right edge.

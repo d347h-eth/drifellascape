@@ -13,6 +13,7 @@
   export let activeIndex: number = 0; // bindable
   // Gallery infinite scroll (near-edge prefetch)
   export let galleryPagingEnabled: boolean = false;
+  export let suppressScrollReactions: boolean = false;
   export let edgePrefetchThreshold: number = 3;
   const PREFETCH_COOLDOWN_MS = 600;
   let lastPrefetchAt = 0;
@@ -96,6 +97,7 @@
 
   function handleWheel(e: WheelEvent) {
     if (!scrollerEl) return;
+    if (suppressScrollReactions) { e.preventDefault(); return; }
     if (isAnimating) { e.preventDefault(); return; }
     const ax = Math.abs(e.deltaX); const ay = Math.abs(e.deltaY);
     if (Date.now() < blockUntilTs) { e.preventDefault(); return; }
@@ -133,7 +135,12 @@
   // Match ADR-008: finalize immediately on idle
   const FINALIZE_DELAY_MS = 0;
   let scrollEndTimer: any = null;
+  $: if (suppressScrollReactions && scrollEndTimer) {
+    clearTimeout(scrollEndTimer);
+    scrollEndTimer = null;
+  }
   function handleScroll() {
+    if (suppressScrollReactions) return;
     dispatch('indexChange', activeIndex = nearestIndex());
     if (isAnimating) return; // avoid fighting the tween
     if (Date.now() < suppressFinalizeUntilTs) return;
@@ -147,6 +154,7 @@
   }
   function onPointerDown(e: PointerEvent) {
     if (!scrollerEl) return;
+    if (suppressScrollReactions) return;
     const r = scrollerEl.getBoundingClientRect();
     if (e.clientY >= r.bottom - SCROLLBAR_HIT_PX) draggingScrollbar = true;
   }
@@ -165,6 +173,7 @@
   }
   export function wheelY(deltaY: number) {
     if (!scrollerEl) return;
+    if (suppressScrollReactions) return;
     if (isAnimating) return;
     if (Date.now() < blockUntilTs) return;
     scrollerEl.scrollLeft += deltaY * wheelMultiplier;
@@ -188,6 +197,7 @@
   });
 
   function maybeEdgePrefetch() {
+    if (suppressScrollReactions) return;
     if (!galleryPagingEnabled) return;
     if (!items || items.length === 0) return;
     const now = Date.now();

@@ -526,10 +526,12 @@ test("desktop main bar labels show the current state", async ({
 
         await expect(page.getByRole("button", { name: "Grid" })).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Listings" }),
+            page.getByRole("button", { name: "Listings", exact: true }),
         ).toBeVisible();
 
-        await page.getByRole("button", { name: "Listings" }).click();
+        await page
+            .getByRole("button", { name: "Listings", exact: true })
+            .click();
         await expect(
             page.getByRole("button", { name: "Tokens" }),
         ).toBeVisible();

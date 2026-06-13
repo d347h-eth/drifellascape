@@ -77,3 +77,22 @@ export type EnrichedTokenRow = TokenRow & {
     token_name: string | null;
     traits?: ListingTrait[];
 };
+
+export type MarketEventType = "listing" | "sale";
+export type MarketEventFilter = MarketEventType | "all";
+
+export type MarketEventRow = {
+    id: number;
+    event_type: MarketEventType;
+    signature: string;
+    source: string;
+    slot: number;
+    block_time: number;
+    token_mint_addr: string;
+    token_num: number | null;
+    token_name: string | null;
+    price: number;
+    seller: string | null;
+    buyer: string | null;
+    image_url: string | null;
+};

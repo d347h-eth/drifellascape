@@ -19,3 +19,18 @@ export type SyncResult = {
 };
 
 export const PRICE_EPSILON = 10_000_000; // 0.01 SOL in raw units
+
+export type MarketEventType = "listing" | "sale";
+
+export type NormalizedMarketEvent = {
+    event_type: MarketEventType;
+    signature: string;
+    source: string;
+    slot: number;
+    block_time: number;
+    token_mint_addr: string;
+    price: number; // integer: SOL raw amount with 9 decimals
+    seller?: string;
+    buyer?: string;
+    image_url?: string;
+};
