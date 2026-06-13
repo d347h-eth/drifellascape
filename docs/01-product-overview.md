@@ -98,6 +98,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Starts in Grid mode, then enters the horizontal Gallery for focused browsing.
   - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
   - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
+  - Traits explorer toggle `F` opens the left trait catalog panel; focus/refocus uses `B`.
   - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
   - Computes final price = nominal + maker fee (2%) + royalty (5%), using integer arithmetic in base units and renders in SOL (rounded up to 2 decimals).
@@ -113,7 +114,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Pixel‑accurate swapping between images; double‑click resets view; ESC closes.
 - Grid mode (default homepage)
   - Vertical 3‑column grid; press `G` or `Esc` to enter from Gallery/Explore; click any image to return to Gallery centered on that token.
-  - Infinite scroll up/down with user‑interaction arming for paging; press `F` in Grid to refocus the last anchored token.
+  - Infinite scroll up/down with user‑interaction arming for paging; press `B` in Grid to refocus the last anchored token.
 
 ## Operating Characteristics
 

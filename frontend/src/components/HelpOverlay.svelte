@@ -15,6 +15,7 @@
         <li>Toggle help — <span class="kbd">H</span> / <span class="kbd">F1</span></li>
         <li>Toggle data source (Listings/Tokens) — <span class="kbd">T</span></li>
         <li>Toggle filter panel — <span class="kbd">V</span></li>
+        <li>Toggle traits explorer — <span class="kbd">F</span></li>
         <li>Traits purpose class (left/right) — <span class="kbd">Z</span> / <span class="kbd">C</span></li>
         <li>Next trait page (wrap) — <span class="kbd">X</span></li>
         <li>Focus token search — <span class="kbd">E</span></li>
@@ -22,14 +23,14 @@
       
       <h3>Grid</h3>
       <ul>
-        <li>Refocus last anchored token — <span class="kbd">F</span></li>
+        <li>Refocus last anchored token — <span class="kbd">B</span></li>
         <li>Enter gallery (back to anchored token) — <span class="kbd">G</span></li>
       </ul>
 
       <h3>Gallery (Horizontal Scroll)</h3>
       <ul>
         <li>Previous/Next image — <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span></li>
-        <li>Focus current — <span class="kbd">F</span></li>
+        <li>Focus current — <span class="kbd">B</span></li>
         <li>Enter exploration — <span class="kbd">W</span></li>
         <li>Return to grid view — <span class="kbd">G</span> or <span class="kbd">Esc</span></li>
         <li>Toggle motion — <span class="kbd">M</span></li>

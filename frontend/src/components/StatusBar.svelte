@@ -44,7 +44,7 @@
   }
 
   $: sortLabel = dataSource === 'tokens'
-    ? `Token ${sortAscTokens ? '↑' : '↓'}`
+    ? `Sort #${sortAscTokens ? '↑' : '↓'}`
     : `Price ${sortAscListings ? '↑' : '↓'}`;
 
   // Numbers
@@ -137,15 +137,15 @@
           </button>
           <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
             {#if gridMode}
-              Gallery
-            {:else if inExplore}
-              Gallery
-            {:else}
               Grid
+            {:else if inExplore}
+              Explore
+            {:else}
+              Gallery
             {/if}
           </button>
           <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
-            {dataSource === 'tokens' ? 'Listings' : 'Tokens'}
+            {dataSource === 'tokens' ? 'Tokens' : 'Listings'}
           </button>
           <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
             {sortLabel}

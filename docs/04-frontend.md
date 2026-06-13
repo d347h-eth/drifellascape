@@ -69,10 +69,11 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Hotkeys — Gallery
 
   - Previous/Next image — Left/Right or `A`/`D`
-  - Focus current — `F`
+  - Focus current — `B`
   - Enter exploration — `W`
   - Toggle motion — `M`
   - Toggle filter panel — `V`
+  - Toggle traits explorer — `F`
   - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
   - Next trait page (wrap) — `X`
   - Jump to first/last — `Home` / `End`
@@ -107,7 +108,9 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Toggle: `Traits` in the status bar.
 - Desktop: fixed left side-panel, roughly one third of the viewport width, full height. It pushes the main viewport right; Grid uses two columns while open.
 - Mobile: full-screen overlay so users can focus on trait exploration.
-- Content: trait buckets sorted alpha-numerically and closed by default. Root search filters visible buckets/values from the third character. Expanded buckets include a value search that filters from the first character and overrides root search for that bucket.
+- Content: trait buckets sorted alpha-numerically and closed by default. Root search filters visible buckets/values from the first character. Bucket-name root matches show only values that also match the root query.
+- When root search matches a bucket name, the bucket header shows an inline `jump` button. Clicking it copies the root query into that bucket search, clears root search, collapses every other bucket, and scrolls to that bucket header.
+- Expanded buckets include a value search that filters from the first character and overrides root search for that bucket.
 - Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
 - Click a value to add/remove it from the current value filter. Ctrl-click replaces the current filter set with only that value. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
 
@@ -167,7 +170,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Click any image to return to the horizontal gallery centered on that token.
 - On enter, the grid scrolls to the last focused token and briefly flashes a cyan outline to anchor attention.
 - Paging — Infinite scroll up/down with real‑interaction arming. Observers attach only after user wheel/click/keydown to avoid surprise requests on entry. Paging uses server‑returned effective `offset`.
-- Refocus — Press `F` in Grid to refocus the last anchored token (from Gallery/Explore).
+- Refocus — Press `B` in Grid to refocus the last anchored token (from Gallery/Explore).
 - Images — grid uses downsized assets from `https://app.drifellascape.art/static/art/540h/{mint}.jpg` for faster loads.
 - Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
@@ -211,9 +214,9 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 - Persistent bottom strip stacked with the filter panel.
 - Buttons (left → right):
-  - Source (Listings ⇄ Tokens)
-  - Mode (Grid ⇄ Gallery). Enter Exploration from Gallery with `W`.
-  - Sorting (Price ↑/↓ for Listings; Token ↑/↓ for Tokens). Resets to first page.
+  - Source (shows the current source: Listings or Tokens)
+  - Mode (shows the current mode: Grid, Gallery, or Explore). Enter Exploration from Gallery with `W`.
+  - Sorting (Price ↑/↓ for Listings; Sort #↑/#↓ for Tokens). Resets to first page.
   - Animation (enable/disable snap animation)
   - Autosnap (enable/disable auto finalize to center). Default off on mobile.
   - Traits (show/hide left traits explorer)

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  import { createEventDispatcher, tick } from 'svelte';
   import type { TraitCatalogBucket, TraitCatalogValue, TraitsCatalog } from '../lib/types';
 
   export let visible: boolean = false;
@@ -17,9 +17,10 @@
     bucketQuery: string;
     sortMode: SortMode;
     expanded: boolean;
+    rootBucketMatch: boolean;
   };
 
-  const ROOT_SEARCH_MIN_LENGTH = 3;
+  const ROOT_SEARCH_MIN_LENGTH = 1;
   const dispatch = createEventDispatcher<{
     close: void;
     valueClick: { valueId: number; replace: boolean };
@@ -38,6 +39,7 @@
   let buckets: BucketView[] = [];
   let bucketQueries: Record<number, string> = {};
   let bucketSortModes: Record<number, SortMode> = {};
+  let bucketHeaderEls: Record<number, HTMLDivElement | null> = {};
 
   function compareText(a: string | null | undefined, b: string | null | undefined): number {
     return collator.compare(a ?? '', b ?? '');
@@ -148,7 +150,7 @@
       visibleValues = bucket.values.filter((value) =>
         matchesQuery(value.value, normalizedBucketQuery),
       );
-    } else if (rootSearchActive && !bucketMatchesRoot) {
+    } else if (rootSearchActive) {
       visibleValues = valuesMatchingRoot;
     }
 
@@ -167,6 +169,7 @@
         expandedIds,
         searchCollapsedIds,
       ),
+      rootBucketMatch: bucketMatchesRoot,
     };
   }
 
@@ -218,6 +221,7 @@
 
   function resetRootSearch() {
     rootQuery = '';
+    lastRootSearchKey = '';
     searchCollapsedTypeIds = new Set();
   }
 
@@ -234,6 +238,26 @@
   function toggleSortMode(typeId: number) {
     const nextMode: SortMode = getBucketSortMode(typeId) === 'rarity' ? 'alpha' : 'rarity';
     bucketSortModes = { ...bucketSortModes, [typeId]: nextMode };
+  }
+
+  async function jumpRootSearchToBucket(typeId: number) {
+    const query = rootQuery;
+    if (normalizeQuery(query).length < ROOT_SEARCH_MIN_LENGTH) return;
+
+    const collapsed = new Set<number>();
+    for (const bucket of catalog?.buckets ?? []) {
+      if (bucket.type_id !== typeId) collapsed.add(bucket.type_id);
+    }
+
+    bucketQueries = { ...bucketQueries, [typeId]: query };
+    rootQuery = '';
+    lastRootSearchKey = '';
+    expandedTypeIds = new Set([typeId]);
+    searchCollapsedTypeIds = collapsed;
+
+    await tick();
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    bucketHeaderEls[typeId]?.scrollIntoView({ block: 'start' });
   }
 
   function formatPercent(value: number): string {
@@ -258,7 +282,7 @@
     <div class="panel-top">
       <form class="root-search" role="search" on:submit|preventDefault>
         <input
-          type="search"
+          type="text"
           class="search-input"
           aria-label="Search traits"
           data-testid="traits-root-search"
@@ -300,18 +324,34 @@
       {:else}
         {#each buckets as bucket (bucket.type_id)}
           <section class="bucket" data-testid={`traits-bucket-${bucket.type_id}`}>
-            <button
-              type="button"
-              class="bucket-header"
-              aria-expanded={bucket.expanded}
-              aria-label={bucket.label}
-              data-testid={`traits-bucket-header-${bucket.type_id}`}
-              on:click={() => toggleBucket(bucket.type_id)}
+            <div
+              class="bucket-header-row"
+              bind:this={bucketHeaderEls[bucket.type_id]}
             >
-              <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
-              <span class="bucket-name">{bucket.label}</span>
+              <button
+                type="button"
+                class="bucket-header"
+                aria-expanded={bucket.expanded}
+                aria-label={bucket.label}
+                data-testid={`traits-bucket-header-${bucket.type_id}`}
+                on:click={() => toggleBucket(bucket.type_id)}
+              >
+                <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
+                <span class="bucket-name">{bucket.label}</span>
+              </button>
+              {#if bucket.rootBucketMatch}
+                <button
+                  type="button"
+                  class="jump-button"
+                  aria-label={`Jump to ${bucket.label}`}
+                  data-testid={`traits-bucket-jump-${bucket.type_id}`}
+                  on:click={() => jumpRootSearchToBucket(bucket.type_id)}
+                >
+                  jump
+                </button>
+              {/if}
               <span class="bucket-count">{bucket.valueCount}</span>
-            </button>
+            </div>
             {#if bucket.expanded}
               <div class="bucket-body">
                 <form class="bucket-controls" role="search" on:submit|preventDefault>
@@ -414,6 +454,10 @@
     border-color: rgba(0, 208, 255, 0.75);
     box-shadow: 0 0 0 1px rgba(0, 208, 255, 0.4);
   }
+  .root-search .search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
   .root-reset {
     position: absolute;
     top: 50%;
@@ -447,15 +491,23 @@
     background: rgba(255, 255, 255, 0.08);
   }
   .close:focus,
-  .close:focus-visible,
   .bucket-header:focus,
-  .bucket-header:focus-visible,
   .value-row:focus,
-  .value-row:focus-visible,
   .root-reset:focus,
-  .root-reset:focus-visible,
   .sort-toggle:focus,
+  .jump-button:focus {
+    outline: none;
+    box-shadow: none;
+  }
+  .close:focus-visible,
+  .bucket-header:focus-visible,
+  .value-row:focus-visible,
+  .root-reset:focus-visible,
   .sort-toggle:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 1px rgba(0, 208, 255, 0.75);
+  }
+  .jump-button:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 1px rgba(0, 208, 255, 0.75);
   }
@@ -477,35 +529,62 @@
   .bucket {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-  .bucket-header {
-    width: 100%;
+  .bucket-header-row {
     min-height: 38px;
     padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .bucket-header-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .bucket-header {
+    min-width: 0;
+    max-width: 100%;
+    height: 38px;
+    padding: 0;
     border: 0;
     background: transparent;
     color: inherit;
     cursor: pointer;
-    display: grid;
-    grid-template-columns: 18px minmax(0, 1fr) auto;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     text-align: left;
   }
-  .bucket-header:hover {
-    background: rgba(255, 255, 255, 0.05);
+  .bucket-header:hover,
+  .jump-button:hover {
+    color: #fff;
   }
   .chevron {
+    flex: 0 0 18px;
     opacity: 0.7;
     font-size: 13px;
   }
   .bucket-name {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 13px;
     font-weight: 700;
   }
+  .jump-button {
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(0, 0, 0, 0.35);
+    color: inherit;
+    cursor: pointer;
+    font-size: 9px;
+    line-height: 1;
+  }
   .bucket-count {
+    margin-left: auto;
+    flex: 0 0 auto;
     min-width: 24px;
     text-align: right;
     font-size: 11px;

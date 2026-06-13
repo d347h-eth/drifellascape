@@ -391,12 +391,19 @@
                     return;
                 }
             }
-            // Focus anchor mint in Grid — F (do not intercept Ctrl/Cmd+F)
-            if (gridMode && (k === 'f' || k === 'F')) {
+            // Traits explorer toggle — F (do not intercept Ctrl/Cmd+F)
+            if (k === 'f' || k === 'F') {
                 if (e.ctrlKey || e.metaKey) {
                     // Let browser find-in-page work
                     return;
                 }
+                e.preventDefault();
+                toggleTraitsExplorer();
+                return;
+            }
+            // Focus anchor mint in Grid — B
+            if (gridMode && (k === 'b' || k === 'B')) {
+                if (e.ctrlKey || e.metaKey) return;
                 e.preventDefault();
                 const m = getStore(anchorLastMint);
                 if (m) {
@@ -504,11 +511,8 @@
             } else if (k === 'End') {
                 e.preventDefault();
                 scrollerRef?.snapToIndex?.(items.length - 1);
-            } else if (k === 'f' || k === 'F') {
-                if (e.ctrlKey || e.metaKey) {
-                    // Allow Ctrl/Cmd+F
-                    return;
-                }
+            } else if (k === 'b' || k === 'B') {
+                if (e.ctrlKey || e.metaKey) return;
                 e.preventDefault();
                 focusCurrent();
             } else if (k === 'm' || k === 'M') {
@@ -988,6 +992,18 @@
     /* Edge click targets for prev/next */
     .edge { position: fixed; top: 0; height: 1087px; width: 25px; z-index: 5; cursor: pointer; background: transparent; border: 0; padding: 0; outline: none; transition: opacity 0.25s ease; }
     .edge:focus, .edge:focus-visible { outline: none; }
+    :global(button:focus:not(:focus-visible)),
+    :global(a:focus:not(:focus-visible)),
+    :global([role="button"]:focus:not(:focus-visible)),
+    :global([role="tab"]:focus:not(:focus-visible)),
+    :global([role="menuitem"]:focus:not(:focus-visible)),
+    :global(summary:focus:not(:focus-visible)),
+    :global(input[type="button"]:focus:not(:focus-visible)),
+    :global(input[type="submit"]:focus:not(:focus-visible)),
+    :global(input[type="reset"]:focus:not(:focus-visible)) {
+        outline: none !important;
+        box-shadow: none !important;
+    }
     .edge.left { left: 0; }
     .edge.left.traitsOpen { left: var(--traits-explorer-width); }
     .edge.right { right: 0; }

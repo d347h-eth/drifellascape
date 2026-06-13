@@ -20,7 +20,7 @@ High‑signal guidance for agents working in this repo. Follow these rules to ke
 - Listings schema: primary key is `(version_id, token_mint_addr)`. Ignore price deltas < 0.01 SOL (`PRICE_EPSILON`).
 - Frontend: preserve hard‑pixel rendering and hotkeys contract in the exploration mode. Main bar on mobile uses a two‑step “wrap‑around” menu (☰ → toggles → → pagination/search → ✕ collapse). Token quick search lives in the bar (Enter to jump; no magnifier on mobile). Pagination/search text uses non‑breaking spacing.
 - UI copy: do not add unrequested explanatory/prose text into application layouts. Prefer controls, labels, icons, and existing data; keep visible text intentional and user-requested.
-- Hotkeys: `T` toggles data source (Listings/Tokens); `G`/`Esc` enter Grid; `F` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
+- Hotkeys: `T` toggles data source (Listings/Tokens); `F` toggles the traits explorer; `G`/`Esc` enter Grid; `B` refocuses last anchored token in Grid; `O` toggles debug overlay in Explore.
 
 ## How to Work
 

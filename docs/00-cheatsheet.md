@@ -40,11 +40,12 @@
 ## Frontend Hotkeys (Gallery)
 
 - Previous/Next image — Left/Right or `A`/`D`
-- Focus current — `F`
+- Focus current — `B`
 - Focus token search — `E`
 - Enter exploration — `W`
 - Enter grid view — `G` or `Esc`
 - Toggle data source (Listings/Tokens) — `T`
+- Toggle traits explorer — `F`
 - Toggle motion — `M`
 - Toggle filter panel — `V`
 - Purpose class (left/right) — `Z` / `C` (wrap; skips empty)
@@ -65,16 +66,17 @@
 
 ## Frontend Hotkeys (Grid)
 
-- Refocus last anchored token — `F`
+- Refocus last anchored token — `B`
 - Enter gallery — `G`
 - Focus token search — `E`
 - Toggle data source (Listings/Tokens) — `T`
+- Toggle traits explorer — `F`
 
 ## Main Bar (Toggles & Indicators)
 
-- Source toggle — Listings ⇄ Tokens
-- Mode toggle — Grid ⇄ Gallery (Exploration is entered from Gallery with `W`)
-- Sorting — Price ↑/↓ (Listings), Token ↑/↓ (Tokens); resets to the first page
+- Source toggle — displays the current source, Listings or Tokens
+- Mode toggle — displays the current mode, Grid/Gallery/Explore
+- Sorting — Price ↑/↓ (Listings), Sort #↑/#↓ (Tokens); resets to the first page
 - Animation — enable/disable snap animation
 - Autosnap — enable/disable auto finalize to center
 - Traits — show/hide the left traits explorer
