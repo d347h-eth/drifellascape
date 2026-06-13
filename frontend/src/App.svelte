@@ -1070,6 +1070,7 @@
         loading={traitsCatalogLoading}
         error={traitsCatalogError}
         {selectedValueIds}
+        {selectedValueMeta}
         on:close={() => (showTraitsExplorer = false)}
         on:valueClick={handleTraitsExplorerValueClick}
     />

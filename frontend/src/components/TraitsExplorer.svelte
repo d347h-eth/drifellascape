@@ -8,6 +8,7 @@
   export let loading: boolean = false;
   export let error: string | null = null;
   export let selectedValueIds: Set<number> = new Set();
+  export let selectedValueMeta: Record<number, string> = {};
 
   type SortMode = 'rarity' | 'alpha';
   type BucketView = TraitCatalogBucket & {
@@ -20,7 +21,7 @@
     showJump: boolean;
   };
 
-  const ROOT_SEARCH_MIN_LENGTH = 1;
+  const ROOT_SEARCH_MIN_LENGTH = 2;
   const dispatch = createEventDispatcher<{
     close: void;
     valueClick: { valueId: number; replace: boolean };
@@ -36,6 +37,7 @@
   let lastRootSearchKey = '';
   let rootQuery = '';
   let rootSearch = '';
+  let rootSearchActive = false;
   let buckets: BucketView[] = [];
   let bucketQueries: Record<number, string> = {};
   let bucketSortModes: Record<number, SortMode> = {};
@@ -174,8 +176,9 @@
   }
 
   $: rootSearch = normalizeQuery(rootQuery);
+  $: rootSearchActive = rootSearch.length >= ROOT_SEARCH_MIN_LENGTH;
   $: {
-    const nextRootSearchKey = rootSearch.length >= ROOT_SEARCH_MIN_LENGTH ? rootSearch : '';
+    const nextRootSearchKey = rootSearchActive ? rootSearch : '';
     if (nextRootSearchKey !== lastRootSearchKey) {
       lastRootSearchKey = nextRootSearchKey;
       searchCollapsedTypeIds = new Set();
@@ -269,6 +272,10 @@
   function handleValueClick(event: MouseEvent, valueId: number) {
     dispatch('valueClick', { valueId, replace: event.ctrlKey });
   }
+
+  function handleFilterPillClick(valueId: number) {
+    dispatch('valueClick', { valueId, replace: false });
+  }
 </script>
 
 {#if visible}
@@ -280,29 +287,46 @@
     aria-label="Traits explorer"
   >
     <div class="panel-top">
-      <form class="root-search" role="search" on:submit|preventDefault>
-        <input
-          type="text"
-          class="search-input"
-          aria-label="Search traits"
-          data-testid="traits-root-search"
-          value={rootQuery}
-          autocomplete="off"
-          spellcheck="false"
-          on:input={handleRootInput}
-        />
-        {#if rootQuery.length > 0}
-          <button
-            type="button"
-            class="root-reset"
-            aria-label="Reset trait search"
-            data-testid="traits-root-reset"
-            on:click={resetRootSearch}
-          >
-            x
-          </button>
+      <div class="panel-search-stack">
+        <form class="root-search" role="search" on:submit|preventDefault>
+          <input
+            type="text"
+            class="search-input"
+            aria-label="Search traits"
+            data-testid="traits-root-search"
+            value={rootQuery}
+            autocomplete="off"
+            spellcheck="false"
+            on:input={handleRootInput}
+          />
+          {#if rootQuery.length > 0}
+            <button
+              type="button"
+              class="root-reset"
+              aria-label="Reset trait search"
+              data-testid="traits-root-reset"
+              on:click={resetRootSearch}
+            >
+              x
+            </button>
+          {/if}
+        </form>
+        {#if selectedValueIds.size > 0}
+          <div class="selected-filters" data-testid="traits-selected-filters">
+            {#each Array.from(selectedValueIds) as vid}
+              <button
+                type="button"
+                class="filter-pill"
+                title={`Remove filter: ${selectedValueMeta[vid] ?? ('#' + vid)}`}
+                data-testid={`traits-filter-pill-${vid}`}
+                on:click={() => handleFilterPillClick(vid)}
+              >
+                <span aria-hidden="true">×</span>&nbsp;{selectedValueMeta[vid] ?? ('#' + vid)}
+              </button>
+            {/each}
+          </div>
         {/if}
-      </form>
+      </div>
       <button
         type="button"
         class="close"
@@ -354,28 +378,30 @@
             </div>
             {#if bucket.expanded}
               <div class="bucket-body">
-                <form class="bucket-controls" role="search" on:submit|preventDefault>
-                  <input
-                    type="search"
-                    class="search-input bucket-search"
-                    aria-label={`Search ${bucket.label}`}
-                    data-testid={`traits-bucket-search-${bucket.type_id}`}
-                    value={bucket.bucketQuery}
-                    autocomplete="off"
-                    spellcheck="false"
-                    on:input={(event) => handleBucketInput(event, bucket.type_id)}
-                  />
-                  <button
-                    type="button"
-                    class="sort-toggle"
-                    aria-label={bucket.sortMode === 'rarity' ? 'Sort trait names alpha-numeric ascending' : 'Sort by rarity ascending'}
-                    title={bucket.sortMode === 'rarity' ? 'A-Z' : '%'}
-                    data-testid={`traits-bucket-sort-${bucket.type_id}`}
-                    on:click={() => toggleSortMode(bucket.type_id)}
-                  >
-                    {bucket.sortMode === 'rarity' ? '%' : 'A'}
-                  </button>
-                </form>
+                {#if !rootSearchActive}
+                  <form class="bucket-controls" role="search" on:submit|preventDefault>
+                    <input
+                      type="search"
+                      class="search-input bucket-search"
+                      aria-label={`Search ${bucket.label}`}
+                      data-testid={`traits-bucket-search-${bucket.type_id}`}
+                      value={bucket.bucketQuery}
+                      autocomplete="off"
+                      spellcheck="false"
+                      on:input={(event) => handleBucketInput(event, bucket.type_id)}
+                    />
+                    <button
+                      type="button"
+                      class="sort-toggle"
+                      aria-label={bucket.sortMode === 'rarity' ? 'Sort trait names alpha-numeric ascending' : 'Sort by rarity ascending'}
+                      title={bucket.sortMode === 'rarity' ? 'A-Z' : '%'}
+                      data-testid={`traits-bucket-sort-${bucket.type_id}`}
+                      on:click={() => toggleSortMode(bucket.type_id)}
+                    >
+                      {bucket.sortMode === 'rarity' ? '%' : 'A'}
+                    </button>
+                  </form>
+                {/if}
                 <div class="values">
                   {#each bucket.visibleValues as value (value.value_id)}
                     <button
@@ -426,11 +452,17 @@
     min-height: 48px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 28px;
-    align-items: center;
+    align-items: start;
     gap: 8px;
     padding: 8px 10px 8px 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-sizing: border-box;
+  }
+  .panel-search-stack {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
   .root-search {
     position: relative;
@@ -495,6 +527,7 @@
   .value-row:focus,
   .root-reset:focus,
   .sort-toggle:focus,
+  .filter-pill:focus,
   .jump-button:focus {
     outline: none;
     box-shadow: none;
@@ -503,6 +536,7 @@
   .bucket-header:focus-visible,
   .value-row:focus-visible,
   .root-reset:focus-visible,
+  .filter-pill:focus-visible,
   .sort-toggle:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 1px rgba(0, 208, 255, 0.75);
@@ -525,6 +559,31 @@
   .state.error {
     color: #ff8a8a;
     opacity: 1;
+  }
+  .selected-filters {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .filter-pill {
+    cursor: pointer;
+    margin: 0 4px 0 0;
+    padding: 3px 8px;
+    max-width: 100%;
+    font-size: 12px;
+    color: #e6e6e6;
+    background: rgba(12, 12, 14, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .filter-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
   }
   .bucket {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);

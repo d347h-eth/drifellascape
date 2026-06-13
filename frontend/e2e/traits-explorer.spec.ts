@@ -217,7 +217,7 @@ test("opens with buckets closed and toggles bucket content from the header", asy
     }
 });
 
-test("root search filters from the first character and reset restores closed buckets", async ({
+test("root search filters from the second character and hides bucket controls", async ({
     page,
 }, testInfo) => {
     const diagnostics = capturePageDiagnostics(page);
@@ -230,8 +230,16 @@ test("root search filters from the first character and reset restores closed buc
 
         await rootSearch.fill("z");
         await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-2")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-jump-1")).toHaveCount(0);
+        await expect(page.getByTestId("traits-value-103")).toHaveCount(0);
+
+        await rootSearch.fill("ze");
+        await expect(page.getByTestId("traits-bucket-1")).toBeVisible();
         await expect(page.getByTestId("traits-bucket-jump-1")).toBeVisible();
         await expect(page.getByTestId("traits-value-103")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-search-1")).toHaveCount(0);
+        await expect(page.getByTestId("traits-bucket-sort-1")).toHaveCount(0);
         await expect(page.getByTestId("traits-bucket-2")).toHaveCount(0);
 
         await rootSearch.fill("back");
@@ -272,6 +280,7 @@ test("root search jump transfers input into one bucket and scrolls to its header
         await expect(page.getByTestId("traits-bucket-search-99")).toHaveValue(
             "tail",
         );
+        await expect(page.getByTestId("traits-bucket-sort-99")).toBeVisible();
         await expect(
             page.getByTestId("traits-bucket-header-99"),
         ).toHaveAttribute("aria-expanded", "true");
@@ -319,10 +328,37 @@ test("bucket search overrides root search and bucket sort toggles value ordering
 
         await page.getByTestId("traits-root-search").fill("blu");
         await expect(background.locator(".value-name")).toHaveText(["Blue"]);
+        await expect(
+            background.getByTestId("traits-bucket-search-1"),
+        ).toHaveCount(0);
 
+        await background.getByTestId("traits-bucket-jump-1").click();
         await background.getByTestId("traits-bucket-search-1").fill("z");
         await expect(background.locator(".value-name")).toHaveText(["Zebra"]);
         await expect(page.getByTestId("traits-value-101")).toHaveCount(0);
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("selected filters render as removable side-panel pills", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await openTraitsExplorer(page);
+
+        await page.getByTestId("traits-bucket-header-1").click();
+        await page.getByTestId("traits-value-101").click();
+
+        const pill = page.getByTestId("traits-filter-pill-101");
+        await expect(pill).toBeVisible();
+        await expect(pill).toContainText("Background: Blue");
+
+        await pill.click();
+        await expect(page.getByTestId("traits-filter-pill-101")).toHaveCount(0);
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;
