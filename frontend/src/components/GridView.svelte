@@ -202,12 +202,12 @@ const STATIC_BASE = "https://app.drifellascape.art/static";
           (press T).
         </span>
         {#if filtersApplied}
-          <span>Or try to change the applied trait filters.</span>
+          <span>Or try to change the applied filters.</span>
         {/if}
       {:else}
         <span>No tokens found.</span>
         {#if filtersApplied}
-          <span>Try to change the applied trait filters.</span>
+          <span>Try to change the applied filters.</span>
         {/if}
       {/if}
     </div>

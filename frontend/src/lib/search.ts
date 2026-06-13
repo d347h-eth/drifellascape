@@ -42,6 +42,7 @@ export type BuildParams = {
     limit?: number;
     offset?: number; // used only when no anchorMint
     anchorMint?: string; // exclusive with offset
+    ownerAddress?: string;
     mode?: "value" | "trait"; // optional override
     sort?: string; // optional override
 };
@@ -55,6 +56,7 @@ export function buildSearchBody(p: BuildParams): ListingsSearchBody {
     const body: any = { mode, includeTraits, limit, sort };
     if (mode === "trait") body.traits = p.traits ?? [];
     else body.valueIds = p.valueIds ?? [];
+    if (p.ownerAddress) body.ownerAddress = p.ownerAddress;
     if (p.anchorMint) body.anchorMint = p.anchorMint;
     else body.offset = p.offset ?? 0;
     return body as ListingsSearchBody;

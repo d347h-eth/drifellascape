@@ -23,6 +23,7 @@
   export let sortAscTokens: boolean = true;
   export let networkBusy: boolean = false;
   export let currentRow: Row | null = null;
+  export let ownerAddress: string | null = null;
   
   const dispatch = createEventDispatcher();
 
@@ -40,7 +41,7 @@
     return (typeof tn === 'number') ? `#${tn}` : '';
   }
   function refillFromCurrent() {
-    const v = tokenNumLabel();
+    const v = gridMode && ownerAddress ? ownerAddress : tokenNumLabel();
     if (v) { tokenInput = v; tokenDirty = false; }
   }
 
@@ -68,20 +69,40 @@
     const focused = typeof document !== 'undefined' && document.activeElement === tokenInputEl;
     if (typeof tn === 'number' && !tokenDirty && !focused) tokenInput = `#${tn}`;
   }
+  $: if (gridMode && !collapsed) {
+    const focused = typeof document !== 'undefined' && document.activeElement === tokenInputEl;
+    if (!tokenDirty && !focused) tokenInput = ownerAddress ?? '';
+  }
 
   function parseTokenNum(raw: string): number | null {
-    const s = String(raw || '').trim().replace(/^#/, '');
+    const value = String(raw || '').trim();
+    if (!/^#?\d{1,4}$/.test(value)) return null;
+    const s = value.replace(/^#/, '');
     const n = Number(s);
     if (!Number.isFinite(n)) return null;
     if (n < 0) return 0;
     if (n > 1332) return 1332; // 0..1332 inclusive
     return Math.floor(n);
   }
+  function parseOwnerAddress(raw: string): string | null {
+    const value = String(raw || '').trim();
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) ? value : null;
+  }
   function triggerSearch() {
-    const n = parseTokenNum(tokenInput);
-    if (n === null) return;
+    const raw = tokenInput;
+    const n = parseTokenNum(raw);
     tokenDirty = false;
-    dispatch('tokenSearch', n);
+    if (n !== null) {
+      dispatch('tokenSearch', { type: 'token', tokenNum: n });
+      return;
+    }
+    const owner = parseOwnerAddress(raw);
+    if (owner) dispatch('tokenSearch', { type: 'owner', ownerAddress: owner });
+  }
+  function handleSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
+    else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
   }
   function meUrl(mint: string) { return `https://magiceden.io/item-details/${mint}`; }
   function tsUrl(mint: string) { return `https://tensor.trade/item/${mint}`; }
@@ -178,26 +199,18 @@
         <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
         <span class="sep">•</span>
         <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" placeholder="#token" bind:value={tokenInput}
+          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
             on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
+            on:keydown={handleSearchKeydown} />
           
         </div>
       {:else if !inExplore}
         <span class="mono">{galleryIndex1}/{total}</span>
         <span class="sep">•</span>
         <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}
+          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
             on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
+            on:keydown={handleSearchKeydown} />
           
         </div>
         {#if currentRow}
@@ -244,26 +257,18 @@
         <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
         <span class="sep">•</span>
         <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" placeholder="#token" bind:value={tokenInput}
+          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
             on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
+            on:keydown={handleSearchKeydown} />
           
         </div>
       {:else if !inExplore}
         <span class="mono">{galleryIndex1}/{total}</span>
         <span class="sep">•</span>
         <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}
+          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
             on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
+            on:keydown={handleSearchKeydown} />
           
         </div>
         {#if currentRow}
@@ -326,7 +331,7 @@
   .token-link { text-decoration: none; color: inherit; }
   .token-link:hover { text-decoration: underline; }
   .token-search { display: inline-flex; align-items: center; gap: 4px; }
-  .token-input { height: 20px; width: 80px; padding: 0 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(12,12,14,0.85); color: #e6e6e6; border-radius: 4px; }
+  .token-input { height: 20px; width: 120px; padding: 0 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(12,12,14,0.85); color: #e6e6e6; border-radius: 4px; }
   .token-input:focus { outline: none; border-color: rgba(0,208,255,0.8); }
   
   .cluster { display: inline-flex; align-items: center; gap: 6px; }

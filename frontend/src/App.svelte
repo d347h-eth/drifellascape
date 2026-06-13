@@ -45,6 +45,7 @@
     let selectedPurpose: Purpose = "middle";
     // Bottom filter panel paging is encapsulated in TraitBar
     let selectedValueIds: Set<number> = new Set();
+    let activeOwnerAddress: string | null = null;
     // Map of selected trait value id -> display label (best-effort, derived from current items' traits)
     let catalogValueMeta: Record<number, string> = {};
     let selectedValueMeta: Record<number, string> = {};
@@ -98,6 +99,20 @@
     function currentSort(): string {
         if (dataSource === 'tokens') return sortAscTokens ? 'token_asc' : 'token_desc';
         return sortAscListings ? 'price_asc' : 'price_desc';
+    }
+    function ownerFilter(): string | undefined {
+        return activeOwnerAddress ?? undefined;
+    }
+    function clearTokenUrlParam() {
+        try {
+            if (typeof window !== 'undefined' && window.history && window.location) {
+                const u = new URL(window.location.href);
+                if (u.searchParams.has('token')) {
+                    u.searchParams.delete('token');
+                    window.history.replaceState({}, '', u.toString());
+                }
+            }
+        } catch {}
     }
     function toggleDataSource() {
         const cur = currentItem();
@@ -157,7 +172,7 @@
         pagingSession++;
         isLoadingMore = false;
         try {
-            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
+            const res = await loadInitialPage({ source: dataSource, valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, ownerAddress: ownerFilter(), sort: currentSort() });
             items = res.items;
             total = res.total;
             baseOffset = res.baseOffset;
@@ -240,6 +255,7 @@
     async function handleTokenSearch(num: number) {
         // Always jump via Tokens dataset to ensure the token exists
         dataSource = 'tokens';
+        activeOwnerAddress = null;
         if (selectedValueIds.size > 0) { selectedValueIds = new Set(); }
         const mint = await resolveMintByTokenNum(num);
         if (!mint) return;
@@ -252,7 +268,7 @@
             }
         } catch {}
         try {
-            const resp = await postSearch('tokens', buildSearchBody({ source: 'tokens', valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() }));
+            const resp = await postSearch('tokens', buildSearchBody({ source: 'tokens', valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, ownerAddress: ownerFilter(), sort: currentSort() }));
             items = resp.items ?? [];
             total = Number(resp.total || 0);
             baseOffset = Number(resp.offset || 0);
@@ -270,10 +286,56 @@
         } catch {}
     }
 
+    async function handleOwnerSearch(ownerAddress: string) {
+        const owner = String(ownerAddress || '').trim();
+        if (!owner) return;
+        dataSource = 'tokens';
+        activeOwnerAddress = owner;
+        if (selectedValueIds.size > 0) selectedValueIds = new Set();
+        if (exploreIndex !== null) {
+            exploreIndex = null;
+            exploreItems = null;
+        }
+        gridMode = true;
+        clearTokenUrlParam();
+        stagedItems = null;
+        stagedVersionId = null;
+        stagedTotal = null;
+        loading = true;
+        error = null;
+        pagingSession++;
+        isLoadingMore = false;
+        isLoadingPrev = false;
+        galleryPagingArmed = false;
+        pagingArmed = false;
+        try {
+            const res = await loadInitialPage({
+                source: 'tokens',
+                valueIds: [],
+                offset: 0,
+                limit: DEFAULT_SEARCH_LIMIT,
+                includeTraits: true,
+                ownerAddress: owner,
+                sort: currentSort(),
+            });
+            items = res.items;
+            total = res.total;
+            baseOffset = res.baseOffset;
+            versionId = res.versionId;
+            activeIndex = 0;
+            gridCurrentPage = computeGridPageBackward();
+            gridTargetMint = items[0]?.token_mint_addr ?? null;
+        } catch (e: any) {
+            error = e?.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
     async function pollForUpdates() {
         try {
             if (dataSource !== 'listings') return; // tokens are static; skip polling
-            const body = buildSearchBody({ source: 'listings', valueIds: [], offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
+            const body = buildSearchBody({ source: 'listings', valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, ownerAddress: ownerFilter(), sort: currentSort() });
             const data = await postSearch('listings', body);
             if (typeof data?.versionId === "number" && data.versionId !== versionId) {
                 stagedItems = data.items ?? [];
@@ -601,7 +663,7 @@
             const anchorMintToUse: string | undefined = selectAnchorMint(gridMode, inExploreOrGallery, curMint);
             // Disarm gallery paging around filter transitions to avoid immediate edge prefetch
             galleryPagingArmed = false;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: anchorMintToUse, offset: 0, sort: currentSort() });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: anchorMintToUse, ownerAddress: ownerFilter(), offset: 0, sort: currentSort() });
             const data = await postSearch(dataSource, body);
             let newItems = data.items ?? [];
             items = newItems;
@@ -703,15 +765,7 @@
         gridMode = true;
         pagingArmed = false; // avoid immediate paging on entry
         // Drop token param from URL when leaving gallery
-        try {
-            if (typeof window !== 'undefined' && window.history && window.location) {
-                const u = new URL(window.location.href);
-                if (u.searchParams.has('token')) {
-                    u.searchParams.delete('token');
-                    window.history.replaceState({}, '', u.toString());
-                }
-            }
-        } catch {}
+        clearTokenUrlParam();
     }
     function exitToGallery() {
         const target = gridTargetMint ?? items[activeIndex]?.token_mint_addr ?? items[0]?.token_mint_addr ?? null;
@@ -792,7 +846,7 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, currentLength: items.length, sort: currentSort() });
+            const { newItems, newTotal } = await loadNextPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, currentLength: items.length, ownerAddress: ownerFilter(), sort: currentSort() });
             if (session !== pagingSession || !gridMode) return;
             total = newTotal;
             if (newItems.length > 0) {
@@ -819,7 +873,7 @@
         const anchorMint = items[0]?.token_mint_addr;
         const beforeTop = anchorMint ? (document.getElementById(`cell-${anchorMint}`)?.getBoundingClientRect()?.top ?? 0) : 0;
         try {
-            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, sort: currentSort() });
+            const prev = await loadPrevPage({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, baseOffset, ownerAddress: ownerFilter(), sort: currentSort() });
             if (!prev) { isLoadingPrev = false; return; }
             const newItems = prev.newItems;
             if (session !== pagingSession || !gridMode) return;
@@ -850,7 +904,7 @@
         isLoadingMore = true;
         const session = pagingSession;
         try {
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, ownerAddress: ownerFilter(), sort: currentSort() });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];
@@ -874,7 +928,7 @@
         try {
             const mint = items[activeIndex]?.token_mint_addr;
             if (!mint) return;
-            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, sort: currentSort() });
+            const body = buildSearchBody({ source: dataSource, valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, ownerAddress: ownerFilter(), sort: currentSort() });
             const data = await postSearch(dataSource, body);
             if (session !== pagingSession || gridMode || exploreIndex !== null) return;
             items = data.items ?? [];
@@ -915,6 +969,7 @@
         galleryLandingActive = true;
         galleryPagingArmed = false;
         dataSource = 'tokens';
+        activeOwnerAddress = null;
         if (selectedValueIds.size > 0) selectedValueIds = new Set();
         loading = true;
         error = null;
@@ -979,6 +1034,17 @@
             return;
         }
         marketPanelMode = nextPanelMode;
+    }
+
+    function handleStatusSearch(e: CustomEvent<any>) {
+        const detail = e.detail;
+        if (typeof detail === 'number') {
+            handleTokenSearch(detail);
+        } else if (detail?.type === 'token') {
+            handleTokenSearch(detail.tokenNum);
+        } else if (detail?.type === 'owner') {
+            handleOwnerSearch(detail.ownerAddress);
+        }
     }
 
     async function applyMarketPanelModeInGallery(nextPanelMode: MarketEventType | null) {
@@ -1240,6 +1306,9 @@
         on:openGallery={(e) => {
             openMarketEventInGallery(e.detail);
         }}
+        on:ownerSearch={(e) => {
+            handleOwnerSearch(e.detail);
+        }}
     />
 
     <div
@@ -1287,7 +1356,7 @@
             <GridView
                 items={items}
                 {dataSource}
-                filtersApplied={selectedValueIds.size > 0}
+                filtersApplied={selectedValueIds.size > 0 || !!activeOwnerAddress}
                 {loading}
                 targetMint={gridTargetMint}
                 columns={gridColumns}
@@ -1343,14 +1412,15 @@
               itemsLength={items.length}
               total={Number(total || 0)}
               gridCurrentPage={gridCurrentPage}
-              filtersApplied={selectedValueIds.size > 0}
+              filtersApplied={selectedValueIds.size > 0 || !!activeOwnerAddress}
+              ownerAddress={activeOwnerAddress}
               {sortAscListings}
               {sortAscTokens}
               networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev || $pendingRequestsStore > 0)}
               isMobile={isMobile}
               collapsed={!showMainBar}
               {currentRow}
-              on:tokenSearch={(e) => handleTokenSearch(e.detail)}
+              on:tokenSearch={handleStatusSearch}
               on:toggleSource={toggleDataSource}
               on:nextMode={() => {
                   if (gridMode) exitToGallery();
@@ -1362,7 +1432,7 @@
                   // Reset pagination to the first page and index
                   loading = true; pagingSession++; isLoadingMore = false; isLoadingPrev = false;
                   try {
-                      const res = await loadInitialPage({ source: dataSource, valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, sort: currentSort() });
+                      const res = await loadInitialPage({ source: dataSource, valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, ownerAddress: ownerFilter(), sort: currentSort() });
                       items = res.items; total = res.total; baseOffset = res.baseOffset; versionId = res.versionId;
                       await tick();
                       if (!gridMode && exploreIndex === null) { scrollerRef?.scrollToIndexInstant?.(0); activeIndex = 0; }

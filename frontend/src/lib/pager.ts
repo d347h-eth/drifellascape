@@ -24,6 +24,7 @@ export async function loadInitialPage(params: {
     limit: number;
     includeTraits: boolean;
     anchorMint?: string;
+    ownerAddress?: string;
     offset?: number;
     sort?: string;
 }): Promise<PageResult> {
@@ -33,6 +34,7 @@ export async function loadInitialPage(params: {
         limit: params.limit,
         includeTraits: params.includeTraits,
         anchorMint: params.anchorMint,
+        ownerAddress: params.ownerAddress,
         offset: params.offset ?? 0,
         sort: params.sort,
     });
@@ -52,6 +54,7 @@ export async function loadNextPage(params: {
     includeTraits: boolean;
     baseOffset: number;
     currentLength: number;
+    ownerAddress?: string;
     sort?: string;
 }): Promise<{ newItems: Row[]; newTotal: number }> {
     const offset = params.baseOffset + params.currentLength;
@@ -61,6 +64,7 @@ export async function loadNextPage(params: {
         limit: params.limit,
         includeTraits: params.includeTraits,
         offset,
+        ownerAddress: params.ownerAddress,
         sort: params.sort,
     });
     const data = await postSearch(params.source, body);
@@ -73,6 +77,7 @@ export async function loadPrevPage(params: {
     limit: number;
     includeTraits: boolean;
     baseOffset: number;
+    ownerAddress?: string;
     sort?: string;
 }): Promise<{ newItems: Row[]; newBaseOffset: number } | null> {
     const newOffset = Math.max(0, params.baseOffset - params.limit);
@@ -83,6 +88,7 @@ export async function loadPrevPage(params: {
         limit: params.limit,
         includeTraits: params.includeTraits,
         offset: newOffset,
+        ownerAddress: params.ownerAddress,
         sort: params.sort,
     });
     const data = await postSearch(params.source, body);
