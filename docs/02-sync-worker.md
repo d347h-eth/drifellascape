@@ -5,6 +5,7 @@ This document describes the Drifellascape synchronization worker in depth: what 
 ## Responsibilities
 
 - Periodically fetch the current listings for the Drifella III collection from the marketplace API.
+- Periodically fetch listing and sale activities for the same collection.
 - Normalize the data into a stable internal shape keyed by `tokenMint`.
 - Compute diffs against the active local snapshot to decide whether a new snapshot is warranted.
 - If changes exist, create and activate a new append‑only snapshot atomically; clean up stale rows.
@@ -16,9 +17,15 @@ This document describes the Drifellascape synchronization worker in depth: what 
   - `GET https://api-mainnet.magiceden.dev/v2/collections/drifella_iii/listings?offset=0&limit=100&sort=listPrice&listingAggMode=true&sort_direction=asc`
   - Pagination: `limit=100`; advance `offset` by 100 until returned page size < 100.
   - Rate limits: ≤ 2 RPS, ≤ 120 RPM (enforced by a simple in‑process limiter).
+- Source: Magic Eden activities API
+  - Listings: `GET https://api-mainnet.magiceden.dev/v2/collections/drifella_iii/activities?offset=0&limit=100&type=list`
+  - Sales: `GET https://api-mainnet.magiceden.dev/v2/collections/drifella_iii/activities?offset=0&limit=100&type=buyNow`
+  - Pagination: same `limit=100` / `offset += 100` contract.
 - Target: Local SQLite (WAL) schema
   - `listing_versions(id, created_at, total, active)` — only one row has `active=1`.
   - `listings_current(version_id, token_mint_addr, token_num?, price, seller, image_url, listing_source, created_at)` — append‑only snapshot rows; after activation, non‑active rows are deleted.
+  - `market_events(...)` — append-only listing/sale event rows, unique on `(event_type, signature, token_mint_addr)`.
+  - `market_event_sync_state(...)` — per-type historical backfill cursor.
 
 ## Control Flow (One Cycle)
 
@@ -43,6 +50,26 @@ Crash safety:
 
 - If process dies before activation, the pending version remains inactive and is ignored.
 - If it dies after activation but before cleanup, the next run’s cleanup removes any stragglers.
+
+## Market Event Flow
+
+The worker uses Magic Eden collection activities directly for market feeds rather than deriving sale/listing history from listing snapshot diffs.
+
+1. For each event type (`listing`, `sale`), fetch the first recent activity pages every cycle.
+2. If historical backfill is incomplete, fetch a bounded number of pages from the stored per-type cursor.
+3. Normalize only primary activity fields:
+   - `event_type`: internal `listing` from remote `type=list`, internal `sale` from remote `type=buyNow`
+   - `signature`, `source`, `slot`, `blockTime`
+   - `token_mint_addr = tokenMint`
+   - `price`: numeric SOL `price` converted to 9-decimal integer base units
+   - `seller`, `buyer?`, `image?`
+4. Insert with `INSERT OR IGNORE`; repeated recent pages and restarted backfills are idempotent.
+5. Advance `market_event_sync_state.backfill_offset` after each full historical page; mark complete when a page returns fewer than 100 rows.
+
+Operational notes:
+
+- The same in-process limiter is shared with listing fetches, so activities remain within the worker’s ≤ 2 RPS / ≤ 120 RPM budget.
+- Activity `priceInfo.solPrice.rawAmount` has been observed at a different scale from listings; the worker stores activity prices from the numeric SOL `price` field to keep all persisted prices in the project’s 9-decimal integer convention.
 
 ## Rate Limiting, Retries, Logging
 
@@ -146,10 +173,13 @@ Notes:
 Source layout (worker):
 
 - `worker/src/fetcher.ts`
-  - Rate limiter, retry wrapper, pagination, and normalization.
+  - Rate limiter, retry wrapper, pagination, listings normalization, and market event normalization.
   - Returns `{ ok: true, listings, pages, skipped } | { ok: false, error }`.
+- `worker/src/market-events.ts`
+  - Orchestrates recent activity sampling plus bounded historical backfill for listing/sale events.
 - `worker/src/repo.ts`
   - Small DB helpers (create temp table, load rows, count diffs, versioning, activation, cleanup).
+  - Market event insert helpers and backfill state updates.
   - `ensureActiveVersionId()` seeds an initial active version if missing.
 - `worker/src/sync.ts`
   - Orchestrates a single cycle: stage → diff → apply (if needed) → cleanup.
@@ -179,6 +209,8 @@ DB module (shared):
 ## Configuration
 
 - `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
+- `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
+- `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
 - Marketplace base URL and params are currently in code (single collection); can be externalized later if needed.
 
 ## Testing Strategy
@@ -186,6 +218,8 @@ DB module (shared):
 - Unit tests (Vitest):
   - `repo.countDiffs` with scenarios: no‑op, inserts, updates (epsilon below/at), deletes, mixed.
   - `fetcher.normalizeItem` for required field enforcement and parsing behavior.
+  - `fetcher.normalizeMarketEvent` for listing/sale activity field normalization and price scaling.
+  - Market event repo helpers for idempotent inserts and backfill state.
 - Test harness:
   - `setDbPath()` to point the DB module to an isolated temp file per test.
   - `initializeDatabase()` runs migrations for each test suite.
@@ -193,7 +227,7 @@ DB module (shared):
 
 ## Extensions & Future Work
 
-- Support additional endpoints (activities) and derived signals (e.g., delist/list events) while keeping the snapshot model intact.
+- Support additional activity types such as delists and accepted bids if the UI needs them.
 - Make the price epsilon configurable per collection/market conditions.
 - Consider `bigint` for price to future‑proof raw amounts.
 - Add metrics/health reporting for last sync time, last error, and current version id.

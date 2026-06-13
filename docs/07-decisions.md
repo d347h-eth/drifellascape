@@ -86,3 +86,9 @@
 
 - Decision: Add a left-side Traits explorer backed by `GET /traits/catalog`, but keep filtering behavior owned by the existing selected `valueIds` search flow.
 - Rationale: Users can browse the full trait catalog without creating a second filtering model. The bottom Filter panel remains viewport/current-token context; the explorer is an orchestrator over the same filter state.
+
+## ADR-017: Market Events from Activities API
+
+- Decision: Build listing and sale feeds from Magic Eden collection activities (`type=list` and `type=buyNow`) rather than deriving events from listing snapshot diffs.
+- Rationale: The activity endpoint provides historical, signature-backed market facts keyed by `tokenMint`; snapshot diffs only approximate list/delist/sale behavior and can miss events between worker cycles.
+- Notes: Store market events append-only with idempotent inserts keyed by `(event_type, signature, token_mint_addr)`. Normalize activity prices from numeric SOL `price` into the same 9-decimal integer base-unit convention used by listings.

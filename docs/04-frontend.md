@@ -18,6 +18,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — bottom Filter panel purpose pills + trait strip (fixed paging)
 - `frontend/src/components/TraitsExplorer.svelte` — left-side trait catalog explorer
+- `frontend/src/components/MarketFeed.svelte` — bottom-stack listing/sale event feed panel
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
 - `frontend/static/` — git-ignored image tree mounted by Caddy in production
@@ -26,7 +27,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -37,6 +38,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 - The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
+- The market feed panel loads `GET /market/events` and keeps its own All/Listings/Sales filter state.
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -115,6 +117,15 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Outside root-search mode, expanded buckets include a value search that filters from the first character.
 - Values default to rarity ascending inside each bucket; a compact sort toggle switches a bucket to trait-name alpha-numeric ascending.
 - Click a value to replace the current value filter with only that value. Ctrl-click adds that value to the current filter set. Both paths reuse the same selected-value filtering flow as the bottom filter panel.
+
+## Market Feed
+
+- Toggle: `Market` in the status bar.
+- Position: bottom stack above the Filter panel/status bar, sharing the same desktop/mobile bottom offset behavior.
+- Data: `GET /market/events` with `type=all|listing|sale`, offset paging, and newest-first ordering.
+- Rows show event kind, token number or shortened mint, event price in SOL, event time, source, shortened seller/buyer, and a token thumbnail.
+- Prices are event prices as recorded by the activity API; the frontend does not apply listing maker/royalty fee display math to sale/list event rows.
+- The panel fetches through the shared frontend API helper, so the existing network activity dot reflects market feed loads.
 
 ## Gallery/Listings Rendering
 
@@ -224,6 +235,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
   - Autosnap (enable/disable auto finalize to center). Default off on mobile.
   - Traits (show/hide left traits explorer)
   - Filter (show/hide bottom filter panel)
+  - Market (show/hide listing/sale event feed)
   - Hotkeys (open helper overlay)
   - About (open about overlay)
 - Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.

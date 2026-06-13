@@ -170,3 +170,47 @@ Notes:
 
 - The special `None` value (`trait_values.id = 217`) is excluded.
 - The endpoint is read-only catalog data; applying filters still uses `POST /listings/search` or `POST /tokens/search` with `valueIds`.
+
+## GET /market/events
+
+Retrieve listing and sale activity events, newest first.
+
+Query parameters:
+
+- `type` (string, default `all`): `all` | `listing` | `sale`
+- `offset` (int, default 0): starting index, `>= 0`
+- `limit` (int, default 50): number of items, `1..100`
+
+Response 200 (application/json):
+
+```json
+{
+  "type": "sale",
+  "total": 612,
+  "offset": 0,
+  "limit": 50,
+  "items": [
+    {
+      "id": 42,
+      "event_type": "sale",
+      "signature": "…",
+      "source": "magiceden_v2",
+      "slot": 426066496,
+      "block_time": 1781301192,
+      "token_mint_addr": "…",
+      "token_num": 920,
+      "token_name": "Drifella III #920",
+      "price": 2981400000,
+      "seller": "…",
+      "buyer": "…",
+      "image_url": "https://…"
+    }
+  ]
+}
+```
+
+Notes:
+
+- `event_type` is normalized to `listing` or `sale`. Magic Eden remote activity types are `list` and `buyNow`.
+- `price` is an integer in raw SOL units (9 decimals), matching listing rows.
+- `token_num`, `token_name`, and image fallback come from the static `tokens` table when available.

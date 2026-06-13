@@ -7,6 +7,7 @@ This document covers the local database used by Drifellascape: schema, migration
 - Engine: SQLite (file‑based) with WAL enabled
 - Access: Node `better-sqlite3` (sync API, fast & simple)
 - Purpose: store a normalized, append‑only snapshot of current listings, plus static token/trait tables for search and enrichment
+- Additional append-only market event rows back listing/sale feeds.
 - Migrations: plain SQL files executed by a small runner at startup
 
 ## File Layout
@@ -169,6 +170,35 @@ Operational note:
 Ingestion script (`scripts/traits/ingest-traits.ts`) populates these tables from the local metadata dump and a CSV mapping of mint ↔ image URL. All strings are ingested exactly as they appear in metadata (no normalization). The script recomputes counts for types, values, and type/value pairs.
 
 Duplicate images (expected): In this collection, multiple mints can reference the same `image_url`. The ingest script handles this by treating the CSV mapping as `image_url → queue of mints` and assigns each occurrence of the same image to the next mint in FIFO order. This guarantees all 1,333 mints are inserted into `tokens` even when only ~1,263 unique image URLs exist. The schema enforces uniqueness only on `token_mint_addr` and `token_num`, not on `image_url`.
+
+## Market Events Schema
+
+Migration `003_market_events_schema.sql` adds append-only event storage for Magic Eden collection activities:
+
+- `market_events`
+
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `event_type TEXT NOT NULL CHECK(event_type IN ('listing', 'sale'))`
+  - `signature TEXT NOT NULL`
+  - `source TEXT NOT NULL`
+  - `slot INTEGER NOT NULL`
+  - `block_time INTEGER NOT NULL`
+  - `token_mint_addr TEXT NOT NULL`
+  - `price INTEGER NOT NULL` using the same 9-decimal SOL base units as listings
+  - `seller TEXT`, `buyer TEXT`, `image_url TEXT`
+  - Unique key: `(event_type, signature, token_mint_addr)` for idempotent inserts
+  - Indexes: `(event_type, block_time DESC, slot DESC, id DESC)`, `(block_time DESC, slot DESC, id DESC)`, `(token_mint_addr, block_time DESC)`
+
+- `market_event_sync_state`
+  - `event_type TEXT PRIMARY KEY`
+  - `backfill_offset INTEGER NOT NULL DEFAULT 0`
+  - `backfill_complete INTEGER NOT NULL DEFAULT 0`
+  - `updated_at INTEGER NOT NULL`
+
+Design notes:
+
+- Market events do not participate in the active listing snapshot flip. They are independent append-only facts from the activities API.
+- The worker samples recent pages every cycle and advances historical backfill through `market_event_sync_state`, so reruns and duplicate pages are safe.
 
 ## Future Work
 

@@ -13,6 +13,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 - Local dev supervisor: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Worker: `logs/worker.log` — fetch attempts, skip counts, new version summaries or failures
+- Market events: `logs/worker.log` also records per-type pages fetched, rows inserted, skipped rows, and backfill cursor state
 - Backend: stdout/stderr (server start, errors)
 
 ## Database
@@ -60,6 +61,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 - Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30000, min 5000)
 - Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30000, min 5000), `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS` (default 30000, min 5000 at runtime)
+- Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default 2), `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default 5)
 
 ## Run Sequences
 
@@ -79,6 +81,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
     handle /listings* { reverse_proxy backend:3000 }
     handle /tokens* { reverse_proxy backend:3000 }
     handle /traits* { reverse_proxy backend:3000 }
+    handle /market* { reverse_proxy backend:3000 }
     handle /static/* { root * /srv/static; file_server }
     handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
   }
@@ -93,3 +96,8 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 - Start a temporary Caddy on `:8080` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
 - Test routes and static assets; tear down when done. This keeps the live Caddy untouched.
+
+### 10) Market feed is empty or stale
+
+- Symptoms: `GET /market/events` returns no rows or old rows.
+- Action: Check `logs/worker.log` for `Market listing events` and `Market sale events` lines. Inspect `market_event_sync_state` for `backfill_offset` and `backfill_complete`. If recent pages fail, confirm Magic Eden activities requests are not returning 429/5xx.

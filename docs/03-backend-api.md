@@ -5,6 +5,7 @@ This document describes the Drifellascape backend API: its in‑memory caching m
 ## Purpose
 
 - Serve the current listings snapshot quickly and cheaply.
+- Serve the append-only market event feed for listing and sale activity.
 - Provide server-side trait/value search for active listings and the static token catalog.
 - Decouple the basic listings read path from the database by keeping the active snapshot in memory.
 - Reload the in‑memory snapshot only when the active version flips in the database.
@@ -85,6 +86,42 @@ To avoid a race between reading the active version id and its rows while the wor
   - Response includes `total_tokens`, bucket metadata, per-value token counts, and per-value `rarity_pct`.
   - Used by the frontend traits explorer; filtering still goes through the existing Listings/Tokens search endpoints with `valueIds`.
 
+- `GET /market/events`
+  - Newest-first listing/sale activity feed from persisted Magic Eden activities.
+  - Query params:
+    - `type`: `all` (default), `listing`, or `sale`
+    - `offset`: default 0, clamped to `>= 0`
+    - `limit`: default 50, clamped to `[1, 100]`
+  - Response:
+    ```json
+    {
+      "type": "all",
+      "total": 123,
+      "offset": 0,
+      "limit": 50,
+      "items": [
+        {
+          "id": 1,
+          "event_type": "sale",
+          "signature": "…",
+          "source": "magiceden_v2",
+          "slot": 426066496,
+          "block_time": 1781301192,
+          "token_mint_addr": "…",
+          "token_num": 920,
+          "token_name": "Drifella III #920",
+          "price": 2981400000,
+          "seller": "…",
+          "buyer": "…",
+          "image_url": "https://…"
+        }
+      ]
+    }
+    ```
+  - Notes:
+    - `price` uses the same 9-decimal integer base-unit convention as listings.
+    - Rows are left-joined to `tokens` for `token_num`, `token_name`, and image fallback when the static token catalog is present.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
@@ -116,6 +153,7 @@ Notes:
   - `getActiveVersionId()`: reads the active version id.
   - `loadSnapshot(versionId)`: loads all rows for the given version id.
   - `loadActiveSnapshotConsistent()`: reads id+rows in a single transaction (preferred).
+  - `loadMarketEvents()`: loads newest-first market events with optional type filtering and token enrichment.
 
 ## Concurrency & Database
 
@@ -149,6 +187,7 @@ Notes:
 
 - Add health endpoint (e.g., `/health`) with last refresh time, version id, and item count.
 - Add optional filters for price ranges, marketplace source, and token number if the UI needs them.
+- Add optional market event filters for price ranges, marketplace source, token number, and date ranges if the UI needs them.
 - Improve sorting: tie‑breakers, then secondary fields.
 - Consider gzip/deflate if payloads grow (many listings); Vite dev already handles compression for frontend.
 
@@ -162,4 +201,4 @@ yarn backend:run
 DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, and `/traits*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
