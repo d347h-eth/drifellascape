@@ -6,14 +6,14 @@
     import HelpOverlay from "./components/HelpOverlay.svelte";
     import AboutOverlay from "./components/AboutOverlay.svelte";
     import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
-    import MarketFeed from "./components/MarketFeed.svelte";
+    import MarketExplorer from "./components/MarketExplorer.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import TraitsExplorer from "./components/TraitsExplorer.svelte";
     import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore, fetchTraitsCatalog } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
-    import type { Row, ListingTrait, DataSource, TraitsCatalog } from "./lib/types";
+    import type { Row, ListingTrait, DataSource, TraitsCatalog, MarketEventType } from "./lib/types";
 
     // Types moved to lib/types.ts
 
@@ -35,7 +35,7 @@
     let exploreItems: Row[] | null = null;
     let showHelp = false;
     let showAbout = false;
-    let showMarketFeed = false;
+    let marketPanelMode: MarketEventType | null = null;
     let showTraitBar = false;
     let showTraitsExplorer = false;
     let traitsCatalog: TraitsCatalog | null = null;
@@ -54,6 +54,11 @@
     let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
     let statusBarRef: any = null;
+    $: marketPanelVisible = gridMode && exploreIndex === null && marketPanelMode !== null;
+    $: if ((!gridMode || exploreIndex !== null) && marketPanelMode !== null) marketPanelMode = null;
+    $: gridColumns = !isMobile
+        ? Math.max(1, 3 - (showTraitsExplorer ? 1 : 0) - (marketPanelVisible ? 1 : 0))
+        : 3;
 
     // Horizontal scroller state (delegated to GalleryScroller)
     let activeIndex = 0; // nearest item to viewport center
@@ -898,6 +903,59 @@
         activeIndex = i;
     }
 
+    async function openMarketEventInGallery(mint: string) {
+        marketPanelMode = null;
+        dataSource = 'tokens';
+        if (selectedValueIds.size > 0) selectedValueIds = new Set();
+        loading = true;
+        error = null;
+        pagingSession++;
+        isLoadingMore = false;
+        isLoadingPrev = false;
+        try {
+            const resp = await postSearch('tokens', buildSearchBody({
+                source: 'tokens',
+                valueIds: [],
+                limit: DEFAULT_SEARCH_LIMIT,
+                includeTraits: true,
+                anchorMint: mint,
+                sort: currentSort(),
+            }));
+            items = resp.items ?? [];
+            total = Number(resp.total || 0);
+            baseOffset = Number(resp.offset || 0);
+            versionId = resp.versionId ?? versionId;
+            gridCurrentPage = computeGridPageBackward();
+            const idx = items.findIndex((r) => r.token_mint_addr === mint);
+            const i = idx >= 0 ? idx : 0;
+            gridMode = false;
+            if (isMobile) showMainBar = false;
+            try {
+                const row: any = items[i] as any;
+                const tn = row?.token_num;
+                if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('token', String(tn));
+                    window.history.replaceState({}, '', url.toString());
+                }
+            } catch {}
+            anchorArm(mint);
+            await tick();
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+            scrollerRef?.scrollToIndexInstant?.(i);
+            activeIndex = i;
+        } catch (e: any) {
+            error = e?.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    function handleMarketPanelToggle(nextMode: MarketEventType) {
+        if (!gridMode || exploreIndex !== null) return;
+        marketPanelMode = marketPanelMode === nextMode ? null : nextMode;
+    }
+
     function openExploreByMint(mint: string) {
         showTraitsExplorer = false;
         exploreItems = items.slice(); // freeze current page order
@@ -992,15 +1050,23 @@
         margin: 0;
         padding: 0;
         --traits-explorer-width: min(33vw, 480px);
+        --market-explorer-width: min(33vw, 480px);
     }
     .main-viewport {
         min-height: 100vh;
         width: 100%;
-        transition: margin-left 120ms ease, width 120ms ease;
+        transition: margin-left 120ms ease, margin-right 120ms ease, width 120ms ease;
     }
     .main-viewport.traitsOpen {
         margin-left: var(--traits-explorer-width);
         width: calc(100% - var(--traits-explorer-width));
+    }
+    .main-viewport.marketOpen {
+        margin-right: var(--market-explorer-width);
+        width: calc(100% - var(--market-explorer-width));
+    }
+    .main-viewport.traitsOpen.marketOpen {
+        width: calc(100% - var(--traits-explorer-width) - var(--market-explorer-width));
     }
     .status { opacity: 0.8; font-size: 14px; padding: 8px 0 16px; }
     .error { color: #ff6b6b; }
@@ -1055,6 +1121,9 @@
     .bottom-stack.traitsOpen {
         left: var(--traits-explorer-width);
     }
+    .bottom-stack.marketOpen {
+        right: var(--market-explorer-width);
+    }
     .gallery-entry-overlay { width: 100%; pointer-events: auto; }
     .overlay-msg {
         position: sticky; top: 40svh; left: 50%; transform: translateX(-50%);
@@ -1068,8 +1137,15 @@
             margin-left: 0;
             width: 100%;
         }
+        .main-viewport.marketOpen {
+            margin-right: 0;
+            width: 100%;
+        }
         .bottom-stack.traitsOpen {
             left: 0;
+        }
+        .bottom-stack.marketOpen {
+            right: 0;
         }
         .edge.left.traitsOpen {
             left: 0;
@@ -1091,7 +1167,21 @@
         on:valueClick={handleTraitsExplorerValueClick}
     />
 
-    <div class="main-viewport" class:traitsOpen={showTraitsExplorer && !isMobile}>
+    <MarketExplorer
+        visible={marketPanelVisible}
+        mode={marketPanelMode ?? 'sale'}
+        {isMobile}
+        on:close={() => (marketPanelMode = null)}
+        on:openGallery={(e) => {
+            openMarketEventInGallery(e.detail);
+        }}
+    />
+
+    <div
+        class="main-viewport"
+        class:traitsOpen={showTraitsExplorer && !isMobile}
+        class:marketOpen={marketPanelVisible && !isMobile}
+    >
         {#if !gridMode}
             <!-- Horizontal scroller -->
             {#if isMobile && showGalleryEntryOverlay}
@@ -1133,7 +1223,7 @@
                 filtersApplied={selectedValueIds.size > 0}
                 {loading}
                 targetMint={gridTargetMint}
-                columns={showTraitsExplorer && !isMobile ? 2 : 3}
+                columns={gridColumns}
                 enablePaging={pagingArmed && !loading && (total ?? 0) > items.length}
                 loadingMore={isLoadingMore}
                 on:openGallery={(e) => openGalleryByMint(e.detail)}
@@ -1154,11 +1244,12 @@
     
     <!-- Bottom stack: fixed container that stacks the filter panel (if visible) above StatusBar, with proper bottom offset -->
     {#if !(isMobile && showGalleryEntryOverlay)}
-      <div class="bottom-stack" class:traitsOpen={showTraitsExplorer && !isMobile} style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}>
-          <MarketFeed
-              visible={showMarketFeed}
-              on:close={() => (showMarketFeed = false)}
-          />
+      <div
+          class="bottom-stack"
+          class:traitsOpen={showTraitsExplorer && !isMobile}
+          class:marketOpen={marketPanelVisible && !isMobile}
+          style={`bottom: ${isMobile ? 0 : ((!gridMode && exploreIndex === null) ? 15 : 0)}px`}
+      >
           {#if showTraitBar}
               <TraitBar
                   traits={traitsForCurrent}
@@ -1177,7 +1268,7 @@
               {autoSnapEnabled}
               {showTraitBar}
               {showTraitsExplorer}
-              {showMarketFeed}
+              {marketPanelMode}
               gridMode={gridMode}
               inExplore={exploreIndex !== null}
               {activeIndex}
@@ -1213,7 +1304,7 @@
               }}
               on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
               on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
-              on:toggleMarketFeed={() => { showMarketFeed = !showMarketFeed; }}
+              on:toggleMarketPanel={(e) => handleMarketPanelToggle(e.detail)}
               on:toggleTraitsExplorer={toggleTraitsExplorer}
               on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
               on:toggleHelp={() => { showHelp = !showHelp; }}

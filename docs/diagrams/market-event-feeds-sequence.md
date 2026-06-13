@@ -1,12 +1,12 @@
 # Market Event Feeds — E2E Sequence
 
-This diagram shows how listing and sale activity moves from Magic Eden into the local append-only feed and then into the frontend `Market` panel.
+This diagram shows how listing and sale activity moves from Magic Eden into the local append-only feed and then into the Grid-only right-side market panel.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant User
-    participant FE as Frontend<br/>MarketFeed.svelte
+    participant FE as Frontend<br/>MarketExplorer.svelte
     participant API as Backend<br/>GET /market/events
     participant Repo as Backend Repo<br/>loadMarketEvents
     participant DB as SQLite<br/>market_events + tokens
@@ -57,19 +57,20 @@ sequenceDiagram
     end
 
     rect rgb(65, 49, 65)
-        Note over User,DB: Read path, triggered when the user opens the Market panel
-        User->>FE: Click Market
-        FE->>API: fetchMarketEvents(type=all, offset=0, limit=50)
+        Note over User,DB: Read path, triggered from Grid via sales/listings status-bar buttons
+        User->>FE: Click sales or listings
+        FE->>FE: open right side-panel<br/>mode=sale|listing
+        FE->>API: fetchMarketEvents(type=sale|listing, offset=0, limit=50)
         API->>API: clamp type/offset/limit
         API->>Repo: loadMarketEvents(type, offset, limit)
         Repo->>DB: SELECT count + newest-first rows<br/>LEFT JOIN tokens by token_mint_addr
         DB-->>Repo: events enriched with token_num,<br/>token_name, image fallback
         Repo-->>API: total, offset, limit, items
         API-->>FE: JSON feed response
-        FE->>FE: render All/Listings/Sales tabs,<br/>event rows, thumbnails, wallets, price
+        FE->>FE: render compact rows:<br/>relative time, 540h preview,<br/>price SOL • #token • owner flow
 
-        opt user clicks More
-            User->>FE: Click More
+        opt user scrolls near feed bottom
+            User->>FE: Scroll feed
             FE->>API: fetchMarketEvents(type, offset=items.length, limit=50)
             API->>Repo: loadMarketEvents(type, offset, limit)
             Repo->>DB: SELECT next page
@@ -78,8 +79,8 @@ sequenceDiagram
             FE->>FE: append rows
         end
 
-        opt user switches feed filter
-            User->>FE: Click All/Listings/Sales
+        opt user switches feed mode
+            User->>FE: Click sales or listings
             FE->>FE: reset items and offset
             FE->>API: fetchMarketEvents(new_type, offset=0, limit=50)
             API->>Repo: loadMarketEvents(new_type, 0, 50)
@@ -87,6 +88,12 @@ sequenceDiagram
             DB-->>Repo: event rows
             API-->>FE: JSON feed response
             FE->>FE: replace rendered feed
+        end
+
+        opt user opens token from event
+            User->>FE: Click preview or #token
+            FE->>FE: close market panel
+            FE->>FE: navigate to Gallery centered on token mint
         end
     end
 ```
@@ -97,4 +104,5 @@ Key properties:
 - The worker samples recent activity pages every cycle so new events appear without waiting for full historical backfill.
 - Historical backfill is bounded per cycle by `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`.
 - The backend reads are short SQLite transactions and never touch the in-memory listings cache.
+- The frontend market feed is Grid-only; opening a token from a row closes the side-panel and enters Gallery centered on that mint.
 - The frontend market feed uses the shared API helper, so the existing network activity dot reflects feed loads.
