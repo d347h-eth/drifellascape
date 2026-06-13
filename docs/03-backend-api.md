@@ -168,6 +168,8 @@ Notes:
 
 ## Configuration
 
+In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaults before starting the backend; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
+
 - `DRIFELLASCAPE_BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
 - `DRIFELLASCAPE_PORT` — server port (default `3000`).
 - `DRIFELLASCAPE_DEBUG` — when set, search responses include `anchorDebug`.

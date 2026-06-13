@@ -227,6 +227,8 @@ DB module (shared):
 
 ## Configuration
 
+In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local defaults before starting the worker; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
+
 - `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
 - `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
 - `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.

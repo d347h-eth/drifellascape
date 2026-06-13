@@ -9,13 +9,19 @@ RELEASE_ID="${1:-$(date +%Y%m%d%H%M%S)}"
 
 mkdir -p releases
 
+# shellcheck disable=SC1091
+source "${PROJECT_ROOT}/scripts/dev/load-env.sh"
+load_project_env .env
+
 echo "[frontend-build] Building release ${RELEASE_ID}"
 DEFAULT_VITE_API_BASE="https://api.drifellascape.art"
 VITE_API_BASE=${VITE_API_BASE:-$DEFAULT_VITE_API_BASE}
+VITE_POLL_MS=${VITE_POLL_MS:-30000}
 
 docker compose run --rm \
     -e RELEASE_ID="$RELEASE_ID" \
     -e VITE_API_BASE="$VITE_API_BASE" \
+    -e VITE_POLL_MS="$VITE_POLL_MS" \
     frontend-build
 
 ln -sfn "$RELEASE_ID" releases/current

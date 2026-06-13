@@ -27,6 +27,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
+- `yarn dev` loads root `.env` as local defaults before starting Vite; already-set env vars still take precedence. If running Vite directly from `frontend/`, copy `frontend/.env.example` to `frontend/.env` or export the vars in your shell.
 - `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)

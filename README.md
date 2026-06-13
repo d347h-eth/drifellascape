@@ -36,13 +36,20 @@ Install deps:
 yarn install
 ```
 
+Prepare local env:
+
+```bash
+cp .env.example .env
+# Optional: set HELIUS_KEY=... to enable ownership sync
+```
+
 Run the full local stack:
 
 ```bash
 yarn dev
 ```
 
-This starts the backend, worker, and frontend. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
+This starts the backend, worker, and frontend. The backend/worker scripts and the full dev script load root `.env` as local defaults when present; already-set env vars still take precedence. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
 
 Run backend API only (port 3000):
 
@@ -102,7 +109,7 @@ The VPS setup builds the frontend once per release and serves the static output 
    # optional custom ID: ./scripts/release/build-frontend-release.sh 20241021-frontend
    ```
    The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
-   By default the build sets `VITE_API_BASE=https://api.drifellascape.art`; export `VITE_API_BASE` before running the script to override.
+   By default the build sets `VITE_API_BASE=https://api.drifellascape.art` and `VITE_POLL_MS=30000`; set either in `.env` or export them before running the script to override.
 3. Reload Caddy to swap the live assets:
    ```bash
    docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile

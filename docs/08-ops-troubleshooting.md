@@ -59,6 +59,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Environment Variables
 
+- Copy `.env.example` to `.env` for local dev and Docker Compose. `yarn backend:run`, `yarn worker:run`, and `yarn dev` load root `.env` as local defaults; already-set env vars still take precedence. Compose passes the same values into backend, worker, and frontend-build containers with defaults.
 - Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30000, min 5000)
 - Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30000, min 5000), `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS` (default 30000, min 5000 at runtime)

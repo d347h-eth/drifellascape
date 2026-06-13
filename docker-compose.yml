@@ -6,7 +6,9 @@ services:
         working_dir: /app
         command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn backend:run"
         environment:
-            - DRIFELLASCAPE_BACKEND_REFRESH_MS=30000
+            DRIFELLASCAPE_PORT: ${DRIFELLASCAPE_PORT:-3000}
+            DRIFELLASCAPE_BACKEND_REFRESH_MS: ${DRIFELLASCAPE_BACKEND_REFRESH_MS:-30000}
+            DRIFELLASCAPE_DEBUG: ${DRIFELLASCAPE_DEBUG:-}
         volumes:
             - ./:/app
             - ./logs:/app/logs
@@ -17,7 +19,12 @@ services:
         working_dir: /app
         command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn worker:run"
         environment:
-            - DRIFELLASCAPE_SYNC_INTERVAL_MS=30000
+            DRIFELLASCAPE_SYNC_INTERVAL_MS: ${DRIFELLASCAPE_SYNC_INTERVAL_MS:-30000}
+            DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES: ${DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES:-2}
+            DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES: ${DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES:-5}
+            HELIUS_KEY: ${HELIUS_KEY:-}
+            DRIFELLASCAPE_HELIUS_KEY: ${DRIFELLASCAPE_HELIUS_KEY:-}
+            DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS: ${DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS:-600000}
         volumes:
             - ./:/app
             - ./logs:/app/logs
@@ -40,6 +47,9 @@ services:
             rm -rf /app/releases/\"$${RELEASE_ID}\" &&
             mkdir -p /app/releases/\"$${RELEASE_ID}\" &&
             yarn workspace @drifellascape/frontend build --outDir /app/releases/\"$${RELEASE_ID}\""
+        environment:
+            VITE_API_BASE: ${VITE_API_BASE:-https://api.drifellascape.art}
+            VITE_POLL_MS: ${VITE_POLL_MS:-30000}
         volumes:
             - ./:/app
 
