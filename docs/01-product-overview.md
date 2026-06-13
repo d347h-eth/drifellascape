@@ -7,6 +7,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 - Create a fast, dependable explorer for a single NFT collection (Drifella III, 1,333 tokens) that:
   - Periodically syncs authoritative listings from a remote marketplace API under strict rate limits.
   - Indexes listing and sale activity into an append-only market event feed.
+  - Optionally snapshots collection ownership from Helius so users can filter tokens by owner address.
   - Maintains an accurate, query‑friendly local state (normalized, append‑only snapshots) for reliability and performance.
   - Serves users quickly and economically by keeping the current snapshot in memory.
   - Provides a crisp, high‑fidelity “image exploration” experience of original token artwork with precise pixel rendering.
@@ -27,6 +28,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Normalizes and stages data into a temp table; computes diffs; creates a new snapshot only if inserts/updates/deletes exist.
   - Flips the active version atomically; cleans up stale rows.
   - Fetches Magic Eden collection activities for listing (`type=list`) and sale (`type=buyNow`) events, inserting them idempotently.
+  - If a Helius key is configured, fetches an ownership snapshot at a slower cadence and flips it with the same append-only version model.
 - Database (SQLite + better‑sqlite3, WAL)
   - Tables: `listing_versions` (one active), `listings_current` (append‑only snapshot rows).
   - Concurrency: WAL enables concurrent reads while the worker writes short transactions.
@@ -46,6 +48,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 1. Worker → DB
    - Marketplace API → normalized rows → temp table → diff → new version → flip → cleanup
    - Marketplace activities → normalized market events → append-only idempotent inserts
+   - Helius ownership → normalized rows → temp table → diff → new ownership version → flip → cleanup
 2. DB → Backend
    - Backend on startup: migration + load active snapshot → in‑memory cache → periodic refresh if version changes
 3. Backend → Frontend
@@ -68,6 +71,12 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Listing rows use remote `type=list`; sale rows use remote `type=buyNow`.
   - Fields of interest: `signature`, `source`, `tokenMint`, `slot`, `blockTime`, `seller`, `buyer`, numeric `price`, and `image`.
   - Activity `priceInfo.solPrice.rawAmount` is not stored at the same scale as listing rows, so the worker normalizes activity prices from numeric SOL `price` into the project’s 9-decimal integer convention.
+- Optional ownership endpoint (Helius DAS):
+  - `POST https://mainnet.helius-rpc.com/?api-key=...` using JSON-RPC `getAssetsByGroup`.
+  - Group: `collection = ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ`.
+  - Pagination: `limit=1000`; Drifella III currently needs two pages for 1,333 tokens.
+  - Fields of interest: asset `id` (mint) and `ownership.owner`.
+  - Listed tokens use the active Magic Eden listing `seller` as effective owner while retaining the Helius owner as `onchain_owner`.
 
 ## Local Data Model
 
@@ -83,10 +92,14 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 - Market events
   - `market_events` stores append-only listing/sale rows keyed idempotently by `(event_type, signature, token_mint_addr)`.
   - `market_event_sync_state` tracks per-type historical backfill progress while every worker cycle still samples recent pages.
+- Ownership
+  - `ownership_versions` and `ownership_current` mirror the active-version snapshot model for token owner data.
+  - `ownership_current.owner` is the effective filter owner; `onchain_owner` keeps the Helius owner; `listed_owner` records the listing seller when present.
 
 ## Synchronization Strategy (Worker)
 
 - Periodic cadence: default every 30 seconds; configurable via env.
+- Ownership cadence: default every 10 minutes, optional, and skipped entirely when no Helius key is configured.
 - Rate limiter: respects 2 RPS / 120 RPM; sequential page fetching with retries (exponential backoff).
 - Diffing algorithm:
   - Stage normalized rows into `temp_listings` (deduplicated by `token_mint_addr`).
@@ -101,7 +114,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 
 - In‑memory cache: load active listings snapshot on startup; background loop checks for `active` version change (default every 30s, clamped to at least 5s).
 - `GET /listings?offset=0&limit=100&sort=price_asc|price_desc` returns the in‑memory active listing rows.
-- `POST /listings/search` and `POST /tokens/search` run short, transactionally consistent DB reads for trait/value filtering, enrichment, and anchor-based pagination.
+- `POST /listings/search` and `POST /tokens/search` run short, transactionally consistent DB reads for trait/value/owner filtering, enrichment, and anchor-based pagination.
 - No auth; CORS enabled for ease of development; designed for ~100 concurrent users.
 
 ## Frontend UX (Svelte)
@@ -111,6 +124,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Fetches `POST /listings/search` by default with `limit=50`, traits attached, price ascending sort, and staged periodic listings refresh (default 30s; clamped to at least 5s).
   - Data source toggle `T` switches between current Listings and canon Tokens; both sources support filtering, anchoring, and paging.
   - Market feed: Grid/Gallery right side-panel for newest-first sales and listing events, opened by separate `Sales` and `Listings` status-bar buttons.
+  - Owner filtering starts from the token/owner search input or from seller/buyer links in market feeds, then opens Grid over tokens held by that owner.
   - Traits explorer toggle `F` opens the left trait catalog panel; focus/refocus uses `B`.
   - Gallery/Grid images are loaded from static JPG assets under `https://app.drifellascape.art/static/art/{2560,540h}/...`; exploration mode uses the original `image_url` from marketplace/listing data.
 - Price display
@@ -146,6 +160,8 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default: 30000)
   - `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default: 2)
   - `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default: 5)
+  - `HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY` for optional ownership sync
+  - `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS` (default: 600000)
 - Backend
   - `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default: 30000)
   - `DRIFELLASCAPE_PORT` (default: 3000)
@@ -158,6 +174,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
 - Search and filters
   - Existing: token/trait normalization, value/trait filtering, and Listings/Tokens search endpoints.
   - Existing: market listing/sale event feed from Magic Eden activities.
+  - Existing: Helius-backed owner filtering for tokens/listings search.
   - Remaining: price range, marketplace source, token-number filters, and richer event types if the UI needs them.
 - Frontend UX
   - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.

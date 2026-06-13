@@ -6,6 +6,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 
 - Slow & steady sync worker (rate‑limited; resilient), append‑only snapshots with atomic activation
 - Market event indexing for listing and sale feeds from Magic Eden collection activities
+- Optional Helius ownership snapshots for owner-address token filtering
 - Normalized SQLite schema (WAL); concurrent reads while syncing
 - Backend API with an in‑memory listings cache plus DB‑side search for listings/tokens
 - Frontend (Svelte) with:
@@ -57,6 +58,7 @@ Run worker (infinite loop, default 30s interval):
 yarn worker:run
 # Optional env:
 #   DRIFELLASCAPE_SYNC_INTERVAL_MS=60000 yarn worker:run
+#   HELIUS_KEY=... yarn worker:run
 ```
 
 Run frontend (dev server on port 5173):

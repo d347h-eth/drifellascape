@@ -61,6 +61,7 @@ Body (application/json):
 - `sort` (string, default `price_asc`): `price_asc` | `price_desc`
 - `offset` (int, default 0), `limit` (int, default 100; max 200)
 - `includeTraits` (bool, default true): include full traits per token
+- `ownerAddress` (string, optional): filter to tokens whose active ownership snapshot has `owner = ownerAddress`
 - `anchorMint` (string, optional): exclusive with `offset`. When provided, the server computes the page so that this mint appears (centered when possible) and returns the effective `offset` used in the response.
 
 Response 200 (application/json):
@@ -80,6 +81,9 @@ Response 200 (application/json):
       "seller": "…",
       "image_url": "https://…",
       "listing_source": "…",
+      "owner": "…",
+      "onchain_owner": "…",
+      "listed_owner": "…",
       "token_id": 999,
       "token_name": "Drifella III #1058",
       "traits": [
@@ -100,6 +104,7 @@ Response 200 (application/json):
 Notes:
 
 - Unknown IDs are ignored (no results error).
+- `ownerAddress` is optional and uses the active ownership snapshot. Before ownership sync runs, owner-filtered results are empty.
 - The backend excludes the special `None` value (`trait_values.id = 217`) from filtering and traits to reduce noise.
 - Consistent read: results are anchored to the active snapshot.
 - Exclusive params: provide either `anchorMint` or `offset`. When `anchorMint` is present, `offset` is ignored and the response `offset` reflects the computed effective offset.
@@ -117,11 +122,13 @@ Body (application/json):
 - `sort` (string, default `token_asc`): `token_asc` | `token_desc`
 - `offset` (int, default 0), `limit` (int, default 100; max 100)
 - `includeTraits` (bool, default true)
+- `ownerAddress` (string, optional): filter to tokens whose active ownership snapshot has `owner = ownerAddress`
 - `anchorMint` (string, optional): exclusive with `offset`. When provided, the server computes the page so that this mint appears (centered when possible) and returns the effective `offset` used in the response.
 
 Notes:
 
 - `tokens` represents the canon dataset; response `versionId` is always `null`.
+- Search rows include `owner`, `onchain_owner`, and `listed_owner` when ownership data exists.
 - The server still returns an effective `offset` and honors `anchorMint`.
 - Exclusive params: provide either `anchorMint` or `offset`.
 - Debug: if `DRIFELLASCAPE_DEBUG` is set, the response includes `anchorDebug: { anchorMint, effectiveOffset, pageContainsAnchor }`.

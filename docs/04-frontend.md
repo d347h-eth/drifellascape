@@ -39,6 +39,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 - The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
 - The market event side-panel loads `GET /market/events` for the active `Sales` or `Listings` feed mode.
+- The token search input accepts `#NUM` or an owner address. Numeric input jumps to the token via Tokens mode; owner input opens Grid filtered to tokens held by that owner.
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -126,6 +127,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Data: `GET /market/events` with `type=sale|listing`, offset paging, and newest-first ordering.
 - Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode while keeping the market side-panel open.
 - Listing rows use the same panel and image treatment, with the seller address in the compact detail line.
+- Masked seller/buyer addresses are buttons that open owner-filtered Grid results without closing the market panel.
 - Prices are event prices as recorded by the activity API; the frontend does not apply listing maker/royalty fee display math to sale/list event rows.
 - The panel fetches through the shared frontend API helper, so the existing network activity dot reflects market feed loads.
 
@@ -189,7 +191,8 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Images — grid uses downsized assets from `https://app.drifellascape.art/static/art/540h/{mint}.jpg` for faster loads.
 - Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
-- Empty results — Listings mode shows a link to switch to Tokens browsing (`T` does the same). The filter-change hint appears only when trait filters are currently applied; Tokens mode shows the same filter hint only when filters are applied.
+- Owner filters are carried through Grid paging, sorting, source toggles, and Gallery recentering until a direct token jump clears them.
+- Empty results — Listings mode shows a link to switch to Tokens browsing (`T` does the same). The filter-change hint appears only when filters are currently applied; Tokens mode shows the same filter hint only when filters are applied.
 
 ### Image Swapping & Flicker Control
 
@@ -242,7 +245,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Right section buttons:
   - Sales (show/hide sales side-panel in Grid/Gallery)
   - Listings (show/hide listings side-panel in Grid/Gallery)
-- Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
+- Token search — `#NUM` (0–1332) or owner address. Enter on a token jumps to that token (Tokens mode); Enter on an owner address opens owner-filtered Grid. The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)
   - Grid: Page X/Y and Total N (always for Listings; for Tokens only when filtered)

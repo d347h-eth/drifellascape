@@ -14,6 +14,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 - Local dev supervisor: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
 - Worker: `logs/worker.log` — fetch attempts, skip counts, new version summaries or failures
 - Market events: `logs/worker.log` also records per-type pages fetched, rows inserted, skipped rows, and backfill cursor state
+- Ownership: `logs/worker.log` records Helius missing-key skips once, applied/no-change summaries, and failures
 - Backend: stdout/stderr (server start, errors)
 
 ## Database
@@ -62,6 +63,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 - Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30000, min 5000), `DRIFELLASCAPE_PORT`, `DRIFELLASCAPE_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS` (default 30000, min 5000 at runtime)
 - Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` (default 2), `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` (default 5)
+- Ownership: `HELIUS_KEY` or `DRIFELLASCAPE_HELIUS_KEY`; `DRIFELLASCAPE_OWNERSHIP_SYNC_INTERVAL_MS` (default 600000, min 60000)
 
 ## Run Sequences
 
@@ -101,3 +103,8 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 - Symptoms: `GET /market/events` returns no rows or old rows.
 - Action: Check `logs/worker.log` for `Market listing events` and `Market sale events` lines. Inspect `market_event_sync_state` for `backfill_offset` and `backfill_complete`. If recent pages fail, confirm Magic Eden activities requests are not returning 429/5xx.
+
+### 11) Owner filter is empty
+
+- Symptoms: searching an owner address returns no Grid rows.
+- Action: Check whether `HELIUS_KEY` / `DRIFELLASCAPE_HELIUS_KEY` is configured. Then inspect `logs/worker.log` for `Ownership sync` lines and `ownership_sync_state.last_success_at`. If listings are present, listed tokens should use the listing seller as the effective owner.

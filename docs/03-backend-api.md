@@ -62,8 +62,10 @@ To avoid a race between reading the active version id and its rows while the wor
     - `traits`: `{ typeId: number, valueIds: number[] }[]` (AND across types, OR within values)
     - `offset`, `limit` (default 0/100; max 200), `sort` (`price_asc` | `price_desc`), `includeTraits` (default true)
     - `anchorMint` (optional): exclusive with `offset`. When present, the server computes the page so this mint appears (centered when possible) and returns the effective `offset` used.
+    - `ownerAddress` (optional): filters to rows whose active ownership snapshot has `owner = ownerAddress`.
   - Notes:
     - Consistent read: results are anchored to the active snapshot id.
+    - Owner filtering uses the active ownership snapshot. If ownership sync has not run or no matching owner exists, results are empty.
     - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
     - If `DRIFELLASCAPE_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
   - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
@@ -76,12 +78,15 @@ To avoid a race between reading the active version id and its rows while the wor
     - `mode`, `valueIds`, `traits`, `includeTraits` same as listings.
     - `offset`, `limit` (default 0/100; max 100), `sort` (`token_asc` | `token_desc`).
     - `anchorMint` (optional): exclusive with `offset`. Behavior mirrors listings search; response `offset` is the effective offset used.
+    - `ownerAddress` (optional): filters the canon token dataset by the active ownership snapshot.
   - Notes:
     - Tokens are static; the response uses `versionId: null`.
+    - Owner filtering still depends on the active ownership snapshot produced by the worker.
     - Excludes `trait_values.id = 217` ("None").
     - If `DRIFELLASCAPE_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
 
 - `GET /traits/catalog`
+
   - Returns all non-`None` trait buckets and values from the static token metadata catalog.
   - Response includes `total_tokens`, bucket metadata, per-value token counts, and per-value `rarity_pct`.
   - Used by the frontend traits explorer; filtering still goes through the existing Listings/Tokens search endpoints with `valueIds`.
