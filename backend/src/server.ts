@@ -107,6 +107,13 @@ function sanitizeGroups(arr: any): TraitFilterGroup[] {
     return out;
 }
 
+function sanitizeOwnerAddress(raw: any): string | undefined {
+    if (typeof raw !== "string") return undefined;
+    const value = raw.trim();
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return undefined;
+    return value;
+}
+
 async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
     try {
         const raw = await readBody(req);
@@ -129,11 +136,19 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 200);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const ownerAddress = sanitizeOwnerAddress(body.ownerAddress);
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
             const { versionId, total, usedOffset, items } =
-                searchListingsByTraits(groups, sort, offset, limit, anchorMint);
+                searchListingsByTraits(
+                    groups,
+                    sort,
+                    offset,
+                    limit,
+                    anchorMint,
+                    ownerAddress,
+                );
             const enriched = includeTraits ? attachTraits(items) : items;
             const respBody: any = {
                 versionId,
@@ -165,6 +180,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
             offset,
             limit,
             anchorMint,
+            ownerAddress,
         );
         const enriched = includeTraits ? attachTraits(items) : items;
         {
@@ -224,6 +240,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 100);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const ownerAddress = sanitizeOwnerAddress(body.ownerAddress);
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
@@ -233,6 +250,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 offset,
                 limit,
                 anchorMint,
+                ownerAddress,
             );
             const enriched = includeTraits ? attachTraitsGeneric(items) : items;
             const respBody: any = {
@@ -264,6 +282,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
             offset,
             limit,
             anchorMint,
+            ownerAddress,
         );
         const enriched = includeTraits ? attachTraitsGeneric(items) : items;
         {

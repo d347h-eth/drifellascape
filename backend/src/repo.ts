@@ -49,6 +49,31 @@ function sortTokensSql(sort: string | undefined): string {
         : "ORDER BY t.token_num ASC";
 }
 
+function getActiveOwnershipVersionId(): number {
+    const row = db.raw
+        .prepare("SELECT id FROM ownership_versions WHERE active = 1 LIMIT 1")
+        .get() as { id?: number } | undefined;
+    return row?.id ?? -1;
+}
+
+function ownershipJoinSql(alias: string, ownerAddress?: string): string {
+    const join = ownerAddress ? "JOIN" : "LEFT JOIN";
+    const ownerPredicate = ownerAddress ? " AND oc.owner = ?" : "";
+    return `${join} ownership_current oc ON oc.version_id = ? AND oc.token_mint_addr = ${alias}.token_mint_addr${ownerPredicate}`;
+}
+
+function ownershipParams(
+    ownershipVersionId: number,
+    ownerAddress?: string,
+): any[] {
+    return ownerAddress
+        ? [ownershipVersionId, ownerAddress]
+        : [ownershipVersionId];
+}
+
+const OWNERSHIP_SELECT =
+    "oc.owner AS owner, oc.onchain_owner AS onchain_owner, oc.listed_owner AS listed_owner";
+
 function centerOffset(total: number, rank: number, limit: number): number {
     const maxStart = Math.max(0, total - limit);
     const start = rank - Math.floor(limit / 2);
@@ -61,6 +86,7 @@ export function searchListingsByValues(
     offset: number,
     limit: number,
     anchorMint?: string,
+    ownerAddress?: string,
 ): {
     versionId: number;
     total: number;
@@ -73,20 +99,31 @@ export function searchListingsByValues(
             .get() as { id?: number } | undefined;
         if (!row?.id) throw new Error("No active version in listing_versions");
         const vid = row.id;
+        const ownershipVersionId = getActiveOwnershipVersionId();
+        const ownerJoin = ownershipJoinSql("lc", ownerAddress);
+        const ownerParams = ownershipParams(ownershipVersionId, ownerAddress);
 
         if (!valueIds || valueIds.length === 0) {
             const countRow = db.raw
                 .prepare(
-                    "SELECT COUNT(*) AS c FROM listings_current WHERE version_id = ?",
+                    `SELECT COUNT(*) AS c
+                     FROM listings_current lc
+                     ${ownerJoin}
+                     WHERE lc.version_id = ?`,
                 )
-                .get(vid) as { c: number };
+                .get(...ownerParams, vid) as { c: number };
             let pageOffset = offset;
             if (anchorMint) {
                 const apRow = db.raw
                     .prepare(
-                        "SELECT price FROM listings_current WHERE version_id = ? AND token_mint_addr = ?",
+                        `SELECT lc.price
+                         FROM listings_current lc
+                         ${ownerJoin}
+                         WHERE lc.version_id = ? AND lc.token_mint_addr = ?`,
                     )
-                    .get(vid, anchorMint) as { price?: number } | undefined;
+                    .get(...ownerParams, vid, anchorMint) as
+                    | { price?: number }
+                    | undefined;
                 if (typeof apRow?.price === "number") {
                     const ap = apRow.price;
                     const cmp =
@@ -95,9 +132,14 @@ export function searchListingsByValues(
                             : `lc.price < ? OR (lc.price = ? AND lc.token_mint_addr < ?)`;
                     const idxRow = db.raw
                         .prepare(
-                            `SELECT COUNT(*) AS c FROM listings_current lc WHERE lc.version_id = ? AND (${cmp})`,
+                            `SELECT COUNT(*) AS c
+                             FROM listings_current lc
+                             ${ownerJoin}
+                             WHERE lc.version_id = ? AND (${cmp})`,
                         )
-                        .get(vid, ap, ap, anchorMint) as { c: number };
+                        .get(...ownerParams, vid, ap, ap, anchorMint) as {
+                        c: number;
+                    };
                     const anchorIdx = idxRow.c;
                     pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
@@ -105,13 +147,15 @@ export function searchListingsByValues(
             const items = db.raw
                 .prepare(
                     `SELECT lc.token_mint_addr, lc.token_num, lc.price, lc.seller, lc.image_url, lc.listing_source,
-                            t.id AS token_id, t.name AS token_name
+                            t.id AS token_id, t.name AS token_name,
+                            ${OWNERSHIP_SELECT}
                      FROM listings_current lc
+                     ${ownerJoin}
                      JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
                      WHERE lc.version_id = ? ${sortSql(sort)}
                      LIMIT ? OFFSET ?`,
                 )
-                .all(vid, limit, pageOffset) as (ListingRow & {
+                .all(...ownerParams, vid, limit, pageOffset) as (ListingRow & {
                 token_id: number;
                 token_name: string | null;
             })[];
@@ -125,11 +169,12 @@ export function searchListingsByValues(
 
         const ph = valueIds.map(() => "?").join(",");
         const havingN = valueIds.length;
-        const paramsBase = [...valueIds, vid];
+        const paramsBase = [...ownerParams, ...valueIds, vid];
 
         const countSql = `
           SELECT COUNT(*) AS c
           FROM listings_current lc
+          ${ownerJoin}
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
@@ -146,9 +191,14 @@ export function searchListingsByValues(
         if (anchorMint) {
             const apRow = db.raw
                 .prepare(
-                    `SELECT price FROM listings_current WHERE version_id = ? AND token_mint_addr = ?`,
+                    `SELECT lc.price
+                     FROM listings_current lc
+                     ${ownerJoin}
+                     WHERE lc.version_id = ? AND lc.token_mint_addr = ?`,
                 )
-                .get(vid, anchorMint) as { price?: number } | undefined;
+                .get(...ownerParams, vid, anchorMint) as
+                | { price?: number }
+                | undefined;
             if (typeof apRow?.price === "number") {
                 const ap = apRow.price;
                 const cmp =
@@ -158,6 +208,7 @@ export function searchListingsByValues(
                 const idxSql = `
                   SELECT COUNT(*) AS c
                   FROM listings_current lc
+                  ${ownerJoin}
                   JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
                   JOIN (
                     SELECT token_id FROM token_traits
@@ -168,7 +219,14 @@ export function searchListingsByValues(
                   WHERE lc.version_id = ? AND (${cmp})`;
                 const idxRow = db.raw
                     .prepare(idxSql)
-                    .get(...valueIds, vid, ap, ap, anchorMint) as { c: number };
+                    .get(
+                        ...ownerParams,
+                        ...valueIds,
+                        vid,
+                        ap,
+                        ap,
+                        anchorMint,
+                    ) as { c: number };
                 const anchorIdx = idxRow.c;
                 pageOffset = centerOffset(countRow.c, anchorIdx, limit);
             }
@@ -176,8 +234,10 @@ export function searchListingsByValues(
 
         const itemsSql = `
           SELECT lc.token_mint_addr, lc.token_num, lc.price, lc.seller, lc.image_url, lc.listing_source,
-                 t.id AS token_id, t.name AS token_name
+                 t.id AS token_id, t.name AS token_name,
+                 ${OWNERSHIP_SELECT}
           FROM listings_current lc
+          ${ownerJoin}
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
@@ -210,6 +270,7 @@ export function searchListingsByTraits(
     offset: number,
     limit: number,
     anchorMint?: string,
+    ownerAddress?: string,
 ): {
     versionId: number;
     total: number;
@@ -232,20 +293,31 @@ export function searchListingsByTraits(
             .get() as { id?: number } | undefined;
         if (!row?.id) throw new Error("No active version in listing_versions");
         const vid = row.id;
+        const ownershipVersionId = getActiveOwnershipVersionId();
+        const ownerJoin = ownershipJoinSql("lc", ownerAddress);
+        const ownerParams = ownershipParams(ownershipVersionId, ownerAddress);
 
         if (g.length === 0) {
             const countRow = db.raw
                 .prepare(
-                    "SELECT COUNT(*) AS c FROM listings_current WHERE version_id = ?",
+                    `SELECT COUNT(*) AS c
+                     FROM listings_current lc
+                     ${ownerJoin}
+                     WHERE lc.version_id = ?`,
                 )
-                .get(vid) as { c: number };
+                .get(...ownerParams, vid) as { c: number };
             let pageOffset = offset;
             if (anchorMint) {
                 const apRow = db.raw
                     .prepare(
-                        "SELECT price FROM listings_current WHERE version_id = ? AND token_mint_addr = ?",
+                        `SELECT lc.price
+                         FROM listings_current lc
+                         ${ownerJoin}
+                         WHERE lc.version_id = ? AND lc.token_mint_addr = ?`,
                     )
-                    .get(vid, anchorMint) as { price?: number } | undefined;
+                    .get(...ownerParams, vid, anchorMint) as
+                    | { price?: number }
+                    | undefined;
                 if (typeof apRow?.price === "number") {
                     const ap = apRow.price;
                     const cmp =
@@ -254,9 +326,14 @@ export function searchListingsByTraits(
                             : `lc.price < ? OR (lc.price = ? AND lc.token_mint_addr < ?)`;
                     const idxRow = db.raw
                         .prepare(
-                            `SELECT COUNT(*) AS c FROM listings_current lc WHERE lc.version_id = ? AND (${cmp})`,
+                            `SELECT COUNT(*) AS c
+                             FROM listings_current lc
+                             ${ownerJoin}
+                             WHERE lc.version_id = ? AND (${cmp})`,
                         )
-                        .get(vid, ap, ap, anchorMint) as { c: number };
+                        .get(...ownerParams, vid, ap, ap, anchorMint) as {
+                        c: number;
+                    };
                     const anchorIdx = idxRow.c;
                     pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
@@ -264,13 +341,15 @@ export function searchListingsByTraits(
             const items = db.raw
                 .prepare(
                     `SELECT lc.token_mint_addr, lc.token_num, lc.price, lc.seller, lc.image_url, lc.listing_source,
-                            t.id AS token_id, t.name AS token_name
+                            t.id AS token_id, t.name AS token_name,
+                            ${OWNERSHIP_SELECT}
                      FROM listings_current lc
+                     ${ownerJoin}
                      JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
                      WHERE lc.version_id = ? ${sortSql(sort)}
                      LIMIT ? OFFSET ?`,
                 )
-                .all(vid, limit, pageOffset) as (ListingRow & {
+                .all(...ownerParams, vid, limit, pageOffset) as (ListingRow & {
                 token_id: number;
                 token_name: string | null;
             })[];
@@ -296,6 +375,7 @@ export function searchListingsByTraits(
         const countSql = `
           SELECT COUNT(*) AS c
           FROM listings_current lc
+          ${ownerJoin}
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
@@ -305,17 +385,22 @@ export function searchListingsByTraits(
           ) ft ON ft.token_id = t.id
           WHERE lc.version_id = ?`;
 
-        const countRow = db.raw.prepare(countSql).get(...paramsCore, vid) as {
-            c: number;
-        };
+        const countRow = db.raw
+            .prepare(countSql)
+            .get(...ownerParams, ...paramsCore, vid) as { c: number };
 
         let pageOffset = offset;
         if (anchorMint) {
             const apRow = db.raw
                 .prepare(
-                    `SELECT price FROM listings_current WHERE version_id = ? AND token_mint_addr = ?`,
+                    `SELECT lc.price
+                     FROM listings_current lc
+                     ${ownerJoin}
+                     WHERE lc.version_id = ? AND lc.token_mint_addr = ?`,
                 )
-                .get(vid, anchorMint) as { price?: number } | undefined;
+                .get(...ownerParams, vid, anchorMint) as
+                | { price?: number }
+                | undefined;
             if (typeof apRow?.price === "number") {
                 const ap = apRow.price;
                 const cmp =
@@ -325,6 +410,7 @@ export function searchListingsByTraits(
                 const idxSql = `
                   SELECT COUNT(*) AS c
                   FROM listings_current lc
+                  ${ownerJoin}
                   JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
                   JOIN (
                     SELECT token_id FROM token_traits
@@ -335,7 +421,14 @@ export function searchListingsByTraits(
                   WHERE lc.version_id = ? AND (${cmp})`;
                 const idxRow = db.raw
                     .prepare(idxSql)
-                    .get(...paramsCore, vid, ap, ap, anchorMint) as {
+                    .get(
+                        ...ownerParams,
+                        ...paramsCore,
+                        vid,
+                        ap,
+                        ap,
+                        anchorMint,
+                    ) as {
                     c: number;
                 };
                 const anchorIdx = idxRow.c;
@@ -345,8 +438,10 @@ export function searchListingsByTraits(
 
         const itemsSql = `
           SELECT lc.token_mint_addr, lc.token_num, lc.price, lc.seller, lc.image_url, lc.listing_source,
-                 t.id AS token_id, t.name AS token_name
+                 t.id AS token_id, t.name AS token_name,
+                 ${OWNERSHIP_SELECT}
           FROM listings_current lc
+          ${ownerJoin}
           JOIN tokens t ON t.token_mint_addr = lc.token_mint_addr
           JOIN (
             SELECT token_id FROM token_traits
@@ -359,7 +454,13 @@ export function searchListingsByTraits(
           LIMIT ? OFFSET ?`;
         const items = db.raw
             .prepare(itemsSql)
-            .all(...paramsCore, vid, limit, pageOffset) as (ListingRow & {
+            .all(
+                ...ownerParams,
+                ...paramsCore,
+                vid,
+                limit,
+                pageOffset,
+            ) as (ListingRow & {
             token_id: number;
             token_name: string | null;
         })[];
@@ -494,23 +595,37 @@ export function searchTokensByValues(
     offset: number,
     limit: number,
     anchorMint?: string,
+    ownerAddress?: string,
 ): {
     total: number;
     usedOffset: number;
     items: (TokenRow & { token_id: number; token_name: string | null })[];
 } {
     const tx = db.raw.transaction(() => {
+        const ownershipVersionId = getActiveOwnershipVersionId();
+        const ownerJoin = ownershipJoinSql("t", ownerAddress);
+        const ownerParams = ownershipParams(ownershipVersionId, ownerAddress);
+
         if (!valueIds || valueIds.length === 0) {
             const countRow = db.raw
-                .prepare("SELECT COUNT(*) AS c FROM tokens")
-                .get() as { c: number };
+                .prepare(
+                    `SELECT COUNT(*) AS c
+                     FROM tokens t
+                     ${ownerJoin}`,
+                )
+                .get(...ownerParams) as { c: number };
             let pageOffset = offset;
             if (anchorMint) {
                 const ar = db.raw
                     .prepare(
-                        "SELECT token_num FROM tokens WHERE token_mint_addr = ?",
+                        `SELECT t.token_num
+                         FROM tokens t
+                         ${ownerJoin}
+                         WHERE t.token_mint_addr = ?`,
                     )
-                    .get(anchorMint) as { token_num?: number } | undefined;
+                    .get(...ownerParams, anchorMint) as
+                    | { token_num?: number }
+                    | undefined;
                 if (typeof ar?.token_num === "number") {
                     const an = ar.token_num;
                     const cmp =
@@ -519,9 +634,14 @@ export function searchTokensByValues(
                             : `t.token_num < ? OR (t.token_num = ? AND t.token_mint_addr < ?)`;
                     const idxRow = db.raw
                         .prepare(
-                            `SELECT COUNT(*) AS c FROM tokens t WHERE ${cmp}`,
+                            `SELECT COUNT(*) AS c
+                             FROM tokens t
+                             ${ownerJoin}
+                             WHERE ${cmp}`,
                         )
-                        .get(an, an, anchorMint) as { c: number };
+                        .get(...ownerParams, an, an, anchorMint) as {
+                        c: number;
+                    };
                     const anchorIdx = idxRow.c;
                     pageOffset = centerOffset(countRow.c, anchorIdx, limit);
                 }
@@ -529,12 +649,14 @@ export function searchTokensByValues(
             const items = db.raw
                 .prepare(
                     `SELECT t.token_mint_addr, t.token_num, t.image_url,
-                            t.id AS token_id, t.name AS token_name
+                            t.id AS token_id, t.name AS token_name,
+                            ${OWNERSHIP_SELECT}
                      FROM tokens t
+                     ${ownerJoin}
                      ${sortTokensSql(sort)}
                      LIMIT ? OFFSET ?`,
                 )
-                .all(limit, pageOffset) as (TokenRow & {
+                .all(...ownerParams, limit, pageOffset) as (TokenRow & {
                 token_id: number;
                 token_name: string | null;
             })[];
@@ -543,11 +665,12 @@ export function searchTokensByValues(
 
         const ph = valueIds.map(() => "?").join(",");
         const havingN = valueIds.length;
-        const paramsBase = [...valueIds];
+        const paramsBase = [...ownerParams, ...valueIds];
 
         const countSql = `
           SELECT COUNT(*) AS c
           FROM tokens t
+          ${ownerJoin}
           JOIN (
             SELECT token_id FROM token_traits
             WHERE value_id IN (${ph}) AND value_id <> 217
@@ -562,9 +685,14 @@ export function searchTokensByValues(
         if (anchorMint) {
             const ar = db.raw
                 .prepare(
-                    "SELECT token_num FROM tokens WHERE token_mint_addr = ?",
+                    `SELECT t.token_num
+                     FROM tokens t
+                     ${ownerJoin}
+                     WHERE t.token_mint_addr = ?`,
                 )
-                .get(anchorMint) as { token_num?: number } | undefined;
+                .get(...ownerParams, anchorMint) as
+                | { token_num?: number }
+                | undefined;
             if (typeof ar?.token_num === "number") {
                 const an = ar.token_num;
                 const cmp =
@@ -574,6 +702,7 @@ export function searchTokensByValues(
                 const idxSql = `
                   SELECT COUNT(*) AS c
                   FROM tokens t
+                  ${ownerJoin}
                   JOIN (
                     SELECT token_id FROM token_traits
                     WHERE value_id IN (${ph}) AND value_id <> 217
@@ -583,7 +712,9 @@ export function searchTokensByValues(
                   WHERE ${cmp}`;
                 const idxRow = db.raw
                     .prepare(idxSql)
-                    .get(...paramsBase, an, an, anchorMint) as { c: number };
+                    .get(...ownerParams, ...valueIds, an, an, anchorMint) as {
+                    c: number;
+                };
                 const anchorIdx = idxRow.c;
                 pageOffset = centerOffset(countRow.c, anchorIdx, limit);
             }
@@ -591,8 +722,10 @@ export function searchTokensByValues(
 
         const itemsSql = `
           SELECT t.token_mint_addr, t.token_num, t.image_url,
-                 t.id AS token_id, t.name AS token_name
+                 t.id AS token_id, t.name AS token_name,
+                 ${OWNERSHIP_SELECT}
           FROM tokens t
+          ${ownerJoin}
           JOIN (
             SELECT token_id FROM token_traits
             WHERE value_id IN (${ph}) AND value_id <> 217
@@ -618,6 +751,7 @@ export function searchTokensByTraits(
     offset: number,
     limit: number,
     anchorMint?: string,
+    ownerAddress?: string,
 ): {
     total: number;
     usedOffset: number;
@@ -633,17 +767,30 @@ export function searchTokensByTraits(
         .filter((x) => Number.isFinite(x.typeId) && x.valueIds.length > 0);
 
     const tx = db.raw.transaction(() => {
+        const ownershipVersionId = getActiveOwnershipVersionId();
+        const ownerJoin = ownershipJoinSql("t", ownerAddress);
+        const ownerParams = ownershipParams(ownershipVersionId, ownerAddress);
+
         if (g.length === 0) {
             const countRow = db.raw
-                .prepare("SELECT COUNT(*) AS c FROM tokens")
-                .get() as { c: number };
+                .prepare(
+                    `SELECT COUNT(*) AS c
+                     FROM tokens t
+                     ${ownerJoin}`,
+                )
+                .get(...ownerParams) as { c: number };
             let pageOffset = offset;
             if (anchorMint) {
                 const ar = db.raw
                     .prepare(
-                        "SELECT token_num FROM tokens WHERE token_mint_addr = ?",
+                        `SELECT t.token_num
+                         FROM tokens t
+                         ${ownerJoin}
+                         WHERE t.token_mint_addr = ?`,
                     )
-                    .get(anchorMint) as { token_num?: number } | undefined;
+                    .get(...ownerParams, anchorMint) as
+                    | { token_num?: number }
+                    | undefined;
                 if (typeof ar?.token_num === "number") {
                     const an = ar.token_num;
                     const cmp =
@@ -652,9 +799,14 @@ export function searchTokensByTraits(
                             : `t.token_num < ? OR (t.token_num = ? AND t.token_mint_addr < ?)`;
                     const idxRow = db.raw
                         .prepare(
-                            `SELECT COUNT(*) AS c FROM tokens t WHERE ${cmp}`,
+                            `SELECT COUNT(*) AS c
+                             FROM tokens t
+                             ${ownerJoin}
+                             WHERE ${cmp}`,
                         )
-                        .get(an, an, anchorMint) as { c: number };
+                        .get(...ownerParams, an, an, anchorMint) as {
+                        c: number;
+                    };
                     const anchorIdx = idxRow.c;
                     pageOffset = Math.max(
                         0,
@@ -668,12 +820,14 @@ export function searchTokensByTraits(
             const items = db.raw
                 .prepare(
                     `SELECT t.token_mint_addr, t.token_num, t.image_url,
-                            t.id AS token_id, t.name AS token_name
+                            t.id AS token_id, t.name AS token_name,
+                            ${OWNERSHIP_SELECT}
                      FROM tokens t
+                     ${ownerJoin}
                      ${sortTokensSql(sort)}
                      LIMIT ? OFFSET ?`,
                 )
-                .all(limit, pageOffset) as (TokenRow & {
+                .all(...ownerParams, limit, pageOffset) as (TokenRow & {
                 token_id: number;
                 token_name: string | null;
             })[];
@@ -693,23 +847,29 @@ export function searchTokensByTraits(
         const countSql = `
           SELECT COUNT(*) AS c
           FROM tokens t
+          ${ownerJoin}
           JOIN (
             SELECT token_id FROM token_traits
             WHERE (${whereUnion}) AND value_id <> 217
             GROUP BY token_id
             HAVING COUNT(DISTINCT type_id) = ${needDistinctTypes}
           ) ft ON ft.token_id = t.id`;
-        const countRow = db.raw.prepare(countSql).get(...paramsCore) as {
-            c: number;
-        };
+        const countRow = db.raw
+            .prepare(countSql)
+            .get(...ownerParams, ...paramsCore) as { c: number };
 
         let pageOffset = offset;
         if (anchorMint) {
             const ar = db.raw
                 .prepare(
-                    "SELECT token_num FROM tokens WHERE token_mint_addr = ?",
+                    `SELECT t.token_num
+                     FROM tokens t
+                     ${ownerJoin}
+                     WHERE t.token_mint_addr = ?`,
                 )
-                .get(anchorMint) as { token_num?: number } | undefined;
+                .get(...ownerParams, anchorMint) as
+                | { token_num?: number }
+                | undefined;
             if (typeof ar?.token_num === "number") {
                 const an = ar.token_num;
                 const cmp =
@@ -719,6 +879,7 @@ export function searchTokensByTraits(
                 const idxSql = `
                   SELECT COUNT(*) AS c
                   FROM tokens t
+                  ${ownerJoin}
                   JOIN (
                     SELECT token_id FROM token_traits
                     WHERE (${whereUnion}) AND value_id <> 217
@@ -728,7 +889,9 @@ export function searchTokensByTraits(
                   WHERE ${cmp}`;
                 const idxRow = db.raw
                     .prepare(idxSql)
-                    .get(...paramsCore, an, an, anchorMint) as { c: number };
+                    .get(...ownerParams, ...paramsCore, an, an, anchorMint) as {
+                    c: number;
+                };
                 const anchorIdx = idxRow.c;
                 pageOffset = Math.max(
                     0,
@@ -742,8 +905,10 @@ export function searchTokensByTraits(
 
         const itemsSql = `
           SELECT t.token_mint_addr, t.token_num, t.image_url,
-                 t.id AS token_id, t.name AS token_name
+                 t.id AS token_id, t.name AS token_name,
+                 ${OWNERSHIP_SELECT}
           FROM tokens t
+          ${ownerJoin}
           JOIN (
             SELECT token_id FROM token_traits
             WHERE (${whereUnion}) AND value_id <> 217
@@ -754,7 +919,12 @@ export function searchTokensByTraits(
           LIMIT ? OFFSET ?`;
         const items = db.raw
             .prepare(itemsSql)
-            .all(...paramsCore, limit, pageOffset) as (TokenRow & {
+            .all(
+                ...ownerParams,
+                ...paramsCore,
+                limit,
+                pageOffset,
+            ) as (TokenRow & {
             token_id: number;
             token_name: string | null;
         })[];
