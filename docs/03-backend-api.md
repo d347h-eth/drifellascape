@@ -92,6 +92,7 @@ To avoid a race between reading the active version id and its rows while the wor
   - Used by the frontend traits explorer; filtering still goes through the existing Listings/Tokens search endpoints with `valueIds`.
 
 - `GET /market/events`
+
   - Newest-first listing/sale activity feed from persisted Magic Eden activities.
   - Query params:
     - `type`: `all` (default), `listing`, or `sale`
@@ -127,12 +128,34 @@ To avoid a race between reading the active version id and its rows while the wor
     - `price` uses the same 9-decimal integer base-unit convention as listings.
     - Rows are left-joined to `tokens` for `token_num`, `token_name`, and image fallback when the static token catalog is present.
 
+- `GET /owners`
+
+  - Groups the active ownership snapshot by effective owner, sorted by token count descending and owner address ascending.
+  - Response:
+    ```json
+    {
+      "versionId": 7,
+      "totalSupply": 1333,
+      "totalOwners": 412,
+      "items": [
+        {
+          "owner": "…",
+          "amount": 12,
+          "supply_pct": 0.900225056264066
+        }
+      ]
+    }
+    ```
+  - Notes:
+    - `owner` uses the same effective-owner field as owner-filtered token search: listed tokens use the active listing seller, unlisted tokens use the Helius on-chain owner.
+    - Before ownership sync runs, the endpoint returns an empty `items` list.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
 - Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, and `/traits*` requests to `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:3000`.
 
 ## Process Flow
 
@@ -159,6 +182,7 @@ Notes:
   - `loadSnapshot(versionId)`: loads all rows for the given version id.
   - `loadActiveSnapshotConsistent()`: reads id+rows in a single transaction (preferred).
   - `loadMarketEvents()`: loads newest-first market events with optional type filtering and token enrichment.
+  - `loadOwnerSummaries()`: loads active ownership owner counts in a single read transaction.
 
 ## Concurrency & Database
 
@@ -187,7 +211,7 @@ In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaul
 
 ## Security & CORS
 
-- No authentication; open `GET /listings`, `POST /listings/search`, `POST /tokens/search`, and `GET /traits/catalog`.
+- No authentication; open `GET /listings`, `POST /listings/search`, `POST /tokens/search`, `GET /traits/catalog`, `GET /market/events`, and `GET /owners`.
 - CORS: permissive, suitable for single‑domain deployment; tighten as needed.
 
 ## Extensions & Roadmap
@@ -208,4 +232,4 @@ yarn backend:run
 BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

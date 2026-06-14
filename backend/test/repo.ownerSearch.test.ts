@@ -4,7 +4,11 @@ import os from "node:os";
 import path from "node:path";
 
 import { db, initializeDatabase, setDbPath } from "@drifellascape/database";
-import { searchListingsByValues, searchTokensByValues } from "../src/repo.js";
+import {
+    loadOwnerSummaries,
+    searchListingsByValues,
+    searchTokensByValues,
+} from "../src/repo.js";
 
 async function createTempDbPath(): Promise<string> {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "drifellascape-test-"));
@@ -129,5 +133,21 @@ describe("owner-filtered search", () => {
             token_mint_addr: mintA,
             owner: ownerA,
         });
+    });
+
+    it("summarizes active ownership by owner rank", () => {
+        const result = loadOwnerSummaries();
+
+        expect(result.versionId).toEqual(expect.any(Number));
+        expect(result.totalSupply).toBe(3);
+        expect(result.totalOwners).toBe(2);
+        expect(
+            result.items.map(({ owner, amount }) => ({ owner, amount })),
+        ).toEqual([
+            { owner: ownerA, amount: 2 },
+            { owner: ownerB, amount: 1 },
+        ]);
+        expect(result.items[0]?.supply_pct).toBeCloseTo(66.7, 1);
+        expect(result.items[1]?.supply_pct).toBeCloseTo(33.3, 1);
     });
 });

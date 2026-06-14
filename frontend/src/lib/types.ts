@@ -101,3 +101,16 @@ export type MarketEventsResponse = {
     limit: number;
     items: MarketEventRow[];
 };
+
+export type OwnerSummaryRow = {
+    owner: string;
+    amount: number;
+    supply_pct: number;
+};
+
+export type OwnerSummaryResponse = {
+    versionId: number | null;
+    totalSupply: number;
+    totalOwners: number;
+    items: OwnerSummaryRow[];
+};

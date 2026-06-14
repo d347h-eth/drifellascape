@@ -7,13 +7,14 @@
     import AboutOverlay from "./components/AboutOverlay.svelte";
     import LandscapeOverlay from "./components/LandscapeOverlay.svelte";
     import MarketExplorer from "./components/MarketExplorer.svelte";
+    import OwnersView from "./components/OwnersView.svelte";
     import StatusBar from "./components/StatusBar.svelte";
     import TraitBar from "./components/TraitBar/TraitBar.svelte";
     import TraitsExplorer from "./components/TraitsExplorer.svelte";
-    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore, fetchTraitsCatalog } from "./lib/search";
+    import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore, fetchTraitsCatalog, fetchOwners } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
-    import type { Row, ListingTrait, DataSource, TraitsCatalog, MarketEventType } from "./lib/types";
+    import type { Row, ListingTrait, DataSource, TraitsCatalog, MarketEventType, OwnerSummaryRow } from "./lib/types";
 
     // Types moved to lib/types.ts
 
@@ -36,6 +37,11 @@
     let showHelp = false;
     let showAbout = false;
     let marketPanelMode: MarketEventType | null = null;
+    let ownersMode = false;
+    let ownerRows: OwnerSummaryRow[] = [];
+    let ownersLoading = false;
+    let ownersError: string | null = null;
+    let ownersLoadNonce = 0;
     let showTraitBar = false;
     let showTraitsExplorer = false;
     let traitsCatalog: TraitsCatalog | null = null;
@@ -55,7 +61,7 @@
     let gridMode = true; // homepage defaults to grid mode with listings
     let gridTargetMint: string | null = null;
     let statusBarRef: any = null;
-    $: marketPanelVisible = exploreIndex === null && marketPanelMode !== null;
+    $: marketPanelVisible = !ownersMode && exploreIndex === null && marketPanelMode !== null;
     $: if (exploreIndex !== null && marketPanelMode !== null) marketPanelMode = null;
     $: gridColumns = !isMobile
         ? Math.max(1, 3 - (showTraitsExplorer ? 1 : 0) - (marketPanelVisible ? 1 : 0))
@@ -115,12 +121,14 @@
         } catch {}
     }
     function toggleDataSource() {
+        ownersMode = false;
         const cur = currentItem();
         gridTargetMint = cur?.token_mint_addr ?? null;
         dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
         applyValueFilterAndFetch();
     }
     function switchToTokensSource() {
+        ownersMode = false;
         if (dataSource === 'tokens') return;
         const cur = currentItem();
         gridTargetMint = cur?.token_mint_addr ?? null;
@@ -253,6 +261,7 @@
         } catch { return null; }
     }
     async function handleTokenSearch(num: number) {
+        ownersMode = false;
         // Always jump via Tokens dataset to ensure the token exists
         dataSource = 'tokens';
         activeOwnerAddress = null;
@@ -289,6 +298,7 @@
     async function handleOwnerSearch(ownerAddress: string) {
         const owner = String(ownerAddress || '').trim();
         if (!owner) return;
+        ownersMode = false;
         dataSource = 'tokens';
         activeOwnerAddress = owner;
         if (selectedValueIds.size > 0) selectedValueIds = new Set();
@@ -332,8 +342,39 @@
         }
     }
 
+    async function loadOwners() {
+        const nonce = ++ownersLoadNonce;
+        ownersLoading = true;
+        ownersError = null;
+        try {
+            const res = await fetchOwners();
+            if (nonce !== ownersLoadNonce) return;
+            ownerRows = res.items ?? [];
+        } catch (e: any) {
+            if (nonce !== ownersLoadNonce) return;
+            ownersError = e?.message || String(e);
+        } finally {
+            if (nonce === ownersLoadNonce) ownersLoading = false;
+        }
+    }
+
+    function openOwnersView() {
+        ownersMode = true;
+        gridMode = true;
+        if (exploreIndex !== null) {
+            exploreIndex = null;
+            exploreItems = null;
+        }
+        marketPanelMode = null;
+        showTraitBar = false;
+        showTraitsExplorer = false;
+        clearTokenUrlParam();
+        void loadOwners();
+    }
+
     async function pollForUpdates() {
         try {
+            if (ownersMode) return;
             if (dataSource !== 'listings') return; // tokens are static; skip polling
             const body = buildSearchBody({ source: 'listings', valueIds: Array.from(selectedValueIds), offset: 0, limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, ownerAddress: ownerFilter(), sort: currentSort() });
             const data = await postSearch('listings', body);
@@ -463,6 +504,13 @@
                 e.preventDefault();
                 e.stopImmediatePropagation();
                 showHelp = false;
+                return;
+            }
+            if (ownersMode && (k === 'Escape' || k === 'Esc' || k === 'g' || k === 'G')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                ownersMode = false;
+                gridMode = true;
                 return;
             }
             // ESC in Gallery enters Grid (same as G)
@@ -759,6 +807,7 @@
 
     // --- Mode toggles (helpers) ---
     function enterGrid() {
+        ownersMode = false;
         const it = currentItem();
         gridTargetMint = it?.token_mint_addr ?? null;
         if (exploreIndex !== null) closeExplore();
@@ -768,6 +817,7 @@
         clearTokenUrlParam();
     }
     function exitToGallery() {
+        ownersMode = false;
         const target = gridTargetMint ?? items[activeIndex]?.token_mint_addr ?? items[0]?.token_mint_addr ?? null;
         if (target) {
             openGalleryByMint(target);
@@ -941,6 +991,7 @@
         }
     }
     async function openGalleryByMint(mint: string) {
+        ownersMode = false;
         galleryLandingActive = false;
         galleryPagingArmed = false;
         const idx = items.findIndex((r) => r.token_mint_addr === mint);
@@ -966,6 +1017,7 @@
     }
 
     async function openMarketEventInGallery(mint: string) {
+        ownersMode = false;
         galleryLandingActive = true;
         galleryPagingArmed = false;
         dataSource = 'tokens';
@@ -1028,6 +1080,10 @@
 
     function handleMarketPanelToggle(nextMode: MarketEventType) {
         if (exploreIndex !== null) return;
+        if (ownersMode) {
+            ownersMode = false;
+            gridMode = true;
+        }
         const nextPanelMode = marketPanelMode === nextMode ? null : nextMode;
         if (!gridMode) {
             void applyMarketPanelModeInGallery(nextPanelMode);
@@ -1077,6 +1133,7 @@
     }
 
     function openExploreByMint(mint: string) {
+        ownersMode = false;
         showTraitsExplorer = false;
         exploreItems = items.slice(); // freeze current page order
         const idx = exploreItems.findIndex((r) => r.token_mint_addr === mint);
@@ -1317,7 +1374,16 @@
         class:marketOpen={marketPanelVisible && !isMobile}
         class:galleryLanding={galleryLandingActive}
     >
-        {#if !gridMode}
+        {#if ownersMode}
+            <OwnersView
+                rows={ownerRows}
+                loading={ownersLoading}
+                error={ownersError}
+                on:ownerSearch={(e) => {
+                    handleOwnerSearch(e.detail);
+                }}
+            />
+        {:else if !gridMode}
             <!-- Horizontal scroller -->
             {#if isMobile && showGalleryEntryOverlay}
               <div class="gallery-entry-overlay" style={`height:${galleryEntryHeightPx}px`} aria-hidden="true">
@@ -1405,6 +1471,7 @@
               {showTraitBar}
               {showTraitsExplorer}
               {marketPanelMode}
+              {ownersMode}
               gridMode={gridMode}
               inExplore={exploreIndex !== null}
               {activeIndex}
@@ -1416,14 +1483,17 @@
               ownerAddress={activeOwnerAddress}
               {sortAscListings}
               {sortAscTokens}
-              networkBusy={Boolean(loading || isLoadingMore || isLoadingPrev || $pendingRequestsStore > 0)}
+              networkBusy={Boolean(loading || ownersLoading || isLoadingMore || isLoadingPrev || $pendingRequestsStore > 0)}
               isMobile={isMobile}
               collapsed={!showMainBar}
               {currentRow}
               on:tokenSearch={handleStatusSearch}
               on:toggleSource={toggleDataSource}
               on:nextMode={() => {
-                  if (gridMode) exitToGallery();
+                  if (ownersMode) {
+                      ownersMode = false;
+                      gridMode = true;
+                  } else if (gridMode) exitToGallery();
                   else if (exploreIndex !== null) closeExplore();
                   else enterGrid();
               }}
@@ -1442,6 +1512,7 @@
               on:toggleMotion={() => { motionEnabled = !motionEnabled; if (!motionEnabled) scrollerRef?.cancel?.(); }}
               on:toggleTraits={() => { showTraitBar = !showTraitBar; }}
               on:toggleMarketPanel={(e) => handleMarketPanelToggle(e.detail)}
+              on:toggleOwners={openOwnersView}
               on:toggleTraitsExplorer={toggleTraitsExplorer}
               on:toggleAutoSnap={() => { autoSnapEnabled = !autoSnapEnabled; }}
               on:toggleHelp={() => { showHelp = !showHelp; }}

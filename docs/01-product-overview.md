@@ -169,7 +169,7 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
   - `BACKEND_PORT` (default: 3000)
   - `BACKEND_DEBUG` for optional search response debug fields
 - Frontend
-  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, and `/traits*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
+  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
   - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)
 
 ## Roadmap & TBDs
@@ -177,7 +177,7 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
 - Search and filters
   - Existing: token/trait normalization, value/trait filtering, and Listings/Tokens search endpoints.
   - Existing: market listing/sale event feed from Magic Eden activities.
-  - Existing: Helius-backed owner filtering for tokens/listings search.
+  - Existing: Helius-backed owner filtering for tokens/listings search and owner ranking table.
   - Remaining: price range, marketplace source, token-number filters, and richer event types if the UI needs them.
 - Frontend UX
   - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.

@@ -28,7 +28,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 ## Configuration
 
 - `yarn dev` loads root `.env` as local defaults before starting Vite; already-set env vars still take precedence. If running Vite directly from `frontend/`, copy `frontend/.env.example` to `frontend/.env` or export the vars in your shell.
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -40,6 +40,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 - The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
 - The market event side-panel loads `GET /market/events` for the active `Sales` or `Listings` feed mode.
+- The Owners status-bar button loads `GET /owners` and renders a full owner ranking table. Clicking an owner address opens owner-filtered Grid results.
 - The token search input accepts `#NUM` or an owner address. Numeric input jumps to the token via Tokens mode; owner input opens Grid filtered to tokens held by that owner.
 
 ## Horizontal Gallery (Continuous Travel)
@@ -246,6 +247,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Right section buttons:
   - Sales (show/hide sales side-panel in Grid/Gallery)
   - Listings (show/hide listings side-panel in Grid/Gallery)
+  - Owners (show the owner ranking table)
 - Token search — `#NUM` (0–1332) or owner address. Enter on a token jumps to that token (Tokens mode); Enter on an owner address opens owner-filtered Grid. The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)

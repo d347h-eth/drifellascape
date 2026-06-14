@@ -5,6 +5,7 @@ import type {
     ListingsSearchBody,
     MarketEventFilter,
     MarketEventsResponse,
+    OwnerSummaryResponse,
     Row,
     TraitsCatalog,
 } from "./types";
@@ -107,6 +108,17 @@ export async function fetchMarketEvents(
         const res = await fetch(`${API_BASE}/market/events?${params}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return (await res.json()) as MarketEventsResponse;
+    } finally {
+        decrementPending();
+    }
+}
+
+export async function fetchOwners(): Promise<OwnerSummaryResponse> {
+    incrementPending();
+    try {
+        const res = await fetch(`${API_BASE}/owners`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return (await res.json()) as OwnerSummaryResponse;
     } finally {
         decrementPending();
     }

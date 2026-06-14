@@ -103,3 +103,16 @@ export type MarketEventRow = {
     buyer: string | null;
     image_url: string | null;
 };
+
+export type OwnerSummaryRow = {
+    owner: string;
+    amount: number;
+    supply_pct: number;
+};
+
+export type OwnerSummaryResponse = {
+    versionId: number | null;
+    totalSupply: number;
+    totalOwners: number;
+    items: OwnerSummaryRow[];
+};

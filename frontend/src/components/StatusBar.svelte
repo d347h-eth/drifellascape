@@ -13,6 +13,7 @@
   export let showTraitBar: boolean = false;
   export let showTraitsExplorer: boolean = false;
   export let marketPanelMode: MarketEventType | null = null;
+  export let ownersMode: boolean = false;
   export let activeIndex: number = 0; // gallery
   export let baseOffset: number = 0;   // gallery/grid
   export let itemsLength: number = 0;  // gallery/grid
@@ -150,7 +151,17 @@
     {/if}
     {#if !collapsed}
       <div class="toggle-strip">
-        {#if !isMobile || section === 0}
+        {#if ownersMode}
+          <button class="btn active" on:click={() => dispatch('nextMode')} title="Return to Grid">
+            Owners
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
+            Hotkeys
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
+            About
+          </button>
+        {:else if !isMobile || section === 0}
           <button class="btn {showTraitsExplorer ? 'active' : ''}" on:click={() => dispatch('toggleTraitsExplorer')} title="Show/Hide traits explorer">
             Traits
           </button>
@@ -158,7 +169,9 @@
             Filter
           </button>
           <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
-            {#if gridMode}
+            {#if ownersMode}
+              Owners
+            {:else if gridMode}
               Grid
             {:else if inExplore}
               Explore
@@ -195,36 +208,36 @@
   {#if !collapsed}
   <div class="center">
     {#if !isMobile}
-      {#if gridMode}
-        <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={handleSearchKeydown} />
-          
-        </div>
-      {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={handleSearchKeydown} />
-          
-        </div>
-        {#if currentRow}
+      {#if !ownersMode}
+        {#if gridMode}
+          <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
           <span class="sep">•</span>
-          <span class="cluster">
-            {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
-            {#if listingPrimary(getSource(currentRow)) === 'ME'}
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-            {:else}
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-            {/if}
-          </span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+          </div>
+        {:else if !inExplore}
+          <span class="mono">{galleryIndex1}/{total}</span>
+          <span class="sep">•</span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+          </div>
+          {#if currentRow}
+            <span class="sep">•</span>
+            <span class="cluster">
+              {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
+              {#if listingPrimary(getSource(currentRow)) === 'ME'}
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+              {:else}
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+              {/if}
+            </span>
+          {/if}
         {/if}
       {/if}
     {/if}
@@ -233,7 +246,7 @@
   {#if !collapsed}
   <div class="right">
     {#if !isMobile && !inExplore}
-      <div class="market-buttons" aria-label="Market feeds">
+      <div class="market-buttons" aria-label="Market feeds and owners">
         <button
           class="btn {marketPanelMode === 'sale' ? 'active' : ''}"
           aria-label="Sales feed"
@@ -250,39 +263,47 @@
         >
           Listings
         </button>
+        <button
+          class="btn {ownersMode ? 'active' : ''}"
+          aria-label="Owners"
+          on:click={() => dispatch('toggleOwners')}
+          title="Owners"
+        >
+          Owners
+        </button>
       </div>
     {/if}
     {#if isMobile && section === 1}
-      {#if gridMode}
-        <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={handleSearchKeydown} />
-          
-        </div>
-      {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={handleSearchKeydown} />
-          
-        </div>
-        {#if currentRow}
+      {#if !ownersMode}
+        {#if gridMode}
+          <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
           <span class="sep">•</span>
-          <span class="cluster">
-            {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
-            {#if listingPrimary(getSource(currentRow)) === 'ME'}
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-            {:else}
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-            {/if}
-          </span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+          </div>
+        {:else if !inExplore}
+          <span class="mono">{galleryIndex1}/{total}</span>
+          <span class="sep">•</span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+          </div>
+          {#if currentRow}
+            <span class="sep">•</span>
+            <span class="cluster">
+              {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
+              {#if listingPrimary(getSource(currentRow)) === 'ME'}
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+              {:else}
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+              {/if}
+            </span>
+          {/if}
         {/if}
       {/if}
     {/if}

@@ -221,3 +221,31 @@ Notes:
 - `event_type` is normalized to `listing` or `sale`. Magic Eden remote activity types are `list` and `buyNow`.
 - `price` is an integer in raw SOL units (9 decimals), matching listing rows.
 - `token_num`, `token_name`, and image fallback come from the static `tokens` table when available.
+
+## GET /owners
+
+Retrieve the active ownership snapshot grouped by effective owner.
+
+Response 200 (application/json):
+
+```json
+{
+  "versionId": 7,
+  "totalSupply": 1333,
+  "totalOwners": 412,
+  "items": [
+    {
+      "owner": "…",
+      "amount": 12,
+      "supply_pct": 0.900225056264066
+    }
+  ]
+}
+```
+
+Notes:
+
+- Rows are sorted by `amount` descending, then `owner` ascending.
+- `totalSupply` is the canonical token count when tokens are ingested; otherwise it falls back to the active ownership snapshot total.
+- `supply_pct` is an unrounded numeric percentage. The frontend Owners table displays it with one decimal point.
+- Before ownership sync runs, `items` is empty.

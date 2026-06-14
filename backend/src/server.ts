@@ -15,6 +15,7 @@ import {
     attachTraitsGeneric,
     loadTraitCatalog,
     loadMarketEvents,
+    loadOwnerSummaries,
 } from "./repo.js";
 import type { MarketEventFilter } from "./types.js";
 
@@ -342,6 +343,14 @@ async function handleMarketEvents(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
+async function handleOwners(req: IncomingMessage, res: ServerResponse) {
+    try {
+        return sendJson(res, 200, loadOwnerSummaries());
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
 function route(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
@@ -349,6 +358,8 @@ function route(req: IncomingMessage, res: ServerResponse) {
         return void handleTraitsCatalog(req, res);
     if (req.method === "GET" && url.startsWith("/market/events"))
         return void handleMarketEvents(req, res);
+    if (req.method === "GET" && url.startsWith("/owners"))
+        return void handleOwners(req, res);
     if (req.method === "GET" && url.startsWith("/listings"))
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))
@@ -360,9 +371,7 @@ function route(req: IncomingMessage, res: ServerResponse) {
 }
 
 async function startRefreshLoop() {
-    const interval = Number(
-        process.env.BACKEND_REFRESH_MS || 30000,
-    );
+    const interval = Number(process.env.BACKEND_REFRESH_MS || 30000);
     // Priming load
     await cache.ensureLoaded().catch(() => {});
     setInterval(

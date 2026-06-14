@@ -40,6 +40,7 @@
 - `POST /tokens/search` — DB‑side filtering over the static canon token dataset plus optional `ownerAddress` (`versionId: null`)
 - `GET /traits/catalog` — full trait bucket/value catalog with counts and rarity percentages
 - `GET /market/events?type=all|listing|sale&offset&limit` — listing/sale event feed, newest first
+- `GET /owners` — active ownership snapshot grouped by owner, newest snapshot only
 
 ## Frontend Hotkeys (Gallery)
 
@@ -87,6 +88,7 @@
 - Filter — show/hide the bottom filter panel
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
+- Owners — show full owner ranking table
 - Token search — input accepts `#NUM` (0–1332) or an owner address. Token input jumps to the token (Tokens mode); owner input opens Grid filtered to that owner's tokens.
 - Indicators
   - Gallery: index/total (1‑based across full result set)

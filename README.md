@@ -76,7 +76,7 @@ yarn workspace @drifellascape/frontend dev
 #   VITE_API_BASE=http://localhost:3000 VITE_POLL_MS=15000 yarn workspace @drifellascape/frontend dev
 ```
 
-Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, and `/traits*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
+Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
 
 Hotkeys (subset)
 

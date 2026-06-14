@@ -10,6 +10,7 @@ import type {
     TraitCatalog,
     MarketEventFilter,
     MarketEventRow,
+    OwnerSummaryResponse,
 } from "./types.js";
 
 export function getActiveVersionId(): number | null {
@@ -54,6 +55,52 @@ function getActiveOwnershipVersionId(): number {
         .prepare("SELECT id FROM ownership_versions WHERE active = 1 LIMIT 1")
         .get() as { id?: number } | undefined;
     return row?.id ?? -1;
+}
+
+export function loadOwnerSummaries(): OwnerSummaryResponse {
+    const tx = db.raw.transaction((): OwnerSummaryResponse => {
+        const versionRow = db.raw
+            .prepare(
+                "SELECT id, total FROM ownership_versions WHERE active = 1 LIMIT 1",
+            )
+            .get() as { id?: number; total?: number } | undefined;
+        const tokenCountRow = db.raw
+            .prepare("SELECT COUNT(*) AS c FROM tokens")
+            .get() as { c: number };
+        const totalSupply = tokenCountRow.c || versionRow?.total || 0;
+
+        if (!versionRow?.id) {
+            return {
+                versionId: null,
+                totalSupply,
+                totalOwners: 0,
+                items: [],
+            };
+        }
+
+        const rows = db.raw
+            .prepare(
+                `SELECT owner, COUNT(*) AS amount
+                 FROM ownership_current
+                 WHERE version_id = ?
+                 GROUP BY owner
+                 ORDER BY amount DESC, owner COLLATE NOCASE ASC`,
+            )
+            .all(versionRow.id) as Array<{ owner: string; amount: number }>;
+
+        return {
+            versionId: versionRow.id,
+            totalSupply,
+            totalOwners: rows.length,
+            items: rows.map((row) => ({
+                owner: row.owner,
+                amount: row.amount,
+                supply_pct:
+                    totalSupply > 0 ? (row.amount / totalSupply) * 100 : 0,
+            })),
+        };
+    });
+    return tx();
 }
 
 function ownershipJoinSql(alias: string, ownerAddress?: string): string {
