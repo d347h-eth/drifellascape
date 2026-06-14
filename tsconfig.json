@@ -13,7 +13,9 @@
         "noEmit": true,
         "baseUrl": ".",
         "paths": {
-            "@drifellascape/database": ["database/src/index.ts"]
+            "@drifellascape/database": ["database/src/index.ts"],
+            "@drifellascape/shared": ["shared/src/index.ts"],
+            "@drifellascape/shared/*": ["shared/src/*"]
         }
     },
     "references": [
