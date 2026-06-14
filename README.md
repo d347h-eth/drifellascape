@@ -86,10 +86,12 @@ Hotkeys (subset)
 - Enter Explore: `W`
 - Toggle Explore debug overlay: `O`
 - Focus token search: `E`
+- Clear owner filter: empty the owner search field and press Enter, or use `reset owner`
 
 Deep‑links
 
 - `?token=NUM` (0–1332) opens Gallery centered on that token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
+- `?owner=ADDRESS` opens Grid filtered to that owner. Owner-filtered Gallery links preserve both params as `?owner=ADDRESS&token=NUM`; direct token jumps clear the owner param.
 
 ## Static Assets (Images)
 

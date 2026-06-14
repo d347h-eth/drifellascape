@@ -42,6 +42,7 @@ This document presents a high‑level, product‑oriented view of Drifellascape:
   - Image exploration mode: fullscreen, hard‑pixel viewing of original artwork with hotkeys and next/prev.
   - Main bar: token quick search (Enter to jump), price + [ME]/[TS] links in the bar; Gallery footer removed. On mobile, the bar wraps sections (☰ → toggles → → pagination/search → ✕).
   - Deep link: `?token=NUM` (0–1332) opens Gallery centered on the token (Tokens mode). Param updates as you browse; removed when entering Grid.
+  - Owner deep link: `?owner=ADDRESS` opens Grid filtered to that owner. Owner-filtered Gallery links may include both `owner` and `token`; direct token jumps clear `owner`.
 
 ### Data Flow (Conceptual)
 

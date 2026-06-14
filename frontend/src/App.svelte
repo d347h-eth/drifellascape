@@ -109,16 +109,59 @@
     function ownerFilter(): string | undefined {
         return activeOwnerAddress ?? undefined;
     }
-    function clearTokenUrlParam() {
+    const OWNER_ADDRESS_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    function updateUrlSearchParams(mutator: (url: URL) => void) {
         try {
             if (typeof window !== 'undefined' && window.history && window.location) {
-                const u = new URL(window.location.href);
-                if (u.searchParams.has('token')) {
-                    u.searchParams.delete('token');
-                    window.history.replaceState({}, '', u.toString());
-                }
+                const url = new URL(window.location.href);
+                mutator(url);
+                window.history.replaceState({}, '', url.toString());
             }
         } catch {}
+    }
+    function setOwnerUrlParam(owner: string) {
+        updateUrlSearchParams((url) => {
+            url.searchParams.set('owner', owner);
+            url.searchParams.delete('token');
+        });
+    }
+    function setOwnerTokenUrlParams(owner: string, tokenNum: number) {
+        updateUrlSearchParams((url) => {
+            url.searchParams.set('owner', owner);
+            url.searchParams.set('token', String(tokenNum));
+        });
+    }
+    function setTokenUrlParam(tokenNum: number, preserveOwner: boolean) {
+        updateUrlSearchParams((url) => {
+            url.searchParams.set('token', String(tokenNum));
+            if (preserveOwner && activeOwnerAddress) {
+                url.searchParams.set('owner', activeOwnerAddress);
+            } else {
+                url.searchParams.delete('owner');
+            }
+        });
+    }
+    function clearTokenUrlParam() {
+        updateUrlSearchParams((url) => {
+            url.searchParams.delete('token');
+            if (!activeOwnerAddress) url.searchParams.delete('owner');
+        });
+    }
+    function clearOwnerUrlParam() {
+        updateUrlSearchParams((url) => {
+            url.searchParams.delete('owner');
+        });
+    }
+    function parseTokenUrlParam(searchParams: URLSearchParams): number | null {
+        const token = searchParams.get('token');
+        if (!token) return null;
+        const n = Number(token);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.min(1332, Math.floor(n)));
+    }
+    function parseOwnerUrlParam(searchParams: URLSearchParams): string | null {
+        const owner = String(searchParams.get('owner') || '').trim();
+        return OWNER_ADDRESS_RE.test(owner) ? owner : null;
     }
     function toggleDataSource() {
         ownersMode = false;
@@ -270,11 +313,7 @@
         if (!mint) return;
         try {
             // Update URL param for shareable link (non-navigating)
-            if (typeof window !== 'undefined' && window.history && window.location) {
-                const url = new URL(window.location.href);
-                url.searchParams.set('token', String(num));
-                window.history.replaceState({}, '', url.toString());
-            }
+            setTokenUrlParam(num, false);
         } catch {}
         try {
             const resp = await postSearch('tokens', buildSearchBody({ source: 'tokens', valueIds: Array.from(selectedValueIds), limit: DEFAULT_SEARCH_LIMIT, includeTraits: true, anchorMint: mint, ownerAddress: ownerFilter(), sort: currentSort() }));
@@ -295,7 +334,7 @@
         } catch {}
     }
 
-    async function handleOwnerSearch(ownerAddress: string) {
+    async function handleOwnerSearch(ownerAddress: string, tokenNum?: number | null) {
         const owner = String(ownerAddress || '').trim();
         if (!owner) return;
         ownersMode = false;
@@ -318,6 +357,18 @@
         isLoadingPrev = false;
         galleryPagingArmed = false;
         pagingArmed = false;
+        let anchorMint: string | undefined;
+        let targetTokenNum: number | null = null;
+        if (typeof tokenNum === 'number' && Number.isFinite(tokenNum)) {
+            targetTokenNum = Math.max(0, Math.min(1332, Math.floor(tokenNum)));
+            const mint = await resolveMintByTokenNum(targetTokenNum);
+            anchorMint = mint ?? undefined;
+        }
+        if (targetTokenNum !== null && anchorMint) {
+            setOwnerTokenUrlParams(owner, targetTokenNum);
+        } else {
+            setOwnerUrlParam(owner);
+        }
         try {
             const res = await loadInitialPage({
                 source: 'tokens',
@@ -325,6 +376,7 @@
                 offset: 0,
                 limit: DEFAULT_SEARCH_LIMIT,
                 includeTraits: true,
+                anchorMint,
                 ownerAddress: owner,
                 sort: currentSort(),
             });
@@ -332,9 +384,71 @@
             total = res.total;
             baseOffset = res.baseOffset;
             versionId = res.versionId;
-            activeIndex = 0;
+            const targetIndex = anchorMint ? items.findIndex((r) => r.token_mint_addr === anchorMint) : -1;
+            activeIndex = targetIndex >= 0 ? targetIndex : 0;
             gridCurrentPage = computeGridPageBackward();
-            gridTargetMint = items[0]?.token_mint_addr ?? null;
+            gridTargetMint = items[activeIndex]?.token_mint_addr ?? null;
+            if (targetIndex >= 0) {
+                gridMode = false;
+                if (isMobile) showMainBar = false;
+                await tick();
+                await new Promise((r) => requestAnimationFrame(() => r(null)));
+                scrollerRef?.scrollToIndexInstant?.(targetIndex);
+            } else if (targetTokenNum !== null) {
+                setOwnerUrlParam(owner);
+            }
+        } catch (e: any) {
+            error = e?.message || String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function resetOwnerFilter() {
+        if (!activeOwnerAddress) return;
+        const targetMint = currentItem()?.token_mint_addr ?? gridTargetMint ?? null;
+        const shouldKeepGallery = !gridMode && exploreIndex === null && !!targetMint;
+        activeOwnerAddress = null;
+        clearOwnerUrlParam();
+        stagedItems = null;
+        stagedVersionId = null;
+        stagedTotal = null;
+        loading = true;
+        error = null;
+        pagingSession++;
+        isLoadingMore = false;
+        isLoadingPrev = false;
+        galleryPagingArmed = false;
+        pagingArmed = false;
+        try {
+            const res = await loadInitialPage({
+                source: dataSource,
+                valueIds: Array.from(selectedValueIds),
+                offset: 0,
+                limit: DEFAULT_SEARCH_LIMIT,
+                includeTraits: true,
+                anchorMint: shouldKeepGallery ? targetMint ?? undefined : undefined,
+                sort: currentSort(),
+            });
+            items = res.items;
+            total = res.total;
+            baseOffset = res.baseOffset;
+            versionId = res.versionId;
+            const targetIndex = targetMint ? items.findIndex((r) => r.token_mint_addr === targetMint) : -1;
+            activeIndex = targetIndex >= 0 ? targetIndex : 0;
+            gridCurrentPage = computeGridPageBackward();
+            gridTargetMint = items[activeIndex]?.token_mint_addr ?? null;
+            if (shouldKeepGallery && targetIndex >= 0) {
+                gridMode = false;
+                await tick();
+                await new Promise((r) => requestAnimationFrame(() => r(null)));
+                scrollerRef?.scrollToIndexInstant?.(targetIndex);
+                const tokenNum = (items[targetIndex] as any)?.token_num;
+                if (typeof tokenNum === 'number') setTokenUrlParam(tokenNum, false);
+            } else {
+                gridMode = true;
+                clearTokenUrlParam();
+            }
         } catch (e: any) {
             error = e?.message || String(e);
         } finally {
@@ -369,7 +483,15 @@
         showTraitBar = false;
         showTraitsExplorer = false;
         clearTokenUrlParam();
+        clearOwnerUrlParam();
         void loadOwners();
+    }
+
+    function exitOwnersToGrid() {
+        ownersMode = false;
+        gridMode = true;
+        clearTokenUrlParam();
+        if (activeOwnerAddress) setOwnerUrlParam(activeOwnerAddress);
     }
 
     async function pollForUpdates() {
@@ -465,15 +587,18 @@
             } catch {}
         };
         window.addEventListener('scroll', maybeDismissEntryOverlay, { passive: true });
-        // If URL has ?token=NUM, try to jump there after startup
+        // If URL has ?owner=ADDRESS, open owner-filtered tokens.
+        // If it also has ?token=NUM, try to land on that token within the owner filter.
         try {
             const sp = new URLSearchParams(window.location.search);
-            const tok = sp.get('token');
-            const n = tok ? Number(tok) : NaN;
-            if (Number.isFinite(n)) {
+            const owner = parseOwnerUrlParam(sp);
+            const tokenNum = parseTokenUrlParam(sp);
+            if (owner) {
+                handleOwnerSearch(owner, tokenNum);
+            } else if (tokenNum !== null) {
                 // Force Tokens mode for canonical anchor so the token always exists
                 dataSource = 'tokens';
-                handleTokenSearch(Math.max(0, Math.min(1332, Math.floor(n))));
+                handleTokenSearch(tokenNum);
             } else {
                 loadListings();
             }
@@ -509,8 +634,7 @@
             if (ownersMode && (k === 'Escape' || k === 'Esc' || k === 'g' || k === 'G')) {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                ownersMode = false;
-                gridMode = true;
+                exitOwnersToGrid();
                 return;
             }
             // ESC in Gallery enters Grid (same as G)
@@ -1003,9 +1127,7 @@
             const row: any = items[i] as any;
             const tn = row?.token_num;
             if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
-                const url = new URL(window.location.href);
-                url.searchParams.set('token', String(tn));
-                window.history.replaceState({}, '', url.toString());
+                setTokenUrlParam(tn, Boolean(activeOwnerAddress));
             }
         } catch {}
         anchorArm(mint);
@@ -1056,9 +1178,7 @@
                 const row: any = items[i] as any;
                 const tn = row?.token_num;
                 if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('token', String(tn));
-                    window.history.replaceState({}, '', url.toString());
+                    setTokenUrlParam(tn, false);
                 }
             } catch {}
             anchorArm(mint);
@@ -1196,9 +1316,7 @@
         const tn: any = (items[activeIndex] as any)?.token_num;
         if (typeof tn === 'number' && tn !== _lastUrlToken) {
             try {
-                const url = new URL(window.location.href);
-                url.searchParams.set('token', String(tn));
-                window.history.replaceState({}, '', url.toString());
+                setTokenUrlParam(tn, Boolean(activeOwnerAddress));
                 _lastUrlToken = tn;
             } catch {}
         }
@@ -1488,11 +1606,11 @@
               collapsed={!showMainBar}
               {currentRow}
               on:tokenSearch={handleStatusSearch}
+              on:resetOwner={resetOwnerFilter}
               on:toggleSource={toggleDataSource}
               on:nextMode={() => {
                   if (ownersMode) {
-                      ownersMode = false;
-                      gridMode = true;
+                      exitOwnersToGrid();
                   } else if (gridMode) exitToGallery();
                   else if (exploreIndex !== null) closeExplore();
                   else enterGrid();

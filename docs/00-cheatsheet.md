@@ -89,10 +89,11 @@
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
 - Owners — show full owner ranking table
-- Token search — input accepts `#NUM` (0–1332) or an owner address. Token input jumps to the token (Tokens mode); owner input opens Grid filtered to that owner's tokens.
+- Token search — input accepts `#NUM` (0–1332) or an owner address. Token input jumps to the token (Tokens mode); owner input opens Grid filtered to that owner's tokens. Clear an active owner value and press Enter, or click `reset owner`, to remove the owner filter.
 - Indicators
   - Gallery: index/total (1‑based across full result set)
   - Grid: Page X/Y; Total N (always for Listings; for Tokens only when filtered)
+- Gallery owner shortcut: `Owner: SSSS` appears next to `[ME] [TS]` when the focused token has owner data; clicking it opens that owner-filtered Grid.
   - Network activity dot (right)
 
 Mobile specifics
@@ -107,6 +108,7 @@ Mobile specifics
 ## Deep Links
 
 - `?token=NUM` (0–1332) deep‑links Gallery to a token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
+- `?owner=ADDRESS` deep-links Grid to an owner-filtered Tokens view. Owner-filtered Gallery links can include both `owner` and `token`; direct token jumps clear `owner`.
 
 ## Static & Releases
 

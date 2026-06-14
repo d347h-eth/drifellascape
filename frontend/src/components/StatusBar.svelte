@@ -58,6 +58,10 @@
   function getPrice(r: Row): number | undefined { return (r as any)?.price; }
   function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
   function getMint(r: Row): string { return (r as any)?.token_mint_addr; }
+  function getOwnerAddress(r: Row): string | null {
+    const anyr: any = r as any;
+    return anyr?.owner || anyr?.listed_owner || anyr?.seller || anyr?.onchain_owner || null;
+  }
   function getName(r: Row): string {
     const anyr: any = r as any;
     return anyr?.token_name || (typeof anyr?.token_num === 'number' ? `#${anyr.token_num}` : getMint(r));
@@ -91,6 +95,11 @@
   }
   function triggerSearch() {
     const raw = tokenInput;
+    if (ownerAddress && String(raw || '').trim() === '') {
+      tokenDirty = false;
+      dispatch('resetOwner');
+      return;
+    }
     const n = parseTokenNum(raw);
     tokenDirty = false;
     if (n !== null) {
@@ -99,6 +108,17 @@
     }
     const owner = parseOwnerAddress(raw);
     if (owner) dispatch('tokenSearch', { type: 'owner', ownerAddress: owner });
+  }
+  function resetOwnerSearch() {
+    tokenInput = '';
+    tokenDirty = false;
+    dispatch('resetOwner');
+  }
+  function maskAddress(value: string): string {
+    return value.slice(0, 4).toUpperCase();
+  }
+  function openOwner(owner: string) {
+    dispatch('tokenSearch', { type: 'owner', ownerAddress: owner });
   }
   function handleSearchKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
@@ -127,6 +147,7 @@
   // Derived: current price label for display
   $: _p = currentRow ? getPrice(currentRow) : undefined;
   $: curPriceLabel = (typeof _p === 'number') ? `${formatSol(priceWithFees(_p))} SOL` : '';
+  $: curOwnerAddress = currentRow ? getOwnerAddress(currentRow) : null;
 
 </script>
 
@@ -216,6 +237,11 @@
             <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
               on:input={() => tokenDirty = true}
               on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
           </div>
         {:else if !inExplore}
           <span class="mono">{galleryIndex1}/{total}</span>
@@ -224,6 +250,11 @@
             <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
               on:input={() => tokenDirty = true}
               on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
           </div>
           {#if currentRow}
             <span class="sep">•</span>
@@ -237,6 +268,13 @@
                 <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
               {/if}
             </span>
+            {#if curOwnerAddress}
+              <span class="sep">•</span>
+              <span class="owner-label">Owner:</span>
+              <button type="button" class="owner-shortcut" title={curOwnerAddress} aria-label={`Filter by owner ${curOwnerAddress}`} on:click={() => openOwner(curOwnerAddress)}>
+                {maskAddress(curOwnerAddress)}
+              </button>
+            {/if}
           {/if}
         {/if}
       {/if}
@@ -282,6 +320,11 @@
             <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
               on:input={() => tokenDirty = true}
               on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
           </div>
         {:else if !inExplore}
           <span class="mono">{galleryIndex1}/{total}</span>
@@ -290,6 +333,11 @@
             <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
               on:input={() => tokenDirty = true}
               on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
           </div>
           {#if currentRow}
             <span class="sep">•</span>
@@ -303,6 +351,13 @@
                 <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
               {/if}
             </span>
+            {#if curOwnerAddress}
+              <span class="sep">•</span>
+              <span class="owner-label">Owner:</span>
+              <button type="button" class="owner-shortcut" title={curOwnerAddress} aria-label={`Filter by owner ${curOwnerAddress}`} on:click={() => openOwner(curOwnerAddress)}>
+                {maskAddress(curOwnerAddress)}
+              </button>
+            {/if}
           {/if}
         {/if}
       {/if}
@@ -354,6 +409,20 @@
   .token-search { display: inline-flex; align-items: center; gap: 4px; }
   .token-input { height: 20px; width: 120px; padding: 0 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(12,12,14,0.85); color: #e6e6e6; border-radius: 4px; }
   .token-input:focus { outline: none; border-color: rgba(0,208,255,0.8); }
+  .reset-owner { padding: 0 6px; font-size: 11px; white-space: nowrap; }
+  .owner-label { opacity: 0.95; }
+  .owner-shortcut {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .owner-shortcut:hover { text-decoration: underline; }
+  .owner-shortcut:focus, .owner-shortcut:focus-visible { outline: none; box-shadow: none; }
   
   .cluster { display: inline-flex; align-items: center; gap: 6px; }
   .link { text-decoration: none; color: inherit; }

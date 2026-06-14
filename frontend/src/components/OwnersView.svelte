@@ -25,6 +25,12 @@
     <div class="state" aria-label="No owners">-</div>
   {:else}
     <table class="owners-table">
+      <colgroup>
+        <col class="rank-col" />
+        <col class="owner-col" />
+        <col class="amount-col" />
+        <col class="supply-col" />
+      </colgroup>
       <thead>
         <tr>
           <th scope="col">#</th>
@@ -77,6 +83,19 @@
     font-variant-numeric: tabular-nums;
   }
 
+  .rank-col {
+    width: 8%;
+  }
+
+  .owner-col {
+    width: 66%;
+  }
+
+  .amount-col,
+  .supply-col {
+    width: 13%;
+  }
+
   th,
   td {
     text-align: center;
@@ -103,11 +122,15 @@
     color: inherit;
     padding: 0;
     font: inherit;
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+      'Courier New', monospace;
+    font-size: 11px;
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 3px;
-    overflow-wrap: anywhere;
-    line-height: 1.35;
+    white-space: nowrap;
+    line-height: 1;
   }
 
   .owner-link:hover {
@@ -140,9 +163,29 @@
       font-size: 12px;
     }
 
+    .rank-col {
+      width: 7%;
+    }
+
+    .owner-col {
+      width: 71%;
+    }
+
+    .amount-col {
+      width: 10%;
+    }
+
+    .supply-col {
+      width: 12%;
+    }
+
     th,
     td {
-      padding: 8px 6px;
+      padding: 8px 3px;
+    }
+
+    .owner-link {
+      font-size: 8px;
     }
   }
 </style>
