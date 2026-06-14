@@ -1,3 +1,6 @@
+# Repo-local side-by-side verification artifact. Production public traffic is
+# handled by the central Caddy stack.
+
 {
   auto_https off
 }

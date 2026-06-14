@@ -26,6 +26,7 @@ docker compose run --rm \
 
 ln -sfn "$RELEASE_ID" releases/current
 
-echo "\nFrontend release ${RELEASE_ID} staged."
+printf "\nFrontend release %s staged.\n" "$RELEASE_ID"
 echo "Symlink updated: releases/current -> ${RELEASE_ID}"
-echo "Run 'docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile' to activate."
+echo "Reload central Caddy from its compose directory to activate:"
+echo "  docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile"

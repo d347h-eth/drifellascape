@@ -97,28 +97,33 @@ Deep‑links
 
 - High‑resolution and grid images live outside the bundle under `frontend/static/art/2560/` and `frontend/static/art/540h/` (git‑ignored).
 - The current Gallery/Grid components request `https://app.drifellascape.art/static/art/{2560,540h}/{mint}.jpg`.
-- In production, `docker-compose.yml` mounts `frontend/static` into Caddy and the Caddyfile serves `/static/*` using `handle_path`, so `/static/art/...` maps to `/srv/static/art/...` on disk.
-- The resize helper is cwd‑relative: `yarn tsx scripts/assets/resize-images.ts width|height|meta` reads `static/full` and writes `static/{2560,540h,meta}` from the directory where it is run. Move or sync generated assets into `frontend/static/art/...` for the current Caddy mount.
+- In production, the central Caddy stack serves `releases/current` and `frontend/static` directly from this project root, so `/static/art/...` maps to `frontend/static/art/...` on disk.
+- The resize helper is cwd‑relative: `yarn tsx scripts/assets/resize-images.ts width|height|meta` reads `static/full` and writes `static/{2560,540h,meta}` from the directory where it is run. Move or sync generated assets into `frontend/static/art/...` for the central Caddy mount.
 
-## Deployment (VPS Workflow)
+## Deployment (Shared Edge VPS Workflow)
 
-The VPS setup builds the frontend once per release and serves the static output directly from Caddy. Backend and worker services continue to run from source.
+The VPS setup builds the frontend once per release and serves the static output through the central Caddy stack. Backend and worker services continue to run from source. Public API traffic enters the central Caddy on the external Docker network `public-edge` and is proxied to `drifella-backend:3000`.
 
 1. Pull the latest code: `git pull`
-2. Build a new frontend release:
+2. Ensure the shared edge network exists, then start the app services:
+   ```bash
+   docker network inspect public-edge >/dev/null 2>&1 || docker network create public-edge
+   docker compose up -d backend worker
+   ```
+3. Build a new frontend release:
    ```bash
    ./scripts/release/build-frontend-release.sh
    # optional custom ID: ./scripts/release/build-frontend-release.sh 20241021-frontend
    ```
    The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
    By default the build sets `VITE_API_BASE=https://api.drifellascape.art` and `VITE_POLL_MS=30000`; set either in `.env` or export them before running the script to override.
-3. Reload Caddy to swap the live assets:
+4. Reload the central Caddy from its compose directory to swap the live assets:
    ```bash
    docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
    ```
-4. (Optional) Roll back by re-pointing the symlink: `ln -sfn <previous-id> releases/current` followed by another Caddy reload.
+5. (Optional) Roll back by re-pointing the symlink: `ln -sfn <previous-id> releases/current` followed by another central Caddy reload.
 
-Backend/worker containers still use `docker compose up -d` as before; only the frontend now deploys with a quick, no-downtime swap of static files.
+Normal production startup does not use the repo-local Caddy service. The local Caddyfile remains available behind the opt-in `local-caddy` compose profile, and the side-by-side `caddy-verify` profile still serves `releases/current` and `/static/*` on `:8080`.
 If you still have the legacy `frontend` container running, clean it up once with `docker compose up -d --remove-orphans`.
 
 ## Database

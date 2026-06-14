@@ -62,10 +62,10 @@
 - Rationale: Preserve focus across filter and mode transitions without client heuristics. Avoid surprise jumps and extra requests.
 - Notes: Grid paging uses the server‑returned `offset` for up/down requests; observers arm only after user interaction (wheel/pointer/keydown) to avoid accidental requests on entry.
 
-## ADR-012: Static Serving via Caddy + Release Symlink
+## ADR-012: Static Serving via Shared Caddy + Release Symlink
 
-- Decision: Serve the built frontend as static files from Caddy, mounted under `/srv/releases/current`; serve heavy images from `/srv/static` under `/static/art/...`.
-- Rationale: Zero‑downtime swaps, small bundles, and simplified production footprint. Verified side‑by‑side via a `caddy-verify` profile on `:8080`.
+- Decision: Serve the built frontend as static files from the central Caddy stack, pointed at this repo's `releases/current`; serve heavy images from this repo's `frontend/static` under `/static/art/...`. Expose the backend to central Caddy on the external Docker network `public-edge` as `drifella-backend:3000`. Keep repo-local Caddy only as an opt-in local/example service, with `caddy-verify` for `:8080` side-by-side checks.
+- Rationale: Zero‑downtime swaps, small bundles, simplified production footprint, and one shared public edge for dedicated-server hostnames.
 
 ## ADR-013: Tokens‑only Quick Jump + URL Param
 

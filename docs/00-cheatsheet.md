@@ -4,7 +4,7 @@
 
 - Tokens: 1,333 (Drifella III)
 - Artwork dimensions (original PNG): 3125 × 1327
-- Display assets: `frontend/static/art/{2560,540h}/{token_mint_addr}.jpg` for the Caddy mount; current frontend image components request `https://app.drifellascape.art/static/art/...`.
+- Display assets: `frontend/static/art/{2560,540h}/{token_mint_addr}.jpg` for the central Caddy mount; current frontend image components request `https://app.drifellascape.art/static/art/...`.
 
 ## Keys & Fields
 
@@ -112,8 +112,8 @@ Mobile specifics
 
 ## Static & Releases
 
-- Images are served from `/static/art/{2560,540h}/{mint}.jpg` by Caddy; Gallery/Grid currently use the absolute `https://app.drifellascape.art/static/...` base.
-- Frontend is a static bundle served by Caddy from `releases/current`. Use the `frontend-build` container and symlink flip; verify on `:8080` via the `caddy-verify` compose profile.
+- Images are served from `/static/art/{2560,540h}/{mint}.jpg` by the central Caddy stack; Gallery/Grid currently use the absolute `https://app.drifellascape.art/static/...` base.
+- Frontend is a static bundle served by central Caddy from `releases/current`. Use the `frontend-build` container and symlink flip, then reload central Caddy from its compose directory; verify on `:8080` via the repo-local `caddy-verify` compose profile.
 
 ## Env Vars
 

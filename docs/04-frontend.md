@@ -21,7 +21,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/src/components/MarketExplorer.svelte` — right-side Grid/Gallery Sales/Listings event feed panel
 - `frontend/src/components/TraitBar/ToggleButton.svelte` — centered ▲/▼ toggle strip (transparent)
 - `frontend/src/ImageExplorer.svelte` — full‑screen map‑like viewer (Leaflet)
-- `frontend/static/` — git-ignored image tree mounted by Caddy in production
+- `frontend/static/` — git-ignored image tree served by central Caddy in production and mounted by repo-local Caddy profiles for verification
   - `art/2560/{token_mint_addr}.jpg` — 2560-wide Gallery images
   - `art/540h/{token_mint_addr}.jpg` — Grid thumbnails
 

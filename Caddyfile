@@ -1,3 +1,6 @@
+# Local/legacy Caddy artifact. Production public traffic is handled by the
+# central Caddy stack.
+
 drifellascape.art, app.drifellascape.art {
   encode zstd gzip
 

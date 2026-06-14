@@ -12,6 +12,11 @@ services:
         volumes:
             - ./:/app
             - ./logs:/app/logs
+        networks:
+            default:
+            public-edge:
+                aliases:
+                    - drifella-backend
         restart: unless-stopped
 
     worker:
@@ -54,6 +59,8 @@ services:
 
     caddy:
         image: caddy:2-alpine
+        profiles:
+            - local-caddy
         ports:
             - "80:80"
             - "443:443"
@@ -84,3 +91,7 @@ services:
 volumes:
     caddy_data:
     caddy_config:
+
+networks:
+    public-edge:
+        external: true

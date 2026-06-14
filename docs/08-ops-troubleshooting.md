@@ -8,6 +8,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 - Backend API: `yarn backend:run` (default port 3000)
 - Worker loop: `yarn worker:run` (default interval 30s)
 - Frontend dev: `yarn workspace @drifellascape/frontend dev` (port 5173)
+- Production Compose: `docker compose up -d backend worker` after ensuring the external `public-edge` Docker network exists. The repo-local Caddy is opt-in via `--profile local-caddy`; `caddy-verify` remains opt-in via `--profile verify`.
 
 ## Logs
 
@@ -69,7 +70,11 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ## Run Sequences
 
 - Dev minimal: `yarn dev`; open http://localhost:5173
-- Production: run worker as a service (single instance), backend as a simple Node service behind a reverse proxy, frontend static hosting
+- Production: create/verify the external `public-edge` network, run worker as a single service, run backend on both the project network and `public-edge` as `drifella-backend:3000`, and serve frontend static files through the central Caddy stack.
+  ```bash
+  docker network inspect public-edge >/dev/null 2>&1 || docker network create public-edge
+  docker compose up -d backend worker
+  ```
 - Sync static previews to a new host:
   ```bash
   rsync -avh --progress frontend/static/ $REMOTE:$APP_DIR/frontend/static/
@@ -78,14 +83,14 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 7) 405 on `/listings/search` after switching to same-origin static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.
-- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the live Caddyfile proxies only `api.drifellascape.art` to the backend. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to the backend (no path rewrite), e.g.:
+- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the central Caddy stack proxies `api.drifellascape.art` to `drifella-backend:3000` over `public-edge`. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to the backend (no path rewrite), e.g.:
   ```
   route {
-    handle /listings* { reverse_proxy backend:3000 }
-    handle /tokens* { reverse_proxy backend:3000 }
-    handle /traits* { reverse_proxy backend:3000 }
-    handle /market* { reverse_proxy backend:3000 }
-    handle /owners* { reverse_proxy backend:3000 }
+    handle /listings* { reverse_proxy drifella-backend:3000 }
+    handle /tokens* { reverse_proxy drifella-backend:3000 }
+    handle /traits* { reverse_proxy drifella-backend:3000 }
+    handle /market* { reverse_proxy drifella-backend:3000 }
+    handle /owners* { reverse_proxy drifella-backend:3000 }
     handle /static/* { root * /srv/static; file_server }
     handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
   }
@@ -94,11 +99,11 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 8) 404 on images under `/static/art/...`
 
 - Symptoms: 404 for `/static/art/2560/{mint}.jpg` or `/static/art/540h/{mint}.jpg`.
-- Action: Verify the container mount path matches the URL: host `frontend/static/art/...` → container `/srv/static/art/...` → Caddy `handle /static/*`.
+- Action: Verify the central Caddy mount path matches the URL: project `frontend/static/art/...` → central Caddy static root → `/static/art/...`. The repo-local Caddy profiles use `frontend/static` mounted at `/srv/static` for local/example verification.
 
 ### 9) Side‑by‑side verification without touching prod
 
-- Start a temporary Caddy on `:8080` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
+- Start a temporary repo-local Caddy on `:8080` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
 - Test routes and static assets; tear down when done. This keeps the live Caddy untouched.
 
 ### 10) Market feed is empty or stale
