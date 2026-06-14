@@ -10,10 +10,6 @@
     ownerSearch: string;
   }>();
 
-  function maskedAddress(value: string): string {
-    return value.slice(0, 4).toUpperCase();
-  }
-
   function formatPct(value: number): string {
     if (!Number.isFinite(value)) return '0.0';
     return value.toFixed(1);
@@ -49,7 +45,7 @@
                 aria-label={`Filter by owner ${row.owner}`}
                 on:click={() => dispatch('ownerSearch', row.owner)}
               >
-                {maskedAddress(row.owner)}
+                {row.owner}
               </button>
             </td>
             <td>{row.amount}</td>
@@ -110,6 +106,8 @@
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 3px;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
   }
 
   .owner-link:hover {
