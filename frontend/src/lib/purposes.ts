@@ -5,6 +5,7 @@ export const PURPOSES = [
     "right",
     "decor",
     "items",
+    "special",
     "undefined",
 ] as const;
 
