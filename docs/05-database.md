@@ -8,6 +8,7 @@ This document covers the local database used by Drifellascape: schema, migration
 - Access: Node `better-sqlite3` (sync API, fast & simple)
 - Purpose: store a normalized, append‑only snapshot of current listings, plus static token/trait tables for search and enrichment
 - Additional append-only market event rows back listing/sale feeds.
+- Optional ownership snapshot rows back owner-address filtering.
 - Migrations: plain SQL files executed by a small runner at startup
 
 ## File Layout
@@ -199,6 +200,37 @@ Design notes:
 
 - Market events do not participate in the active listing snapshot flip. They are independent append-only facts from the activities API.
 - The worker samples recent pages every cycle and advances historical backfill through `market_event_sync_state`, so reruns and duplicate pages are safe.
+
+## Ownership Schema
+
+Migration `004_ownership_snapshots.sql` adds optional, versioned ownership snapshots for owner-address filtering:
+
+- `ownership_versions`
+
+  - `id INTEGER PRIMARY KEY AUTOINCREMENT`
+  - `created_at INTEGER NOT NULL`
+  - `total INTEGER NOT NULL`
+  - `active INTEGER NOT NULL DEFAULT 0`
+  - A unique partial index enforces one active ownership version.
+
+- `ownership_current`
+
+  - `version_id INTEGER NOT NULL`
+  - `token_mint_addr TEXT NOT NULL`
+  - `owner TEXT NOT NULL` — effective filter owner used by backend search.
+  - `onchain_owner TEXT NOT NULL` — owner reported by Helius.
+  - `listed_owner TEXT` — active listing seller when the token is listed.
+  - Primary key: `(version_id, token_mint_addr)`
+  - Indexes: `(version_id, owner)` and `(version_id, token_mint_addr)`
+
+- `ownership_sync_state`
+  - Single-row state table with `last_attempt_at`, `last_success_at`, and `last_error`.
+
+Design notes:
+
+- Ownership uses the same append-only active-version flip pattern as listings.
+- The ownership snapshot is independent of listing versions, but each worker ownership run overlays the fresh Magic Eden listing sellers onto the Helius owners before diffing.
+- When no Helius API key is configured, the schema still exists with an empty active ownership version and owner-filtered search simply returns no ownership matches.
 
 ## Future Work
 

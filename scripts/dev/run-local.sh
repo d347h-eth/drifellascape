@@ -8,6 +8,10 @@ LOG_DIR="${PROJECT_ROOT}/tmp/logs"
 mkdir -p "$LOG_DIR"
 cd "$PROJECT_ROOT"
 
+# shellcheck disable=SC1091
+source "${PROJECT_ROOT}/scripts/dev/load-env.sh"
+load_project_env .env
+
 names=()
 pids=()
 shutting_down=0

@@ -6,6 +6,7 @@ A fast, reliable explorer for a single NFT collection (Drifella III). It keeps a
 
 - Slow & steady sync worker (rate‑limited; resilient), append‑only snapshots with atomic activation
 - Market event indexing for listing and sale feeds from Magic Eden collection activities
+- Optional Helius ownership snapshots for owner-address token filtering
 - Normalized SQLite schema (WAL); concurrent reads while syncing
 - Backend API with an in‑memory listings cache plus DB‑side search for listings/tokens
 - Frontend (Svelte) with:
@@ -35,20 +36,27 @@ Install deps:
 yarn install
 ```
 
+Prepare local env:
+
+```bash
+cp .env.example .env
+# Optional: set HELIUS_KEY=... to enable ownership sync
+```
+
 Run the full local stack:
 
 ```bash
 yarn dev
 ```
 
-This starts the backend, worker, and frontend. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
+This starts the backend, worker, and frontend. The backend/worker scripts and the full dev script load root `.env` as local defaults when present; already-set env vars still take precedence. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
 
 Run backend API only (port 3000):
 
 ```bash
 yarn backend:run
 # Optional envs:
-#   DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
+#   BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
 Run worker (infinite loop, default 30s interval):
@@ -56,7 +64,8 @@ Run worker (infinite loop, default 30s interval):
 ```bash
 yarn worker:run
 # Optional env:
-#   DRIFELLASCAPE_SYNC_INTERVAL_MS=60000 yarn worker:run
+#   WORKER_SYNC_INTERVAL_MS=60000 yarn worker:run
+#   HELIUS_KEY=... yarn worker:run
 ```
 
 Run frontend (dev server on port 5173):
@@ -67,7 +76,7 @@ yarn workspace @drifellascape/frontend dev
 #   VITE_API_BASE=http://localhost:3000 VITE_POLL_MS=15000 yarn workspace @drifellascape/frontend dev
 ```
 
-Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, and `/traits*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
+Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
 
 Hotkeys (subset)
 
@@ -77,10 +86,12 @@ Hotkeys (subset)
 - Enter Explore: `W`
 - Toggle Explore debug overlay: `O`
 - Focus token search: `E`
+- Clear owner filter: empty the owner search field and press Enter, or use `reset owner`
 
 Deep‑links
 
 - `?token=NUM` (0–1332) opens Gallery centered on that token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
+- `?owner=ADDRESS` opens Grid filtered to that owner. Owner-filtered Gallery links preserve both params as `?owner=ADDRESS&token=NUM`; direct token jumps clear the owner param.
 
 ## Static Assets (Images)
 
@@ -100,7 +111,7 @@ The VPS setup builds the frontend once per release and serves the static output 
    # optional custom ID: ./scripts/release/build-frontend-release.sh 20241021-frontend
    ```
    The script runs `docker compose run --rm frontend-build` and stages the build under `releases/<release-id>`, updating the `releases/current` symlink.
-   By default the build sets `VITE_API_BASE=https://api.drifellascape.art`; export `VITE_API_BASE` before running the script to override.
+   By default the build sets `VITE_API_BASE=https://api.drifellascape.art` and `VITE_POLL_MS=30000`; set either in `.env` or export them before running the script to override.
 3. Reload Caddy to swap the live assets:
    ```bash
    docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile

@@ -13,7 +13,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 - `frontend/index.html` — Vite entry
 - `frontend/vite.config.ts` — Vite + Svelte configuration (with svelte‑preprocess)
 - `frontend/src/main.ts` — mounts the Svelte app
-- `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components, URL token param integration)
+- `frontend/src/App.svelte` — orchestrator (data fetch + polling, hotkeys, wiring components, token/owner URL param integration)
 - `frontend/src/components/GalleryScroller.svelte` — slides, wheel Y→X, finalize snap, scrollbar‑release snap, near-edge Gallery paging events
 - `frontend/src/components/HelpOverlay.svelte` — keyboard help overlay
 - `frontend/src/components/TraitBar/TraitBar.svelte` — bottom Filter panel purpose pills + trait strip (fixed paging)
@@ -27,7 +27,8 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 ## Configuration
 
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `yarn dev` loads root `.env` as local defaults before starting Vite; already-set env vars still take precedence. If running Vite directly from `frontend/`, copy `frontend/.env.example` to `frontend/.env` or export the vars in your shell.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -35,10 +36,12 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 
 - On mount, the app requests `{source}/search` (default source: listings) with `{ mode: "value", valueIds: [], sort: default, limit: 50, includeTraits: true }` and stores `items`, `versionId`.
 - A periodic poll (default 30s) posts again for Listings only; if `versionId` changed, the result is staged and applied when Gallery focus is at index 0. Tokens are static and are not polled.
-- Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price. The Gallery image footer is removed.
+- Price shown is fee‑inclusive (see below) and rendered in the main bar. Marketplace links `[ME] [TS]` are shown next to the price, followed by an owner shortcut when the focused token has owner data. The Gallery image footer is removed.
 - Data source toggle — `T`: switches between current listings and canon tokens (both sources support identical filtering, anchoring, and grid paging).
 - The traits explorer loads `GET /traits/catalog` and drives the same selected `valueIds` filter state as the bottom filter panel.
 - The market event side-panel loads `GET /market/events` for the active `Sales` or `Listings` feed mode.
+- The Owners status-bar button loads `GET /owners` and renders a full owner ranking table. Clicking an owner address opens owner-filtered Grid results and writes `?owner=ADDRESS`.
+- The token search input accepts `#NUM` or an owner address. Numeric input jumps to the token via Tokens mode; owner input opens Grid filtered to tokens held by that owner. When an owner filter is active, clearing the input and pressing Enter or clicking `reset owner` removes the owner filter.
 
 ## Horizontal Gallery (Continuous Travel)
 
@@ -126,6 +129,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Data: `GET /market/events` with `type=sale|listing`, offset paging, and newest-first ordering.
 - Sales rows render, in order: compact relative event time with UTC timestamp in the hover title, a full-panel-width 540h artwork preview scaled to 200px height, then `price SOL • #token • SELL → BUY` with addresses masked to the first uppercase characters. The preview and token id open that token in Gallery mode while keeping the market side-panel open.
 - Listing rows use the same panel and image treatment, with the seller address in the compact detail line.
+- Masked seller/buyer addresses are buttons that open owner-filtered Grid results without closing the market panel.
 - Prices are event prices as recorded by the activity API; the frontend does not apply listing maker/royalty fee display math to sale/list event rows.
 - The panel fetches through the shared frontend API helper, so the existing network activity dot reflects market feed loads.
 
@@ -189,7 +193,8 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Images — grid uses downsized assets from `https://app.drifellascape.art/static/art/540h/{mint}.jpg` for faster loads.
 - Mobile — hoverless price pills are hidden.
 - Source symmetry — Listings and Tokens behave identically for filtering, anchoring, and paging.
-- Empty results — Listings mode shows a link to switch to Tokens browsing (`T` does the same). The filter-change hint appears only when trait filters are currently applied; Tokens mode shows the same filter hint only when filters are applied.
+- Owner filters are carried through Grid paging, sorting, source toggles, and Gallery recentering until a direct token jump or `reset owner` clears them. `?owner=ADDRESS` opens owner-filtered Grid; owner-filtered Gallery links preserve both `owner` and `token`.
+- Empty results — Listings mode shows a link to switch to Tokens browsing (`T` does the same). The filter-change hint appears only when filters are currently applied; Tokens mode shows the same filter hint only when filters are applied.
 
 ### Image Swapping & Flicker Control
 
@@ -242,7 +247,8 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Right section buttons:
   - Sales (show/hide sales side-panel in Grid/Gallery)
   - Listings (show/hide listings side-panel in Grid/Gallery)
-- Token search — `#NUM` (0–1332). Enter jumps to that token (Tokens mode). The main bar shows price and `[ME] [TS]` links; the Gallery image footer is removed.
+  - Owners (show the owner ranking table)
+- Token search — `#NUM` (0–1332) or owner address. Enter on a token jumps to that token (Tokens mode); Enter on an owner address opens owner-filtered Grid. Clearing an active owner value and pressing Enter, or clicking `reset owner`, removes the owner filter. The Gallery main bar shows price, `[ME] [TS]` links, and `Owner: SSSS` when owner data is present; the Gallery image footer is removed.
 - Indicators:
   - Gallery: index/total (1‑based across the full filtered set)
   - Grid: Page X/Y and Total N (always for Listings; for Tokens only when filtered)

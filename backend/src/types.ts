@@ -5,6 +5,9 @@ export type ListingRow = {
     seller: string;
     image_url: string;
     listing_source: string;
+    owner?: string | null;
+    onchain_owner?: string | null;
+    listed_owner?: string | null;
 };
 
 export type ListingsSnapshot = {
@@ -22,6 +25,7 @@ export type ListingsSearchBody = {
     offset?: number;
     limit?: number;
     includeTraits?: boolean;
+    ownerAddress?: string;
     // Exclusive with `offset`: when provided, the server computes the page
     // so that this mint appears (centered when possible) and returns the
     // effective `offset` in the response. If both are provided, `anchorMint`
@@ -70,6 +74,9 @@ export type TokenRow = {
     token_mint_addr: string;
     token_num: number;
     image_url: string;
+    owner?: string | null;
+    onchain_owner?: string | null;
+    listed_owner?: string | null;
 };
 
 export type EnrichedTokenRow = TokenRow & {
@@ -95,4 +102,17 @@ export type MarketEventRow = {
     seller: string | null;
     buyer: string | null;
     image_url: string | null;
+};
+
+export type OwnerSummaryRow = {
+    owner: string;
+    amount: number;
+    supply_pct: number;
+};
+
+export type OwnerSummaryResponse = {
+    versionId: number | null;
+    totalSupply: number;
+    totalOwners: number;
+    items: OwnerSummaryRow[];
 };

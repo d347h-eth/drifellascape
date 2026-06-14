@@ -6,6 +6,7 @@ This document describes the Drifellascape synchronization worker in depth: what 
 
 - Periodically fetch the current listings for the Drifella III collection from the marketplace API.
 - Periodically fetch listing and sale activities for the same collection.
+- Optionally fetch a collection-wide ownership snapshot from Helius.
 - Normalize the data into a stable internal shape keyed by `tokenMint`.
 - Compute diffs against the active local snapshot to decide whether a new snapshot is warranted.
 - If changes exist, create and activate a new append‑only snapshot atomically; clean up stale rows.
@@ -26,6 +27,8 @@ This document describes the Drifellascape synchronization worker in depth: what 
   - `listings_current(version_id, token_mint_addr, token_num?, price, seller, image_url, listing_source, created_at)` — append‑only snapshot rows; after activation, non‑active rows are deleted.
   - `market_events(...)` — append-only listing/sale event rows, unique on `(event_type, signature, token_mint_addr)`.
   - `market_event_sync_state(...)` — per-type historical backfill cursor.
+  - `ownership_versions` / `ownership_current` — active ownership snapshot rows keyed by `(version_id, token_mint_addr)`.
+  - `ownership_sync_state` — last ownership attempt/success/error timestamps.
 
 ## Control Flow (One Cycle)
 
@@ -70,6 +73,20 @@ Operational notes:
 
 - The same in-process limiter is shared with listing fetches, so activities remain within the worker’s ≤ 2 RPS / ≤ 120 RPM budget.
 - Activity `priceInfo.solPrice.rawAmount` has been observed at a different scale from listings; the worker stores activity prices from the numeric SOL `price` field to keep all persisted prices in the project’s 9-decimal integer convention.
+
+## Ownership Flow
+
+Ownership sync runs in the same worker cycle after the Magic Eden listings snapshot has been applied. It is optional: when `HELIUS_KEY` is not configured, the worker skips ownership sync and the rest of the app continues normally.
+
+1. Enforce the ownership interval (`OWNERSHIP_SYNC_INTERVAL_MS`, default 10 minutes; clamped to at least 1 minute) using `ownership_sync_state.last_attempt_at`.
+2. Fetch all Drifella III assets from Helius DAS `getAssetsByGroup` with `groupKey=collection`, `groupValue=ArqtvxDZ1nfWgnGiHYCFTLj4FSVuyf7tmkAetQ9SScyQ`, and `limit=1000`.
+3. Normalize `id` as `token_mint_addr` and `ownership.owner` as `onchain_owner`.
+4. Merge with the fresh Magic Eden listings from the same cycle:
+   - `owner = listing.seller` for listed tokens.
+   - `owner = onchain_owner` for unlisted tokens.
+   - `listed_owner` records the listing seller when present.
+5. Stage rows into `temp_ownership`, compute inserted/updated/deleted counts against the active ownership version, and create a new version only when material changes exist.
+6. Flip the active ownership version atomically and clean non-active ownership rows/versions.
 
 ## Rate Limiting, Retries, Logging
 
@@ -177,9 +194,11 @@ Source layout (worker):
   - Returns `{ ok: true, listings, pages, skipped } | { ok: false, error }`.
 - `worker/src/market-events.ts`
   - Orchestrates recent activity sampling plus bounded historical backfill for listing/sale events.
+- `worker/src/ownership.ts`
+  - Orchestrates optional Helius pagination, listed-seller overlay, interval gating, and ownership snapshot sync.
 - `worker/src/repo.ts`
   - Small DB helpers (create temp table, load rows, count diffs, versioning, activation, cleanup).
-  - Market event insert helpers and backfill state updates.
+  - Market event insert helpers, ownership snapshot helpers, and backfill/sync state updates.
   - `ensureActiveVersionId()` seeds an initial active version if missing.
 - `worker/src/sync.ts`
   - Orchestrates a single cycle: stage → diff → apply (if needed) → cleanup.
@@ -187,7 +206,7 @@ Source layout (worker):
 - `worker/src/types.ts`
   - `NormalizedListing`, `SyncResult`, `PRICE_EPSILON = 10_000_000` (0.01 SOL).
 - `worker/src/index.ts`
-  - Infinite loop: fetch → sync → sleep. Interval via `DRIFELLASCAPE_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
+  - Infinite loop: fetch → sync → sleep. Interval via `WORKER_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
 
 DB module (shared):
 
@@ -208,9 +227,13 @@ DB module (shared):
 
 ## Configuration
 
-- `DRIFELLASCAPE_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
-- `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
-- `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
+In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local defaults before starting the worker; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
+
+- `WORKER_SYNC_INTERVAL_MS` — worker loop interval (ms), default `30000`; values below 5000 are raised to 5000.
+- `MARKET_EVENT_RECENT_PAGES` — recent pages per event type per cycle, default `2`, clamped to `0..10`.
+- `MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
+- `HELIUS_KEY` — optional Helius API key for ownership sync.
+- `OWNERSHIP_SYNC_INTERVAL_MS` — ownership snapshot interval, default `600000`, clamped to at least `60000`.
 - Marketplace base URL and params are currently in code (single collection); can be externalized later if needed.
 
 ## Testing Strategy
@@ -220,6 +243,7 @@ DB module (shared):
   - `fetcher.normalizeItem` for required field enforcement and parsing behavior.
   - `fetcher.normalizeMarketEvent` for listing/sale activity field normalization and price scaling.
   - Market event repo helpers for idempotent inserts and backfill state.
+  - Ownership merge/snapshot helpers for listed-seller overlay and no-op diff behavior.
 - Test harness:
   - `setDbPath()` to point the DB module to an isolated temp file per test.
   - `initializeDatabase()` runs migrations for each test suite.
@@ -239,7 +263,7 @@ DB module (shared):
 ```bash
 yarn worker:run
 # optional interval override
-DRIFELLASCAPE_SYNC_INTERVAL_MS=60000 yarn worker:run
+WORKER_SYNC_INTERVAL_MS=60000 yarn worker:run
 ```
 
 - Single‑cycle (programmatic): import `fetchAllListings()` → `syncListings(listings)`.

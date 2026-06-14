@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "playwright/test";
 
 const baseURL =
-    process.env.DRIFELLASCAPE_E2E_BASE_URL?.trim() || "http://127.0.0.1:42711";
+    process.env.FRONTEND_E2E_BASE_URL?.trim() || "http://127.0.0.1:42711";
 const persistSuccessArtifacts =
-    process.env.DRIFELLASCAPE_E2E_PERSIST_SUCCESS_ARTIFACTS === "1";
+    process.env.FRONTEND_E2E_PERSIST_SUCCESS_ARTIFACTS === "1";
 
 export default defineConfig({
     testDir: "./e2e",
@@ -14,7 +14,7 @@ export default defineConfig({
     },
     fullyParallel: false,
     retries: 0,
-    webServer: process.env.DRIFELLASCAPE_E2E_BASE_URL
+    webServer: process.env.FRONTEND_E2E_BASE_URL
         ? undefined
         : {
               command: "yarn dev --host 127.0.0.1 --port 42711 --strictPort",

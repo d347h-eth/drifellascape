@@ -12,6 +12,7 @@
 - Optional: `token_num` (parsed from name; best‑effort)
 - Listing fields of interest: `seller`, `priceInfo.solPrice.rawAmount`, `extra.img`, `listingSource`
 - Market event fields: `type=list|buyNow`, `signature`, `tokenMint`, `blockTime`, `slot`, `seller`, `buyer`, numeric `price`, `image`
+- Ownership fields: Helius DAS `id` (mint) and `ownership.owner`; listed tokens use the active Magic Eden listing `seller` as the effective filter owner.
 
 ## Pricing
 
@@ -28,16 +29,18 @@
 ## Rate Limits & Intervals
 
 - Marketplace limits: ≤ 2 requests/second, ≤ 120 requests/minute
-- Worker interval: default 30s (`DRIFELLASCAPE_SYNC_INTERVAL_MS`)
-- Backend refresh: default 30s (`DRIFELLASCAPE_BACKEND_REFRESH_MS`)
+- Worker interval: default 30s (`WORKER_SYNC_INTERVAL_MS`)
+- Ownership sync: optional Helius snapshot every 10 minutes by default (`HELIUS_KEY`)
+- Backend refresh: default 30s (`BACKEND_REFRESH_MS`)
 
 ## Endpoints
 
 - `GET /listings?offset&limit&sort=price_asc|price_desc` — in‑memory snapshot
-- `POST /listings/search` — DB‑side filtering (value/trait modes), enriched listings from the active snapshot
-- `POST /tokens/search` — DB‑side filtering over the static canon token dataset (`versionId: null`)
+- `POST /listings/search` — DB‑side filtering (value/trait modes plus optional `ownerAddress`), enriched listings from the active snapshot
+- `POST /tokens/search` — DB‑side filtering over the static canon token dataset plus optional `ownerAddress` (`versionId: null`)
 - `GET /traits/catalog` — full trait bucket/value catalog with counts and rarity percentages
 - `GET /market/events?type=all|listing|sale&offset&limit` — listing/sale event feed, newest first
+- `GET /owners` — active ownership snapshot grouped by owner, newest snapshot only
 
 ## Frontend Hotkeys (Gallery)
 
@@ -85,10 +88,12 @@
 - Filter — show/hide the bottom filter panel
 - Hotkeys — show/hide hotkeys helper overlay
 - About — show project/about overlay
-- Token search — input accepts `#NUM` (0–1332). Enter jumps to the token (Tokens mode). Price and [ME]/[TS] links render in the bar; the Gallery image footer is removed.
+- Owners — show full owner ranking table
+- Token search — input accepts `#NUM` (0–1332) or an owner address. Token input jumps to the token (Tokens mode); owner input opens Grid filtered to that owner's tokens. Clear an active owner value and press Enter, or click `reset owner`, to remove the owner filter.
 - Indicators
   - Gallery: index/total (1‑based across full result set)
   - Grid: Page X/Y; Total N (always for Listings; for Tokens only when filtered)
+- Gallery owner shortcut: `Owner: SSSS` appears next to `[ME] [TS]` when the focused token has owner data; clicking it opens that owner-filtered Grid.
   - Network activity dot (right)
 
 Mobile specifics
@@ -103,6 +108,7 @@ Mobile specifics
 ## Deep Links
 
 - `?token=NUM` (0–1332) deep‑links Gallery to a token (Tokens mode). The param updates as you browse in Gallery and is removed when you enter Grid.
+- `?owner=ADDRESS` deep-links Grid to an owner-filtered Tokens view. Owner-filtered Gallery links can include both `owner` and `token`; direct token jumps clear `owner`.
 
 ## Static & Releases
 
@@ -111,9 +117,10 @@ Mobile specifics
 
 ## Env Vars
 
-- Worker: `DRIFELLASCAPE_SYNC_INTERVAL_MS`
-- Market events: `DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES`, `DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES`
-- Backend: `DRIFELLASCAPE_BACKEND_REFRESH_MS`, `DRIFELLASCAPE_PORT`
+- Start from root `.env.example`; copy it to `.env` for local dev and Compose.
+- Worker: `WORKER_SYNC_INTERVAL_MS`, `HELIUS_KEY`, `OWNERSHIP_SYNC_INTERVAL_MS`
+- Market events: `MARKET_EVENT_RECENT_PAGES`, `MARKET_EVENT_BACKFILL_PAGES`
+- Backend: `BACKEND_REFRESH_MS`, `BACKEND_PORT`, `BACKEND_DEBUG`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS`
 
 ## Scripts

@@ -13,6 +13,9 @@ export type BaseRow = {
     image_url: string;
     token_id: number;
     token_name: string | null;
+    owner?: string | null;
+    onchain_owner?: string | null;
+    listed_owner?: string | null;
     traits?: ListingTrait[];
 };
 
@@ -47,6 +50,7 @@ export type ListingsSearchBody = {
     offset?: number;
     limit?: number;
     includeTraits?: boolean;
+    ownerAddress?: string;
     anchorMint?: string;
 };
 
@@ -96,4 +100,17 @@ export type MarketEventsResponse = {
     offset: number;
     limit: number;
     items: MarketEventRow[];
+};
+
+export type OwnerSummaryRow = {
+    owner: string;
+    amount: number;
+    supply_pct: number;
+};
+
+export type OwnerSummaryResponse = {
+    versionId: number | null;
+    totalSupply: number;
+    totalOwners: number;
+    items: OwnerSummaryRow[];
 };

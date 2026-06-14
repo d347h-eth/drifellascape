@@ -13,6 +13,7 @@
   export let showTraitBar: boolean = false;
   export let showTraitsExplorer: boolean = false;
   export let marketPanelMode: MarketEventType | null = null;
+  export let ownersMode: boolean = false;
   export let activeIndex: number = 0; // gallery
   export let baseOffset: number = 0;   // gallery/grid
   export let itemsLength: number = 0;  // gallery/grid
@@ -23,6 +24,7 @@
   export let sortAscTokens: boolean = true;
   export let networkBusy: boolean = false;
   export let currentRow: Row | null = null;
+  export let ownerAddress: string | null = null;
   
   const dispatch = createEventDispatcher();
 
@@ -40,7 +42,7 @@
     return (typeof tn === 'number') ? `#${tn}` : '';
   }
   function refillFromCurrent() {
-    const v = tokenNumLabel();
+    const v = gridMode && ownerAddress ? ownerAddress : tokenNumLabel();
     if (v) { tokenInput = v; tokenDirty = false; }
   }
 
@@ -56,6 +58,10 @@
   function getPrice(r: Row): number | undefined { return (r as any)?.price; }
   function getSource(r: Row): string | undefined { return (r as any)?.listing_source; }
   function getMint(r: Row): string { return (r as any)?.token_mint_addr; }
+  function getOwnerAddress(r: Row): string | null {
+    const anyr: any = r as any;
+    return anyr?.owner || anyr?.listed_owner || anyr?.seller || anyr?.onchain_owner || null;
+  }
   function getName(r: Row): string {
     const anyr: any = r as any;
     return anyr?.token_name || (typeof anyr?.token_num === 'number' ? `#${anyr.token_num}` : getMint(r));
@@ -68,20 +74,56 @@
     const focused = typeof document !== 'undefined' && document.activeElement === tokenInputEl;
     if (typeof tn === 'number' && !tokenDirty && !focused) tokenInput = `#${tn}`;
   }
+  $: if (gridMode && !collapsed) {
+    const focused = typeof document !== 'undefined' && document.activeElement === tokenInputEl;
+    if (!tokenDirty && !focused) tokenInput = ownerAddress ?? '';
+  }
 
   function parseTokenNum(raw: string): number | null {
-    const s = String(raw || '').trim().replace(/^#/, '');
+    const value = String(raw || '').trim();
+    if (!/^#?\d{1,4}$/.test(value)) return null;
+    const s = value.replace(/^#/, '');
     const n = Number(s);
     if (!Number.isFinite(n)) return null;
     if (n < 0) return 0;
     if (n > 1332) return 1332; // 0..1332 inclusive
     return Math.floor(n);
   }
+  function parseOwnerAddress(raw: string): string | null {
+    const value = String(raw || '').trim();
+    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value) ? value : null;
+  }
   function triggerSearch() {
-    const n = parseTokenNum(tokenInput);
-    if (n === null) return;
+    const raw = tokenInput;
+    if (ownerAddress && String(raw || '').trim() === '') {
+      tokenDirty = false;
+      dispatch('resetOwner');
+      return;
+    }
+    const n = parseTokenNum(raw);
     tokenDirty = false;
-    dispatch('tokenSearch', n);
+    if (n !== null) {
+      dispatch('tokenSearch', { type: 'token', tokenNum: n });
+      return;
+    }
+    const owner = parseOwnerAddress(raw);
+    if (owner) dispatch('tokenSearch', { type: 'owner', ownerAddress: owner });
+  }
+  function resetOwnerSearch() {
+    tokenInput = '';
+    tokenDirty = false;
+    dispatch('resetOwner');
+  }
+  function maskAddress(value: string): string {
+    return value.slice(0, 4).toUpperCase();
+  }
+  function openOwner(owner: string) {
+    dispatch('tokenSearch', { type: 'owner', ownerAddress: owner });
+  }
+  function handleSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
+    else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
   }
   function meUrl(mint: string) { return `https://magiceden.io/item-details/${mint}`; }
   function tsUrl(mint: string) { return `https://tensor.trade/item/${mint}`; }
@@ -105,6 +147,7 @@
   // Derived: current price label for display
   $: _p = currentRow ? getPrice(currentRow) : undefined;
   $: curPriceLabel = (typeof _p === 'number') ? `${formatSol(priceWithFees(_p))} SOL` : '';
+  $: curOwnerAddress = currentRow ? getOwnerAddress(currentRow) : null;
 
 </script>
 
@@ -129,7 +172,17 @@
     {/if}
     {#if !collapsed}
       <div class="toggle-strip">
-        {#if !isMobile || section === 0}
+        {#if ownersMode}
+          <button class="btn active" on:click={() => dispatch('nextMode')} title="Return to Grid">
+            Owners
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
+            Hotkeys
+          </button>
+          <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
+            About
+          </button>
+        {:else if !isMobile || section === 0}
           <button class="btn {showTraitsExplorer ? 'active' : ''}" on:click={() => dispatch('toggleTraitsExplorer')} title="Show/Hide traits explorer">
             Traits
           </button>
@@ -137,7 +190,9 @@
             Filter
           </button>
           <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
-            {#if gridMode}
+            {#if ownersMode}
+              Owners
+            {:else if gridMode}
               Grid
             {:else if inExplore}
               Explore
@@ -174,44 +229,53 @@
   {#if !collapsed}
   <div class="center">
     {#if !isMobile}
-      {#if gridMode}
-        <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" placeholder="#token" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
-          
-        </div>
-      {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
-          
-        </div>
-        {#if currentRow}
+      {#if !ownersMode}
+        {#if gridMode}
+          <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
           <span class="sep">•</span>
-          <span class="cluster">
-            {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
-            {#if listingPrimary(getSource(currentRow)) === 'ME'}
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-            {:else}
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
             {/if}
-          </span>
+          </div>
+        {:else if !inExplore}
+          <span class="mono">{galleryIndex1}/{total}</span>
+          <span class="sep">•</span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
+          </div>
+          {#if currentRow}
+            <span class="sep">•</span>
+            <span class="cluster">
+              {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
+              {#if listingPrimary(getSource(currentRow)) === 'ME'}
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+              {:else}
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+              {/if}
+            </span>
+            {#if curOwnerAddress}
+              <span class="sep">•</span>
+              <span class="owner-label">Owner:</span>
+              <button type="button" class="owner-shortcut" title={curOwnerAddress} aria-label={`Filter by owner ${curOwnerAddress}`} on:click={() => openOwner(curOwnerAddress)}>
+                {maskAddress(curOwnerAddress)}
+              </button>
+            {/if}
+          {/if}
         {/if}
       {/if}
     {/if}
@@ -220,7 +284,7 @@
   {#if !collapsed}
   <div class="right">
     {#if !isMobile && !inExplore}
-      <div class="market-buttons" aria-label="Market feeds">
+      <div class="market-buttons" aria-label="Market feeds and owners">
         <button
           class="btn {marketPanelMode === 'sale' ? 'active' : ''}"
           aria-label="Sales feed"
@@ -237,47 +301,64 @@
         >
           Listings
         </button>
+        <button
+          class="btn {ownersMode ? 'active' : ''}"
+          aria-label="Owners"
+          on:click={() => dispatch('toggleOwners')}
+          title="Owners"
+        >
+          Owners
+        </button>
       </div>
     {/if}
     {#if isMobile && section === 1}
-      {#if gridMode}
-        <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" placeholder="#token" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
-          
-        </div>
-      {:else if !inExplore}
-        <span class="mono">{galleryIndex1}/{total}</span>
-        <span class="sep">•</span>
-        <div class="token-search">
-          <input bind:this={tokenInputEl} class="token-input" inputmode="numeric" pattern="[0-9]*" bind:value={tokenInput}
-            on:input={() => tokenDirty = true}
-            on:keydown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); triggerSearch(); }
-              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); refillFromCurrent(); tokenInputEl && tokenInputEl.blur(); }
-              else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); e.stopPropagation(); tokenInputEl && (tokenInputEl.focus(), tokenInputEl.select()); }
-            }} />
-          
-        </div>
-        {#if currentRow}
+      {#if !ownersMode}
+        {#if gridMode}
+          <span class="mono">Page {gridCurrentPage}/{totalPages}</span>{#if filtersApplied || dataSource === 'listings'}<span class="sep">•</span><span class="mono">Total {total}</span>{/if}
           <span class="sep">•</span>
-          <span class="cluster">
-            {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
-            {#if listingPrimary(getSource(currentRow)) === 'ME'}
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-            {:else}
-              <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
-              <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
             {/if}
-          </span>
+          </div>
+        {:else if !inExplore}
+          <span class="mono">{galleryIndex1}/{total}</span>
+          <span class="sep">•</span>
+          <div class="token-search">
+            <input bind:this={tokenInputEl} class="token-input" placeholder="#token or owner address" bind:value={tokenInput}
+              on:input={() => tokenDirty = true}
+              on:keydown={handleSearchKeydown} />
+            {#if ownerAddress}
+              <button type="button" class="btn reset-owner" on:click={resetOwnerSearch} title="Reset owner filter">
+                reset owner
+              </button>
+            {/if}
+          </div>
+          {#if currentRow}
+            <span class="sep">•</span>
+            <span class="cluster">
+              {#if curPriceLabel}<span class="mono">{curPriceLabel}</span>{/if}
+              {#if listingPrimary(getSource(currentRow)) === 'ME'}
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+              {:else}
+                <a class="link" href={tsUrl(getMint(currentRow))} target="_blank" title="Tensor">[TS]</a>
+                <a class="link" href={meUrl(getMint(currentRow))} target="_blank" title="Magic Eden">[ME]</a>
+              {/if}
+            </span>
+            {#if curOwnerAddress}
+              <span class="sep">•</span>
+              <span class="owner-label">Owner:</span>
+              <button type="button" class="owner-shortcut" title={curOwnerAddress} aria-label={`Filter by owner ${curOwnerAddress}`} on:click={() => openOwner(curOwnerAddress)}>
+                {maskAddress(curOwnerAddress)}
+              </button>
+            {/if}
+          {/if}
         {/if}
       {/if}
     {/if}
@@ -326,8 +407,22 @@
   .token-link { text-decoration: none; color: inherit; }
   .token-link:hover { text-decoration: underline; }
   .token-search { display: inline-flex; align-items: center; gap: 4px; }
-  .token-input { height: 20px; width: 80px; padding: 0 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(12,12,14,0.85); color: #e6e6e6; border-radius: 4px; }
+  .token-input { height: 20px; width: 120px; padding: 0 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.2); background: rgba(12,12,14,0.85); color: #e6e6e6; border-radius: 4px; }
   .token-input:focus { outline: none; border-color: rgba(0,208,255,0.8); }
+  .reset-owner { padding: 0 6px; font-size: 11px; white-space: nowrap; }
+  .owner-label { opacity: 0.95; }
+  .owner-shortcut {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    font: inherit;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .owner-shortcut:hover { text-decoration: underline; }
+  .owner-shortcut:focus, .owner-shortcut:focus-visible { outline: none; box-shadow: none; }
   
   .cluster { display: inline-flex; align-items: center; gap: 6px; }
   .link { text-decoration: none; color: inherit; }

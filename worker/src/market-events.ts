@@ -42,13 +42,13 @@ async function fetchAndInsert(type: MarketEventType, offset: number) {
 
 async function syncType(type: MarketEventType): Promise<MarketEventSyncSummary> {
     const recentPages = envInt(
-        "DRIFELLASCAPE_MARKET_EVENT_RECENT_PAGES",
+        "MARKET_EVENT_RECENT_PAGES",
         DEFAULT_RECENT_PAGES,
         0,
         10,
     );
     const backfillPages = envInt(
-        "DRIFELLASCAPE_MARKET_EVENT_BACKFILL_PAGES",
+        "MARKET_EVENT_BACKFILL_PAGES",
         DEFAULT_BACKFILL_PAGES,
         0,
         25,

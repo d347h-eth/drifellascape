@@ -10,6 +10,7 @@
   const dispatch = createEventDispatcher<{
     close: void;
     openGallery: string;
+    ownerSearch: string;
   }>();
 
   let items: MarketEventRow[] = [];
@@ -72,6 +73,10 @@
 
   function openGallery(event: MarketEventRow) {
     dispatch('openGallery', event.token_mint_addr);
+  }
+
+  function openOwner(owner: string | null) {
+    if (owner) dispatch('ownerSearch', owner);
   }
 
   function imageUrl(event: MarketEventRow): string {
@@ -190,9 +195,47 @@
               </button>
               <span aria-hidden="true">•</span>
               {#if event.event_type === 'sale'}
-                <span>{maskedAddress(event.seller)} → {maskedAddress(event.buyer)}</span>
+                {#if event.seller}
+                  <button
+                    type="button"
+                    class="address-link"
+                    title={event.seller}
+                    aria-label={`Filter by owner ${event.seller}`}
+                    on:click={() => openOwner(event.seller)}
+                  >
+                    {maskedAddress(event.seller)}
+                  </button>
+                {:else}
+                  <span>----</span>
+                {/if}
+                <span aria-hidden="true">→</span>
+                {#if event.buyer}
+                  <button
+                    type="button"
+                    class="address-link"
+                    title={event.buyer}
+                    aria-label={`Filter by owner ${event.buyer}`}
+                    on:click={() => openOwner(event.buyer)}
+                  >
+                    {maskedAddress(event.buyer)}
+                  </button>
+                {:else}
+                  <span>----</span>
+                {/if}
               {:else}
-                <span>{maskedAddress(event.seller)}</span>
+                {#if event.seller}
+                  <button
+                    type="button"
+                    class="address-link"
+                    title={event.seller}
+                    aria-label={`Filter by owner ${event.seller}`}
+                    on:click={() => openOwner(event.seller)}
+                  >
+                    {maskedAddress(event.seller)}
+                  </button>
+                {:else}
+                  <span>----</span>
+                {/if}
               {/if}
             </div>
           </article>
@@ -262,14 +305,16 @@
 
   .close:focus,
   .preview-button:focus,
-  .token-link:focus {
+  .token-link:focus,
+  .address-link:focus {
     outline: none;
     box-shadow: none;
   }
 
   .close:focus-visible,
   .preview-button:focus-visible,
-  .token-link:focus-visible {
+  .token-link:focus-visible,
+  .address-link:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 1px rgba(0, 208, 255, 0.75);
   }
@@ -340,7 +385,8 @@
     white-space: nowrap;
   }
 
-  .token-link {
+  .token-link,
+  .address-link {
     padding: 0;
     border: 0;
     background: transparent;
@@ -350,7 +396,8 @@
     text-decoration: none;
   }
 
-  .token-link:hover {
+  .token-link:hover,
+  .address-link:hover {
     color: #fff;
     text-decoration: underline;
   }

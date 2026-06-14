@@ -207,7 +207,7 @@ FROM temp_listings;`
 - Progress
 
   - [x] Implemented ListingsCache with consistent snapshot load
-  - [x] Added refresh loop with `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s)
+  - [x] Added refresh loop with `BACKEND_REFRESH_MS` (default 30s)
   - [x] Implemented `/listings` with offset/limit and price sorting
   - [x] Implemented `/listings/search` and `/tokens/search` with trait/value filtering and anchor pagination
   - [ ] Add health endpoint and backend tests

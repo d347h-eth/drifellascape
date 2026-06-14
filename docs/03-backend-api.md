@@ -62,10 +62,12 @@ To avoid a race between reading the active version id and its rows while the wor
     - `traits`: `{ typeId: number, valueIds: number[] }[]` (AND across types, OR within values)
     - `offset`, `limit` (default 0/100; max 200), `sort` (`price_asc` | `price_desc`), `includeTraits` (default true)
     - `anchorMint` (optional): exclusive with `offset`. When present, the server computes the page so this mint appears (centered when possible) and returns the effective `offset` used.
+    - `ownerAddress` (optional): filters to rows whose active ownership snapshot has `owner = ownerAddress`.
   - Notes:
     - Consistent read: results are anchored to the active snapshot id.
+    - Owner filtering uses the active ownership snapshot. If ownership sync has not run or no matching owner exists, results are empty.
     - Excludes special `trait_values.id = 217` ("None") from filtering and attached traits.
-    - If `DRIFELLASCAPE_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
+    - If `BACKEND_DEBUG` is set, responses include `anchorDebug` with the requested anchor, effective offset, and whether the page contains the anchor.
   - CORS & preflight: `GET,POST,OPTIONS` with `content-type` allowed.
   - See also: API details and sample payloads in `docs/06-api-reference.md`.
 
@@ -76,17 +78,21 @@ To avoid a race between reading the active version id and its rows while the wor
     - `mode`, `valueIds`, `traits`, `includeTraits` same as listings.
     - `offset`, `limit` (default 0/100; max 100), `sort` (`token_asc` | `token_desc`).
     - `anchorMint` (optional): exclusive with `offset`. Behavior mirrors listings search; response `offset` is the effective offset used.
+    - `ownerAddress` (optional): filters the canon token dataset by the active ownership snapshot.
   - Notes:
     - Tokens are static; the response uses `versionId: null`.
+    - Owner filtering still depends on the active ownership snapshot produced by the worker.
     - Excludes `trait_values.id = 217` ("None").
-    - If `DRIFELLASCAPE_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
+    - If `BACKEND_DEBUG` is set, responses include the same `anchorDebug` shape as listings search.
 
 - `GET /traits/catalog`
+
   - Returns all non-`None` trait buckets and values from the static token metadata catalog.
   - Response includes `total_tokens`, bucket metadata, per-value token counts, and per-value `rarity_pct`.
   - Used by the frontend traits explorer; filtering still goes through the existing Listings/Tokens search endpoints with `valueIds`.
 
 - `GET /market/events`
+
   - Newest-first listing/sale activity feed from persisted Magic Eden activities.
   - Query params:
     - `type`: `all` (default), `listing`, or `sale`
@@ -122,18 +128,40 @@ To avoid a race between reading the active version id and its rows while the wor
     - `price` uses the same 9-decimal integer base-unit convention as listings.
     - Rows are left-joined to `tokens` for `token_num`, `token_name`, and image fallback when the static token catalog is present.
 
+- `GET /owners`
+
+  - Groups the active ownership snapshot by effective owner, sorted by token count descending and owner address ascending.
+  - Response:
+    ```json
+    {
+      "versionId": 7,
+      "totalSupply": 1333,
+      "totalOwners": 412,
+      "items": [
+        {
+          "owner": "…",
+          "amount": 12,
+          "supply_pct": 0.900225056264066
+        }
+      ]
+    }
+    ```
+  - Notes:
+    - `owner` uses the same effective-owner field as owner-filtered token search: listed tokens use the active listing seller, unlisted tokens use the Helius on-chain owner.
+    - Before ownership sync runs, the endpoint returns an empty `items` list.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
 - Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, and `/traits*` requests to `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:3000`.
 
 ## Process Flow
 
 1. Server startup:
    - `initializeDatabase()` runs migrations (idempotent) and ensures schema.
-   - Starts refresh loop with interval `DRIFELLASCAPE_BACKEND_REFRESH_MS` (default 30s; clamped to at least 5s).
+   - Starts refresh loop with interval `BACKEND_REFRESH_MS` (default 30s; clamped to at least 5s).
 2. First request / cold start:
    - `ensureLoaded()` loads `{ versionId, items }` with a consistent DB read.
 3. Subsequent requests:
@@ -154,6 +182,7 @@ Notes:
   - `loadSnapshot(versionId)`: loads all rows for the given version id.
   - `loadActiveSnapshotConsistent()`: reads id+rows in a single transaction (preferred).
   - `loadMarketEvents()`: loads newest-first market events with optional type filtering and token enrichment.
+  - `loadOwnerSummaries()`: loads active ownership owner counts in a single read transaction.
 
 ## Concurrency & Database
 
@@ -163,9 +192,11 @@ Notes:
 
 ## Configuration
 
-- `DRIFELLASCAPE_BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
-- `DRIFELLASCAPE_PORT` — server port (default `3000`).
-- `DRIFELLASCAPE_DEBUG` — when set, search responses include `anchorDebug`.
+In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaults before starting the backend; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
+
+- `BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
+- `BACKEND_PORT` — server port (default `3000`).
+- `BACKEND_DEBUG` — when set, search responses include `anchorDebug`.
 
 ## Performance & Capacity
 
@@ -180,7 +211,7 @@ Notes:
 
 ## Security & CORS
 
-- No authentication; open `GET /listings`, `POST /listings/search`, `POST /tokens/search`, and `GET /traits/catalog`.
+- No authentication; open `GET /listings`, `POST /listings/search`, `POST /tokens/search`, `GET /traits/catalog`, `GET /market/events`, and `GET /owners`.
 - CORS: permissive, suitable for single‑domain deployment; tighten as needed.
 
 ## Extensions & Roadmap
@@ -198,7 +229,7 @@ yarn dev
 # Backend only:
 yarn backend:run
 # Optional:
-DRIFELLASCAPE_PORT=4000 DRIFELLASCAPE_BACKEND_REFRESH_MS=10000 yarn backend:run
+BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, and `/market*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

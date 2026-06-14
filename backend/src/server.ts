@@ -15,11 +15,12 @@ import {
     attachTraitsGeneric,
     loadTraitCatalog,
     loadMarketEvents,
+    loadOwnerSummaries,
 } from "./repo.js";
 import type { MarketEventFilter } from "./types.js";
 
 function getEnvPort(): number {
-    const raw = process.env.DRIFELLASCAPE_PORT;
+    const raw = process.env.BACKEND_PORT;
     const n = raw ? Number(raw) : NaN;
     return Number.isFinite(n) ? n : 3000;
 }
@@ -107,6 +108,13 @@ function sanitizeGroups(arr: any): TraitFilterGroup[] {
     return out;
 }
 
+function sanitizeOwnerAddress(raw: any): string | undefined {
+    if (typeof raw !== "string") return undefined;
+    const value = raw.trim();
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value)) return undefined;
+    return value;
+}
+
 async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
     try {
         const raw = await readBody(req);
@@ -129,11 +137,19 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 200);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const ownerAddress = sanitizeOwnerAddress(body.ownerAddress);
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
             const { versionId, total, usedOffset, items } =
-                searchListingsByTraits(groups, sort, offset, limit, anchorMint);
+                searchListingsByTraits(
+                    groups,
+                    sort,
+                    offset,
+                    limit,
+                    anchorMint,
+                    ownerAddress,
+                );
             const enriched = includeTraits ? attachTraits(items) : items;
             const respBody: any = {
                 versionId,
@@ -143,7 +159,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -165,6 +181,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
             offset,
             limit,
             anchorMint,
+            ownerAddress,
         );
         const enriched = includeTraits ? attachTraits(items) : items;
         {
@@ -176,7 +193,7 @@ async function handleListingsSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -224,6 +241,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
         const limit = clamp(Number(body.limit) || 100, 1, 100);
         const mode = (body.mode || "value").toLowerCase();
         const includeTraits = body.includeTraits !== false; // default true
+        const ownerAddress = sanitizeOwnerAddress(body.ownerAddress);
 
         if (mode === "trait") {
             const groups = sanitizeGroups(body.traits);
@@ -233,6 +251,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 offset,
                 limit,
                 anchorMint,
+                ownerAddress,
             );
             const enriched = includeTraits ? attachTraitsGeneric(items) : items;
             const respBody: any = {
@@ -243,7 +262,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -264,6 +283,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
             offset,
             limit,
             anchorMint,
+            ownerAddress,
         );
         const enriched = includeTraits ? attachTraitsGeneric(items) : items;
         {
@@ -275,7 +295,7 @@ async function handleTokensSearch(req: IncomingMessage, res: ServerResponse) {
                 sort,
                 items: enriched,
             };
-            if (process.env.DRIFELLASCAPE_DEBUG) {
+            if (process.env.BACKEND_DEBUG) {
                 respBody.anchorDebug = {
                     anchorMint: anchorMint ?? null,
                     effectiveOffset: usedOffset,
@@ -323,6 +343,14 @@ async function handleMarketEvents(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
+async function handleOwners(req: IncomingMessage, res: ServerResponse) {
+    try {
+        return sendJson(res, 200, loadOwnerSummaries());
+    } catch (e: any) {
+        return sendJson(res, 500, { error: String(e?.message || e) });
+    }
+}
+
 function route(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
@@ -330,6 +358,8 @@ function route(req: IncomingMessage, res: ServerResponse) {
         return void handleTraitsCatalog(req, res);
     if (req.method === "GET" && url.startsWith("/market/events"))
         return void handleMarketEvents(req, res);
+    if (req.method === "GET" && url.startsWith("/owners"))
+        return void handleOwners(req, res);
     if (req.method === "GET" && url.startsWith("/listings"))
         return void handleListings(req, res);
     if (req.method === "POST" && url.startsWith("/listings/search"))
@@ -341,9 +371,7 @@ function route(req: IncomingMessage, res: ServerResponse) {
 }
 
 async function startRefreshLoop() {
-    const interval = Number(
-        process.env.DRIFELLASCAPE_BACKEND_REFRESH_MS || 30000,
-    );
+    const interval = Number(process.env.BACKEND_REFRESH_MS || 30000);
     // Priming load
     await cache.ensureLoaded().catch(() => {});
     setInterval(
