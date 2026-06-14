@@ -267,6 +267,68 @@ test("opens with buckets closed and toggles bucket content from the header", asy
     }
 });
 
+test("groups visible buckets by purpose class through root and bucket search", async ({
+    page,
+}, testInfo) => {
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        await openTraitsExplorer(page);
+
+        await expect(page.locator(".purpose-group-label")).toHaveText([
+            "decor",
+            "items",
+            "special",
+        ]);
+        await expect(page.getByTestId("traits-purpose-group-items")).toHaveCSS(
+            "margin-top",
+            "14px",
+        );
+        await expect(
+            page
+                .getByTestId("traits-purpose-group-decor")
+                .getByTestId("traits-bucket-1"),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByTestId("traits-purpose-group-items")
+                .getByTestId("traits-bucket-3"),
+        ).toBeVisible();
+        await expect(
+            page
+                .getByTestId("traits-purpose-group-special")
+                .getByTestId("traits-bucket-2"),
+        ).toBeVisible();
+
+        const rootSearch = page.getByTestId("traits-root-search");
+        await rootSearch.fill("tail");
+        await expect(page.locator(".purpose-group-label")).toHaveText([
+            "items",
+        ]);
+        await expect(
+            page
+                .getByTestId("traits-purpose-group-items")
+                .getByTestId("traits-bucket-99"),
+        ).toBeVisible();
+
+        await page.getByTestId("traits-bucket-jump-99").click();
+        await expect(rootSearch).toHaveValue("");
+        await expect(page.locator(".purpose-group-label")).toHaveText([
+            "decor",
+            "items",
+            "special",
+        ]);
+        await expect(
+            page
+                .getByTestId("traits-purpose-group-items")
+                .getByTestId("traits-bucket-search-99"),
+        ).toHaveValue("tail");
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
 test("root search filters from the second character and hides bucket controls", async ({
     page,
 }, testInfo) => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, tick } from 'svelte';
   import type { TraitCatalogBucket, TraitCatalogValue, TraitsCatalog } from '../lib/types';
+  import { PURPOSES, type Purpose, normalizedPurpose } from '../lib/purposes';
 
   export let visible: boolean = false;
   export let isMobile: boolean = false;
@@ -13,6 +14,7 @@
   type SortMode = 'rarity' | 'alpha';
   type ValueClickMode = 'replace' | 'add' | 'remove';
   type BucketView = TraitCatalogBucket & {
+    purpose: Purpose;
     label: string;
     visibleValues: TraitCatalogValue[];
     valueCount: number;
@@ -21,6 +23,11 @@
     expanded: boolean;
     showJump: boolean;
     hasActiveFilter: boolean;
+  };
+  type BucketGroupView = {
+    purpose: Purpose;
+    label: string;
+    buckets: BucketView[];
   };
 
   const ROOT_SEARCH_MIN_LENGTH = 2;
@@ -42,8 +49,10 @@
   let rootSearch = '';
   let rootSearchActive = false;
   let buckets: BucketView[] = [];
+  let bucketGroups: BucketGroupView[] = [];
   let bucketQueries: Record<number, string> = {};
   let bucketSortModes: Record<number, SortMode> = {};
+  let panelBodyEl: HTMLDivElement | null = null;
   let bucketHeaderEls: Record<number, HTMLDivElement | null> = {};
 
   function compareText(a: string | null | undefined, b: string | null | undefined): number {
@@ -62,6 +71,10 @@
   function bucketLabel(bucket: TraitCatalogBucket): string {
     const group = bucket.spatial_group?.trim();
     return group ? `${group.toUpperCase()}. ${bucket.type_name}` : bucket.type_name;
+  }
+
+  function purposeLabel(purpose: Purpose): string {
+    return purpose;
   }
 
   function compareBuckets(a: TraitCatalogBucket, b: TraitCatalogBucket): number {
@@ -162,6 +175,7 @@
 
     return {
       ...bucket,
+      purpose: normalizedPurpose(bucket.purpose_class),
       label,
       values: bucket.values,
       visibleValues: sortedValues(visibleValues, sortMode),
@@ -178,6 +192,18 @@
       showJump: rootSearchActive,
       hasActiveFilter: bucket.values.some((value) => selectedIds.has(value.value_id)),
     };
+  }
+
+  function buildBucketGroups(visibleBuckets: BucketView[]): BucketGroupView[] {
+    return PURPOSES.map((purpose) => {
+      const groupBuckets = visibleBuckets.filter((bucket) => bucket.purpose === purpose);
+      if (groupBuckets.length === 0) return null;
+      return {
+        purpose,
+        label: purposeLabel(purpose),
+        buckets: groupBuckets,
+      };
+    }).filter((group): group is BucketGroupView => group !== null);
   }
 
   $: rootSearch = normalizeQuery(rootQuery);
@@ -204,6 +230,7 @@
       ),
     )
     .filter((bucket): bucket is BucketView => bucket !== null);
+  $: bucketGroups = buildBucketGroups(buckets);
 
   function isSearchMode(typeId: number): boolean {
     return bucketIsInSearchMode(typeId, rootSearch, bucketQueries);
@@ -266,7 +293,14 @@
 
     await tick();
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
-    bucketHeaderEls[typeId]?.scrollIntoView({ block: 'start' });
+    const target = bucketHeaderEls[typeId];
+    if (target && panelBodyEl) {
+      const panelTop = panelBodyEl.getBoundingClientRect().top;
+      const targetTop = target.getBoundingClientRect().top;
+      panelBodyEl.scrollTop += targetTop - panelTop;
+    } else {
+      target?.scrollIntoView({ block: 'start' });
+    }
   }
 
   function formatPercent(value: number): string {
@@ -344,7 +378,7 @@
       </button>
     </div>
 
-    <div class="panel-body">
+    <div class="panel-body" bind:this={panelBodyEl}>
       {#if loading}
         <div class="state" aria-label="Loading traits">...</div>
       {:else if error}
@@ -352,85 +386,97 @@
       {:else if buckets.length === 0}
         <div class="state" aria-label="No traits found">-</div>
       {:else}
-        {#each buckets as bucket (bucket.type_id)}
-          <section class="bucket" data-testid={`traits-bucket-${bucket.type_id}`}>
+        {#each bucketGroups as group (group.purpose)}
+          <section
+            class="purpose-group"
+            data-testid={`traits-purpose-group-${group.purpose}`}
+          >
             <div
-              class="bucket-header-row"
-              class:has-active-filter={bucket.hasActiveFilter}
-              bind:this={bucketHeaderEls[bucket.type_id]}
-            >
-              <button
-                type="button"
-                class="bucket-header"
-                aria-expanded={bucket.expanded}
-                aria-label={bucket.label}
-                data-testid={`traits-bucket-header-${bucket.type_id}`}
-                on:click={() => toggleBucket(bucket.type_id)}
-              >
-                <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
-                <span class="bucket-name">{bucket.label}</span>
-              </button>
-              {#if bucket.showJump}
-                <button
-                  type="button"
-                  class="jump-button"
-                  aria-label={`Jump to ${bucket.label}`}
-                  data-testid={`traits-bucket-jump-${bucket.type_id}`}
-                  on:click={() => jumpRootSearchToBucket(bucket.type_id)}
+              class="purpose-group-label"
+              data-testid={`traits-purpose-group-label-${group.purpose}`}
+            >{group.label}</div>
+            {#each group.buckets as bucket (bucket.type_id)}
+              <section class="bucket" data-testid={`traits-bucket-${bucket.type_id}`}>
+                <div
+                  class="bucket-header-row"
+                  class:has-active-filter={bucket.hasActiveFilter}
+                  bind:this={bucketHeaderEls[bucket.type_id]}
                 >
-                  jump
-                </button>
-              {/if}
-              <span class="bucket-count">{bucket.valueCount}</span>
-            </div>
-            {#if bucket.expanded}
-              <div class="bucket-body">
-                {#if !rootSearchActive}
-                  <form class="bucket-controls" role="search" on:submit|preventDefault>
-                    <input
-                      type="search"
-                      class="search-input bucket-search"
-                      aria-label={`Search ${bucket.label}`}
-                      data-testid={`traits-bucket-search-${bucket.type_id}`}
-                      value={bucket.bucketQuery}
-                      autocomplete="off"
-                      spellcheck="false"
-                      on:input={(event) => handleBucketInput(event, bucket.type_id)}
-                    />
+                  <button
+                    type="button"
+                    class="bucket-header"
+                    aria-expanded={bucket.expanded}
+                    aria-label={bucket.label}
+                    data-testid={`traits-bucket-header-${bucket.type_id}`}
+                    on:click={() => toggleBucket(bucket.type_id)}
+                  >
+                    <span class="chevron" aria-hidden="true">{bucket.expanded ? 'v' : '>'}</span>
+                    <span class="bucket-name">{bucket.label}</span>
+                  </button>
+                  {#if bucket.showJump}
                     <button
                       type="button"
-                      class="sort-toggle"
-                      aria-label={bucket.sortMode === 'rarity' ? 'Sort trait names alpha-numeric ascending' : 'Sort by rarity ascending'}
-                      title={bucket.sortMode === 'rarity' ? 'A-Z' : '%'}
-                      data-testid={`traits-bucket-sort-${bucket.type_id}`}
-                      on:click={() => toggleSortMode(bucket.type_id)}
+                      class="jump-button"
+                      aria-label={`Jump to ${bucket.label}`}
+                      data-testid={`traits-bucket-jump-${bucket.type_id}`}
+                      on:click={() => jumpRootSearchToBucket(bucket.type_id)}
                     >
-                      {bucket.sortMode === 'rarity' ? '%' : 'A'}
+                      jump
                     </button>
-                  </form>
-                {/if}
-                <div class="values">
-                  {#each bucket.visibleValues as value (value.value_id)}
-                    <button
-                      type="button"
-                      class="value-row"
-                      class:selected={selectedValueIds.has(value.value_id)}
-                      title="Click to replace active filters; Ctrl-click to add this value"
-                      data-testid={`traits-value-${value.value_id}`}
-                      on:click={(event) => handleValueClick(event, value.value_id)}
-                    >
-                      <span class="value-name">{value.value}</span>
-                      <span class="value-meta">
-                        <span>{value.tokens_with_type_value}</span>
-                        <span>{formatPercent(value.rarity_pct)}</span>
-                      </span>
-                    </button>
-                  {/each}
+                  {/if}
+                  <span class="bucket-count">{bucket.valueCount}</span>
                 </div>
-              </div>
-            {/if}
+                {#if bucket.expanded}
+                  <div class="bucket-body">
+                    {#if !rootSearchActive}
+                      <form class="bucket-controls" role="search" on:submit|preventDefault>
+                        <input
+                          type="search"
+                          class="search-input bucket-search"
+                          aria-label={`Search ${bucket.label}`}
+                          data-testid={`traits-bucket-search-${bucket.type_id}`}
+                          value={bucket.bucketQuery}
+                          autocomplete="off"
+                          spellcheck="false"
+                          on:input={(event) => handleBucketInput(event, bucket.type_id)}
+                        />
+                        <button
+                          type="button"
+                          class="sort-toggle"
+                          aria-label={bucket.sortMode === 'rarity' ? 'Sort trait names alpha-numeric ascending' : 'Sort by rarity ascending'}
+                          title={bucket.sortMode === 'rarity' ? 'A-Z' : '%'}
+                          data-testid={`traits-bucket-sort-${bucket.type_id}`}
+                          on:click={() => toggleSortMode(bucket.type_id)}
+                        >
+                          {bucket.sortMode === 'rarity' ? '%' : 'A'}
+                        </button>
+                      </form>
+                    {/if}
+                    <div class="values">
+                      {#each bucket.visibleValues as value (value.value_id)}
+                        <button
+                          type="button"
+                          class="value-row"
+                          class:selected={selectedValueIds.has(value.value_id)}
+                          title="Click to replace active filters; Ctrl-click to add this value"
+                          data-testid={`traits-value-${value.value_id}`}
+                          on:click={(event) => handleValueClick(event, value.value_id)}
+                        >
+                          <span class="value-name">{value.value}</span>
+                          <span class="value-meta">
+                            <span>{value.tokens_with_type_value}</span>
+                            <span>{formatPercent(value.rarity_pct)}</span>
+                          </span>
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+              </section>
+            {/each}
           </section>
         {/each}
+        <div class="panel-scroll-spacer" aria-hidden="true"></div>
       {/if}
     </div>
   </aside>
@@ -556,7 +602,7 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 4px 0 20px;
+    padding: 4px 0 0;
   }
   .state {
     padding: 20px 16px;
@@ -592,8 +638,31 @@
   .filter-pill:hover {
     background: rgba(255, 255, 255, 0.1);
   }
-  .bucket {
+  .purpose-group {
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .purpose-group + .purpose-group {
+    margin-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .purpose-group-label {
+    height: 24px;
+    padding: 8px 12px 0;
+    box-sizing: border-box;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .panel-scroll-spacer {
+    height: calc(100vh - 128px);
+    min-height: 260px;
+    pointer-events: none;
+  }
+  .bucket + .bucket {
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
   }
   .bucket-header-row {
     min-height: 38px;

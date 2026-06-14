@@ -113,7 +113,7 @@ Goal: a desktop‑first horizontal “travel” experience where wide, landscape
 - Toggle: `Traits` in the status bar.
 - Desktop: fixed left side-panel, roughly one third of the viewport width, full height. It pushes the main viewport right; Grid uses two columns while open.
 - Mobile: full-screen overlay so users can focus on trait exploration.
-- Content: trait buckets sorted alpha-numerically and closed by default. Root search filters visible buckets/values from the second character. Bucket-name root matches show only values that also match the root query.
+- Content: trait buckets are visually grouped by `purpose_class` in the same purpose order as the bottom Filter panel, with distinct spacing between purpose groups. Buckets remain closed by default and sort alpha-numerically within each purpose group. Root search filters visible groups/buckets/values from the second character. Bucket-name root matches show only values that also match the root query.
 - While root search is active, expanded buckets hide bucket-level search and sort controls so matched values appear immediately.
 - While root search is active, every visible bucket header shows an inline `jump` button regardless of whether the match came from the bucket name or a value. The button is a navigation handoff: it copies the root query into that bucket search, clears root search, collapses every other bucket, and scrolls to that bucket header so the user can inspect the bucket-specific matches or clear the bucket search to explore all values in that bucket.
 - The sticky top section displays selected filter pills under the root search. Pills use the same labels and remove-on-click behavior as the bottom Filter panel and wrap onto new rows inside the side panel.
