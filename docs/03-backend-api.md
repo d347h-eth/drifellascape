@@ -150,6 +150,11 @@ To avoid a race between reading the active version id and its rows while the wor
     - `owner` uses the same effective-owner field as owner-filtered token search: listed tokens use the active listing seller, unlisted tokens use the Helius on-chain owner.
     - Before ownership sync runs, the endpoint returns an empty `items` list.
 
+- `GET /healthz`
+
+  - Returns `{ "ok": true }` when the API process can route requests.
+  - The Prometheus metrics sidecar endpoint also exposes `/healthz` on the metrics port when backend metrics are enabled.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
@@ -174,6 +179,8 @@ Notes:
 - `backend/src/server.ts`
   - Node HTTP server, request routing, JSON responses, and CORS header.
   - Starts DB and refresh loop (`startServer()`).
+- `backend/src/observability.ts`
+  - Initializes the optional Prometheus scrape endpoint and records backend HTTP request count, latency, status class, and in-flight gauges.
 - `backend/src/cache.ts`
   - `ListingsCache` with `ensureLoaded()`, `refreshIfChanged()`, and `getSnapshotUnsafe()`.
   - Holds the current `{ versionId, items }` and guards concurrent refresh.
@@ -197,6 +204,8 @@ In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaul
 - `BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
 - `BACKEND_PORT` — server port (default `3000`).
 - `BACKEND_DEBUG` — when set, search responses include `anchorDebug`.
+- `BACKEND_METRICS_ENABLED` — enables `/metrics` and `/healthz` on the backend metrics server.
+- `BACKEND_METRICS_HOST` / `BACKEND_METRICS_PORT` — default local endpoint `127.0.0.1:42840`; Compose uses `0.0.0.0` internally.
 
 ## Performance & Capacity
 
@@ -206,6 +215,7 @@ In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaul
 
 ## Error Handling
 
+- Runtime logs are structured JSON Lines on stdout/stderr with `t`, `level`, `msg`, `component`, and `action`. `yarn dev` captures backend output in `tmp/logs/backend.log`; deploy Alloy reads labeled container logs.
 - Errors during cache load or refresh yield 500 with `{ error }` and are logged to stdout/stderr.
 - The server continues running; next refresh attempts will try to recover.
 

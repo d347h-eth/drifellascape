@@ -183,7 +183,8 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
 - Frontend UX
   - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.
 - Observability
-  - Health endpoint and metrics for last sync, version id, page counts, and failures.
+  - Implemented: structured JSON runtime logs, `/healthz`, Prometheus metrics endpoints, and Grafana/Loki/Alloy/Prometheus/Tempo/Pyroscope compose profiles for local and deploy.
+  - Worker metrics cover Magic Eden and Helius golden signals: request rate, latency, 429 responses, retry scheduling, client rate-limiter waits, and sync run health.
 
 ## Onboarding Summary
 

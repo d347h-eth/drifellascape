@@ -88,12 +88,13 @@ Ownership sync runs in the same worker cycle after the Magic Eden listings snaps
 5. Stage rows into `temp_ownership`, compute inserted/updated/deleted counts against the active ownership version, and create a new version only when material changes exist.
 6. Flip the active ownership version atomically and clean non-active ownership rows/versions.
 
-## Rate Limiting, Retries, Logging
+## Rate Limiting, Retries, Logging, Metrics
 
 - Limiter: ≤ 2 RPS and ≤ 120 RPM using a minimalist token/timestamp window; sequential requests.
-- Retries: up to 3 attempts with exponential backoff (2s, 4s, 8s); 429/5xx responses are logged as retryable, and the current wrapper also retries thrown fetch/HTTP errors before failing the page. Request timeout is 30s.
+- Retries: up to 3 attempts with exponential backoff (2s, 4s, 8s by default); only 429/5xx responses and thrown fetch errors are retried before failing the page. Request timeout is 30s by default.
 - Abort: if any page fails after retries, abort the cycle (don’t produce partial snapshots).
-- Logging: `logs/worker.log` captures page counts, skips, and summary (new version or no change) or failure cause.
+- Logging: runtime logs are structured JSON Lines on stdout/stderr. `yarn dev` captures them in `tmp/logs/worker.log`; deploy Alloy reads labeled container logs.
+- Metrics: when `WORKER_METRICS_ENABLED=true`, the worker exposes `/metrics` and `/healthz` on `WORKER_METRICS_HOST:WORKER_METRICS_PORT` (default `127.0.0.1:42841` locally). Prometheus scrapes Magic Eden and Helius request counts, latency histograms, 429 counters, retry scheduling, client rate-limiter wait histograms, worker run health, and sync result counters.
 
 ## Normalization
 
@@ -190,12 +191,14 @@ Notes:
 Source layout (worker):
 
 - `worker/src/fetcher.ts`
-  - Rate limiter, retry wrapper, pagination, listings normalization, and market event normalization.
+  - Rate limiter, shared retry wrapper, pagination, listings normalization, market event normalization, and Magic Eden request metrics.
   - Returns `{ ok: true, listings, pages, skipped } | { ok: false, error }`.
 - `worker/src/market-events.ts`
   - Orchestrates recent activity sampling plus bounded historical backfill for listing/sale events.
 - `worker/src/ownership.ts`
-  - Orchestrates optional Helius pagination, listed-seller overlay, interval gating, and ownership snapshot sync.
+  - Orchestrates optional Helius pagination, listed-seller overlay, interval gating, ownership snapshot sync, and Helius request metrics.
+- `worker/src/observability.ts` / `worker/src/external-api-observability.ts`
+  - Initializes the metrics scrape endpoint and records external API golden signals.
 - `worker/src/repo.ts`
   - Small DB helpers (create temp table, load rows, count diffs, versioning, activation, cleanup).
   - Market event insert helpers, ownership snapshot helpers, and backfill/sync state updates.
@@ -206,7 +209,7 @@ Source layout (worker):
 - `worker/src/types.ts`
   - `NormalizedListing`, `SyncResult`, `PRICE_EPSILON = 10_000_000` (0.01 SOL).
 - `worker/src/index.ts`
-  - Infinite loop: fetch → sync → sleep. Interval via `WORKER_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Logs to `logs/worker.log`.
+  - Infinite loop: fetch → sync → sleep. Interval via `WORKER_SYNC_INTERVAL_MS` (default 30s, clamped to at least 5s). Graceful SIGINT/SIGTERM handling. Emits structured stdout/stderr logs captured by the local dev supervisor or Docker.
 
 DB module (shared):
 
@@ -218,9 +221,10 @@ DB module (shared):
 
 ## Error Handling & Logging
 
-- File: `logs/worker.log`
-  - Fetch errors (HTTP status and attempt), pagination summary, skip counts.
-  - Sync summary: new version id and counts, or “no change”.
+- Runtime logs:
+  - JSON Lines with `t`, `level`, `msg`, `component`, and `action`.
+  - Local `yarn dev` writes worker output to `tmp/logs/worker.log`; deploy logs are collected from Docker by Alloy.
+  - Fetch errors (HTTP status and attempt), retry scheduling, pagination summary, skip counts, and sync summary are logged with structured fields.
 - Defensive checks:
   - Snapshot insert rowcount must equal `total`; otherwise rollback the new version and abort.
   - Aborts cycle on fetch failure to avoid partial snapshots that would induce mass deletes.
@@ -234,6 +238,10 @@ In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local default
 - `MARKET_EVENT_BACKFILL_PAGES` — historical pages per event type per cycle, default `5`, clamped to `0..25`.
 - `HELIUS_KEY` — optional Helius API key for ownership sync.
 - `OWNERSHIP_SYNC_INTERVAL_MS` — ownership snapshot interval, default `600000`, clamped to at least `60000`.
+- `WORKER_METRICS_ENABLED` — enables the Prometheus scrape endpoint.
+- `WORKER_METRICS_HOST` / `WORKER_METRICS_PORT` — default local endpoint `127.0.0.1:42841`; Compose uses `0.0.0.0` internally.
+- `COMMON_HTTP_FETCH_TIMEOUT_MS` — shared Magic Eden/Helius attempt timeout, default `30000`.
+- `COMMON_HTTP_FETCH_RETRY_MAX_ATTEMPTS`, `COMMON_HTTP_FETCH_RETRY_BASE_DELAY_MS`, `COMMON_HTTP_FETCH_RETRY_MAX_DELAY_MS` — shared retry controls for 429/5xx and thrown fetch errors.
 - Marketplace base URL and params are currently in code (single collection); can be externalized later if needed.
 
 ## Testing Strategy
@@ -254,7 +262,7 @@ In local dev, `yarn worker:run` and `yarn dev` load root `.env` as local default
 - Support additional activity types such as delists and accepted bids if the UI needs them.
 - Make the price epsilon configurable per collection/market conditions.
 - Consider `bigint` for price to future‑proof raw amounts.
-- Add metrics/health reporting for last sync time, last error, and current version id.
+- Add richer sync-state gauges if operational dashboards need per-version last success/error details beyond the current run health and result counters.
 
 ## Quick Start
 

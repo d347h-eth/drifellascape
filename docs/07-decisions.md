@@ -92,3 +92,9 @@
 - Decision: Build listing and sale feeds from Magic Eden collection activities (`type=list` and `type=buyNow`) rather than deriving events from listing snapshot diffs.
 - Rationale: The activity endpoint provides historical, signature-backed market facts keyed by `tokenMint`; snapshot diffs only approximate list/delist/sale behavior and can miss events between worker cycles.
 - Notes: Store market events append-only with idempotent inserts keyed by `(event_type, signature, token_mint_addr)`. Normalize activity prices from numeric SOL `price` into the same 9-decimal integer base-unit convention used by listings.
+
+## ADR-018: ArtGod-style Observability Stack
+
+- Decision: Use the same observability shape as ArtGod for Drifellascape: structured JSON runtime logs, Alloy → Loki log shipping, Prometheus scrape endpoints, Grafana file provisioning, and Tempo/Pyroscope datasources in local and deploy compose profiles.
+- Rationale: Reuses a proven operational model on the same guarded server while keeping Drifellascape instrumentation small and focused on its external API integrations.
+- Notes: The worker records Magic Eden and Helius golden signals (latency, request result/status class, 429s, retry scheduling, and client rate-limiter waits). Deploy Grafana is not attached to `public-edge`; it is bound only to `${OBSERVABILITY_GRAFANA_HOST_BIND_IP}:${OBSERVABILITY_GRAFANA_HOST_BIND_PORT}` (example `10.77.0.1:42835`) for WireGuard-only access.
