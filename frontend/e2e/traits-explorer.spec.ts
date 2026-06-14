@@ -416,10 +416,30 @@ test("trait value clicks replace by default and ctrl-click adds side-panel pills
             .click({ modifiers: ["Control"] });
         await expect(page.getByTestId("traits-filter-pill-103")).toBeVisible();
         await expect(page.getByTestId("traits-filter-pill-102")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-header-1")).toHaveCSS(
+            "color",
+            "rgb(236, 126, 21)",
+        );
 
-        await page.getByTestId("traits-filter-pill-103").click();
-        await expect(page.getByTestId("traits-filter-pill-103")).toHaveCount(0);
-        await expect(page.getByTestId("traits-filter-pill-102")).toBeVisible();
+        await page.getByTestId("traits-bucket-header-2").click();
+        await page.getByTestId("traits-value-201").click();
+        await expect(page.getByTestId("traits-filter-pill-102")).toHaveCount(0);
+        await expect(page.getByTestId("traits-filter-pill-201")).toBeVisible();
+        await expect(page.getByTestId("traits-bucket-header-1")).not.toHaveCSS(
+            "color",
+            "rgb(236, 126, 21)",
+        );
+        await expect(page.getByTestId("traits-bucket-header-2")).toHaveCSS(
+            "color",
+            "rgb(236, 126, 21)",
+        );
+
+        await page.getByTestId("traits-filter-pill-201").click();
+        await expect(page.getByTestId("traits-filter-pill-201")).toHaveCount(0);
+        await expect(page.getByTestId("traits-bucket-header-2")).not.toHaveCSS(
+            "color",
+            "rgb(236, 126, 21)",
+        );
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;
@@ -443,7 +463,7 @@ test("empty listings state links to tokens browsing without filter hint when no 
 
         await expect(page.getByText("No listings found.")).toBeVisible();
         await expect(
-            page.getByText("Try to change the applied trait filters."),
+            page.getByText("Try to change the applied filters."),
         ).toHaveCount(0);
 
         await page.getByRole("button", { name: "tokens browsing" }).click();
@@ -480,7 +500,7 @@ test("empty tokens state includes the filter hint only when filters are applied"
 
         await expect(page.getByText("No tokens found.")).toBeVisible();
         await expect(
-            page.getByText("Try to change the applied trait filters."),
+            page.getByText("Try to change the applied filters."),
         ).toBeVisible();
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);

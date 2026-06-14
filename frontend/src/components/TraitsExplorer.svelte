@@ -20,6 +20,7 @@
     sortMode: SortMode;
     expanded: boolean;
     showJump: boolean;
+    hasActiveFilter: boolean;
   };
 
   const ROOT_SEARCH_MIN_LENGTH = 2;
@@ -128,6 +129,7 @@
     sortModes: Record<number, SortMode>,
     expandedIds: Set<number>,
     searchCollapsedIds: Set<number>,
+    selectedIds: Set<number>,
   ): BucketView | null {
     const label = bucketLabel(bucket);
     const bucketQuery = queries[bucket.type_id] ?? '';
@@ -174,6 +176,7 @@
         searchCollapsedIds,
       ),
       showJump: rootSearchActive,
+      hasActiveFilter: bucket.values.some((value) => selectedIds.has(value.value_id)),
     };
   }
 
@@ -197,6 +200,7 @@
         bucketSortModes,
         expandedTypeIds,
         searchCollapsedTypeIds,
+        selectedValueIds,
       ),
     )
     .filter((bucket): bucket is BucketView => bucket !== null);
@@ -352,6 +356,7 @@
           <section class="bucket" data-testid={`traits-bucket-${bucket.type_id}`}>
             <div
               class="bucket-header-row"
+              class:has-active-filter={bucket.hasActiveFilter}
               bind:this={bucketHeaderEls[bucket.type_id]}
             >
               <button
@@ -617,6 +622,14 @@
   .bucket-header:hover,
   .jump-button:hover {
     color: #fff;
+  }
+  .bucket-header-row.has-active-filter .bucket-header,
+  .bucket-header-row.has-active-filter .bucket-count,
+  .bucket-header-row.has-active-filter .bucket-header:hover {
+    color: #ec7e15;
+  }
+  .bucket-header-row.has-active-filter .bucket-count {
+    opacity: 1;
   }
   .chevron {
     flex: 0 0 18px;
