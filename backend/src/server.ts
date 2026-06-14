@@ -1,6 +1,13 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { initializeDatabase } from "@drifellascape/database";
+import { logger } from "@drifellascape/shared/utils/logger";
 import { ListingsCache } from "./cache.js";
+import {
+    initBackendObservability,
+    recordHttpRequestFinished,
+    recordHttpRequestStarted,
+    stopBackendObservability,
+} from "./observability.js";
 import type {
     ListingRow,
     ListingsSearchBody,
@@ -351,9 +358,23 @@ async function handleOwners(req: IncomingMessage, res: ServerResponse) {
     }
 }
 
-function route(req: IncomingMessage, res: ServerResponse) {
+function routeLabel(method: string | undefined, url: string): string {
+    if (method === "OPTIONS") return "OPTIONS *";
+    if (url.startsWith("/healthz")) return "GET /healthz";
+    if (url.startsWith("/traits/catalog")) return "GET /traits/catalog";
+    if (url.startsWith("/market/events")) return "GET /market/events";
+    if (url.startsWith("/owners")) return "GET /owners";
+    if (url.startsWith("/listings/search")) return "POST /listings/search";
+    if (url.startsWith("/tokens/search")) return "POST /tokens/search";
+    if (url.startsWith("/listings")) return "GET /listings";
+    return "not_found";
+}
+
+function routeRequest(req: IncomingMessage, res: ServerResponse) {
     const url = req.url || "/";
     if (req.method === "OPTIONS") return void sendJson(res, 204, {});
+    if (req.method === "GET" && url.startsWith("/healthz"))
+        return void sendJson(res, 200, { ok: true });
     if (req.method === "GET" && url.startsWith("/traits/catalog"))
         return void handleTraitsCatalog(req, res);
     if (req.method === "GET" && url.startsWith("/market/events"))
@@ -370,6 +391,22 @@ function route(req: IncomingMessage, res: ServerResponse) {
     sendJson(res, 404, { error: "Not found" });
 }
 
+function route(req: IncomingMessage, res: ServerResponse) {
+    const started = Date.now();
+    const method = req.method ?? "GET";
+    const label = routeLabel(method, req.url || "/");
+    recordHttpRequestStarted();
+    res.on("finish", () => {
+        recordHttpRequestFinished({
+            method,
+            route: label,
+            statusCode: res.statusCode,
+            durationMs: Date.now() - started,
+        });
+    });
+    routeRequest(req, res);
+}
+
 async function startRefreshLoop() {
     const interval = Number(process.env.BACKEND_REFRESH_MS || 30000);
     // Priming load
@@ -384,21 +421,42 @@ async function startRefreshLoop() {
 
 export async function startServer() {
     // Initialize DB and run migrations once at startup
+    await initBackendObservability();
     await initializeDatabase();
     await startRefreshLoop();
     const port = getEnvPort();
     const server = createServer(route);
     server.listen(port, () => {
-        // eslint-disable-next-line no-console
-        console.log(`Backend listening on http://localhost:${port}`);
+        logger.info("Backend listening", {
+            component: "BackendApi",
+            action: "server_listening",
+            port,
+        });
     });
+    const shutdown = async (signal: string) => {
+        logger.info("Backend stopping", {
+            component: "BackendApi",
+            action: "server_stopping",
+            signal,
+        });
+        server.close(async () => {
+            await stopBackendObservability();
+            process.exit(0);
+        });
+    };
+    process.once("SIGINT", () => void shutdown("SIGINT"));
+    process.once("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
 // Run if invoked directly
 if (import.meta.url === `file://${process.argv[1]}`) {
     startServer().catch((err) => {
-        // eslint-disable-next-line no-console
-        console.error("Backend failed to start:", err);
+        logger.error("Backend failed to start", {
+            component: "BackendApi",
+            action: "server_start_failed",
+            error: String(err?.message || err),
+        });
+        void stopBackendObservability();
         process.exit(1);
     });
 }

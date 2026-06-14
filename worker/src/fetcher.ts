@@ -1,13 +1,17 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import { fetchWithHttpResilience } from "@drifellascape/shared/network/http-fetch-resilience";
+import { logger } from "@drifellascape/shared/utils/logger";
+import {
+    recordExternalApiAttempt,
+    recordExternalApiRateLimiterWait,
+    recordExternalApiRetryScheduled,
+    type ExternalApiRequestContext,
+} from "./external-api-observability.js";
+import { getWorkerHttpFetchResilienceConfig } from "./http-resilience.js";
 import type {
     MarketEventType,
     NormalizedListing,
     NormalizedMarketEvent,
 } from "./types.js";
-
-const LOGS_DIR = path.resolve(process.cwd(), "logs");
-const WORKER_LOG = path.join(LOGS_DIR, "worker.log");
 
 const COLLECTION = "drifella_iii";
 const COLLECTION_BASE_URL = `https://api-mainnet.magiceden.dev/v2/collections/${COLLECTION}`;
@@ -16,30 +20,9 @@ const ACTIVITIES_URL = `${COLLECTION_BASE_URL}/activities`;
 export const PAGE_LIMIT = 100; // per API contract
 const SOL_LAMPORTS = 1_000_000_000;
 
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 2000; // 2s
-const REQ_TIMEOUT_MS = 30000; // 30s
-
 // Rate limits: <= 2 RPS and <= 120 RPM
 const MIN_INTERVAL_MS = 500; // 2 per second
 const MAX_PER_MINUTE = 120;
-
-async function ensureLogsDir(): Promise<void> {
-    await fs.mkdir(LOGS_DIR, { recursive: true });
-}
-
-async function logLine(message: string): Promise<void> {
-    try {
-        await ensureLogsDir();
-        await fs.appendFile(
-            WORKER_LOG,
-            `[${new Date().toISOString()}] ${message}\n`,
-            "utf8",
-        );
-    } catch {
-        // non-fatal
-    }
-}
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,11 +32,14 @@ class RateLimiter {
     private lastAt = 0;
     private window: number[] = [];
 
-    async waitNext(): Promise<void> {
+    async waitNext(): Promise<number> {
+        let waitedMs = 0;
         const now = Date.now();
         const elapsed = now - this.lastAt;
         if (elapsed < MIN_INTERVAL_MS) {
-            await sleep(MIN_INTERVAL_MS - elapsed);
+            const wait = MIN_INTERVAL_MS - elapsed;
+            await sleep(wait);
+            waitedMs += wait;
         }
         // minute window control
         const now2 = Date.now();
@@ -63,62 +49,54 @@ class RateLimiter {
             const oldest = this.window[0];
             const wait = Math.max(0, 60_000 - (now2 - oldest));
             await sleep(wait);
+            waitedMs += wait;
             // trim again after sleep
             const now3 = Date.now();
             this.window = this.window.filter((t) => now3 - t < 60_000);
         }
         this.lastAt = Date.now();
         this.window.push(this.lastAt);
+        return waitedMs;
     }
 }
 
 const limiter = new RateLimiter();
 
-async function fetchWithRetry(url: URL): Promise<any[]> {
-    let backoff = INITIAL_BACKOFF_MS;
-    let lastErr: unknown;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        await limiter.waitNext();
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), REQ_TIMEOUT_MS);
-        try {
-            const res = await fetch(url, {
-                method: "GET",
-                headers: {
-                    accept: "application/json",
-                    "user-agent": "Drifellascape",
-                },
-                signal: controller.signal,
-            });
-            clearTimeout(timer);
-            if (res.ok) {
-                const data = (await res.json()) as any[];
-                if (!Array.isArray(data)) {
-                    throw new Error("Expected array response");
-                }
-                return data;
-            }
-            const body = await res.text();
-            const msg = `HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`;
-            if (res.status === 429 || res.status >= 500) {
-                await logLine(`Retryable fetch error: ${msg}`);
-                lastErr = new Error(msg);
-            } else {
-                throw new Error(msg);
-            }
-        } catch (err) {
-            clearTimeout(timer);
-            lastErr = err;
-            await logLine(
-                `Fetch attempt ${attempt} failed: ${String((err as any)?.message || err)}`,
-            );
-        }
-        if (attempt < MAX_RETRIES) {
-            await sleep(backoff);
-            backoff *= 2;
-        }
+async function fetchWithRetry(
+    url: URL,
+    context: ExternalApiRequestContext,
+): Promise<any[]> {
+    const res = await fetchWithHttpResilience({
+        input: url,
+        init: {
+            method: "GET",
+            headers: {
+                accept: "application/json",
+                "user-agent": "Drifellascape",
+            },
+        },
+        fetchImpl: async (input, init) => {
+            const waitedMs = await limiter.waitNext();
+            recordExternalApiRateLimiterWait("magic_eden", waitedMs);
+            return fetch(input, init);
+        },
+        config: getWorkerHttpFetchResilienceConfig(),
+        onAttemptComplete: (attempt) =>
+            recordExternalApiAttempt(context, attempt),
+        onRetryScheduled: (retry) =>
+            recordExternalApiRetryScheduled(context, retry),
+    });
+    if (!res.ok) {
+        const body = await res.text();
+        throw new Error(
+            `HTTP ${res.status} ${res.statusText} ${body.slice(0, 200)}`,
+        );
     }
-    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+    const data = (await res.json()) as any[];
+    if (!Array.isArray(data)) {
+        throw new Error("Expected array response");
+    }
+    return data;
 }
 
 function buildListingsUrl(offset: number, limit = PAGE_LIMIT): URL {
@@ -264,7 +242,11 @@ export async function fetchAllListings(): Promise<FetchListingsResult> {
     try {
         for (;;) {
             const url = buildListingsUrl(offset, PAGE_LIMIT);
-            const arr = await fetchWithRetry(url);
+            const arr = await fetchWithRetry(url, {
+                provider: "magic_eden",
+                endpoint: "listings",
+                method: "GET",
+            });
             page += 1;
             for (const item of arr) {
                 const norm = normalizeItem(item);
@@ -277,13 +259,23 @@ export async function fetchAllListings(): Promise<FetchListingsResult> {
             if (arr.length < PAGE_LIMIT) break;
             offset += PAGE_LIMIT;
         }
-        await logLine(
-            `Fetched listings: pages=${page}, total=${all.length}, skipped=${skipped}`,
-        );
+        logger.info("Fetched listings", {
+            component: "WorkerFetcher",
+            action: "fetch_listings",
+            pages: page,
+            total: all.length,
+            skipped,
+        });
         return { ok: true, listings: all, pages: page, skipped };
     } catch (err) {
         const msg = `Fetch listings failed after page=${page}, offset=${offset}: ${String((err as any)?.message || err)}`;
-        await logLine(msg);
+        logger.error(msg, {
+            component: "WorkerFetcher",
+            action: "fetch_listings_failed",
+            page,
+            offset,
+            error: String((err as any)?.message || err),
+        });
         return { ok: false, error: msg };
     }
 }
@@ -305,7 +297,11 @@ export async function fetchMarketEventsPage(
 ): Promise<FetchMarketEventsPageResult> {
     try {
         const url = buildActivitiesUrl(eventType, offset, limit);
-        const arr = await fetchWithRetry(url);
+        const arr = await fetchWithRetry(url, {
+            provider: "magic_eden",
+            endpoint: "activities",
+            method: "GET",
+        });
         const events: NormalizedMarketEvent[] = [];
         let skipped = 0;
         for (const item of arr) {
@@ -325,7 +321,13 @@ export async function fetchMarketEventsPage(
         };
     } catch (err) {
         const msg = `Fetch ${eventType} events failed at offset=${offset}: ${String((err as any)?.message || err)}`;
-        await logLine(msg);
+        logger.error(msg, {
+            component: "WorkerFetcher",
+            action: "fetch_market_events_failed",
+            eventType,
+            offset,
+            error: String((err as any)?.message || err),
+        });
         return { ok: false, eventType, error: msg };
     }
 }
