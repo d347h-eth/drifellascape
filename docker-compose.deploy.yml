@@ -1,0 +1,171 @@
+version: "3.9"
+
+x-drifellascape-log-labels: &drifellascape-log-labels
+    com.drifellascape.observability.logs: "true"
+
+x-drifellascape-node-service: &drifellascape-node-service
+    image: node:24-bookworm-slim
+    init: true
+    restart: unless-stopped
+    working_dir: /app
+    labels: *drifellascape-log-labels
+    env_file:
+        - ${DRIFELLA_DEPLOY_ENV_FILE:-.env.deploy}
+    volumes:
+        - ./:/app
+        - ./logs:/app/logs
+
+services:
+    backend:
+        <<: *drifellascape-node-service
+        command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn backend:run"
+        environment:
+            BACKEND_PORT: ${BACKEND_PORT:-42800}
+            BACKEND_REFRESH_MS: ${BACKEND_REFRESH_MS:-30000}
+            BACKEND_DEBUG: ${BACKEND_DEBUG:-}
+            BACKEND_METRICS_ENABLED: ${BACKEND_METRICS_ENABLED:-true}
+            BACKEND_METRICS_HOST: 0.0.0.0
+            BACKEND_METRICS_PORT: ${BACKEND_METRICS_PORT:-42840}
+        expose:
+            - "42800"
+            - "42840"
+        networks:
+            default:
+            public-edge:
+                aliases:
+                    - drifella-backend
+
+    worker:
+        <<: *drifellascape-node-service
+        command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn worker:run"
+        environment:
+            WORKER_SYNC_INTERVAL_MS: ${WORKER_SYNC_INTERVAL_MS:-30000}
+            MARKET_EVENT_RECENT_PAGES: ${MARKET_EVENT_RECENT_PAGES:-2}
+            MARKET_EVENT_BACKFILL_PAGES: ${MARKET_EVENT_BACKFILL_PAGES:-5}
+            HELIUS_KEY: ${HELIUS_KEY:-}
+            OWNERSHIP_SYNC_INTERVAL_MS: ${OWNERSHIP_SYNC_INTERVAL_MS:-600000}
+            WORKER_METRICS_ENABLED: ${WORKER_METRICS_ENABLED:-true}
+            WORKER_METRICS_HOST: 0.0.0.0
+            WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-42841}
+            COMMON_HTTP_FETCH_TIMEOUT_MS: ${COMMON_HTTP_FETCH_TIMEOUT_MS:-30000}
+            COMMON_HTTP_FETCH_RETRY_MAX_ATTEMPTS: ${COMMON_HTTP_FETCH_RETRY_MAX_ATTEMPTS:-3}
+            COMMON_HTTP_FETCH_RETRY_BASE_DELAY_MS: ${COMMON_HTTP_FETCH_RETRY_BASE_DELAY_MS:-2000}
+            COMMON_HTTP_FETCH_RETRY_MAX_DELAY_MS: ${COMMON_HTTP_FETCH_RETRY_MAX_DELAY_MS:-8000}
+        expose:
+            - "42841"
+        depends_on:
+            - backend
+
+    loki:
+        image: grafana/loki:3.0.0
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        command: ["-config.file=/etc/loki/config.yaml"]
+        expose:
+            - "42830"
+        volumes:
+            - ./observability/loki/loki-config.yaml:/etc/loki/config.yaml:ro
+            - loki-data:/loki
+
+    tempo:
+        image: grafana/tempo:2.7.1
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        command: ["-config.file=/etc/tempo/config.yaml"]
+        expose:
+            - "42831"
+            - "42832"
+        volumes:
+            - ./observability/tempo/tempo-config.yaml:/etc/tempo/config.yaml:ro
+            - tempo-data:/var/tempo
+
+    pyroscope:
+        image: grafana/pyroscope:latest
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        command: ["-server.http-listen-port=42833"]
+        expose:
+            - "42833"
+        volumes:
+            - pyroscope-data:/var/lib/pyroscope
+
+    alloy:
+        image: grafana/alloy:latest
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        command:
+            [
+                "run",
+                "--server.http.listen-addr=0.0.0.0:42836",
+                "/etc/alloy/config.alloy",
+            ]
+        depends_on:
+            - loki
+        volumes:
+            - ./observability/alloy/deploy-config.alloy:/etc/alloy/config.alloy:ro
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    prometheus:
+        image: prom/prometheus:v2.54.1
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        command:
+            [
+                "--config.file=/etc/prometheus/prometheus.yml",
+                "--web.listen-address=0.0.0.0:42834",
+            ]
+        expose:
+            - "42834"
+        volumes:
+            - ./observability/prometheus/deploy-prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - prometheus-data:/prometheus
+
+    grafana:
+        image: grafana/grafana:latest
+        init: true
+        restart: unless-stopped
+        profiles:
+            - observability
+        depends_on:
+            - loki
+            - prometheus
+            - tempo
+            - pyroscope
+        ports:
+            - "${OBSERVABILITY_GRAFANA_HOST_BIND_IP:-10.77.0.1}:${OBSERVABILITY_GRAFANA_HOST_BIND_PORT:-42835}:42835"
+        expose:
+            - "42835"
+        networks:
+            default:
+        environment:
+            GF_SERVER_HTTP_ADDR: 0.0.0.0
+            GF_SERVER_HTTP_PORT: "42835"
+            GF_SECURITY_ADMIN_USER: ${OBSERVABILITY_GRAFANA_ADMIN_USER:-admin}
+            GF_SECURITY_ADMIN_PASSWORD: ${OBSERVABILITY_GRAFANA_ADMIN_PASSWORD:-change-me}
+            GF_USERS_ALLOW_SIGN_UP: "false"
+        volumes:
+            - grafana-data:/var/lib/grafana
+            - ./observability/grafana/provisioning-deploy/datasources:/etc/grafana/provisioning/datasources:ro
+            - ./observability/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+
+volumes:
+    loki-data:
+    tempo-data:
+    pyroscope-data:
+    prometheus-data:
+    grafana-data:
+
+networks:
+    public-edge:
+        name: ${PUBLIC_EDGE_NETWORK:-public-edge}
+        external: true

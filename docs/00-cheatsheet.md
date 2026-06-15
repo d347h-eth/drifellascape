@@ -113,21 +113,26 @@ Mobile specifics
 ## Static & Releases
 
 - Images are served from `/static/art/{2560,540h}/{mint}.jpg` by the central Caddy stack; Gallery/Grid currently use the absolute `https://app.drifellascape.art/static/...` base.
-- Frontend is a static bundle served by central Caddy from `releases/current`. Use the `frontend-build` container and symlink flip, then reload central Caddy from its compose directory; verify on `:8080` via the repo-local `caddy-verify` compose profile.
+- Frontend is a static bundle served by central Caddy from `releases/current`. Use the `frontend-build` container and symlink flip, then reload central Caddy from its compose directory; verify on `:42888` via the repo-local `caddy-verify` compose profile.
 
 ## Env Vars
 
 - Start from root `.env.example`; copy it to `.env` for local dev and Compose.
 - Worker: `WORKER_SYNC_INTERVAL_MS`, `HELIUS_KEY`, `OWNERSHIP_SYNC_INTERVAL_MS`
 - Market events: `MARKET_EVENT_RECENT_PAGES`, `MARKET_EVENT_BACKFILL_PAGES`
-- Backend: `BACKEND_REFRESH_MS`, `BACKEND_PORT`, `BACKEND_DEBUG`
+- Backend: `BACKEND_REFRESH_MS`, `BACKEND_PORT`, `BACKEND_DEBUG`, `BACKEND_METRICS_*`
+- Observability/resilience: `WORKER_METRICS_*`, `COMMON_HTTP_FETCH_*`, `OBSERVABILITY_GRAFANA_*`
 - Frontend: `VITE_API_BASE`, `VITE_POLL_MS`
 
 ## Scripts
 
 - Run local dev stack:
   - `yarn dev`
-  - Logs: `tmp/logs/backend.log`, `tmp/logs/worker.log`, `tmp/logs/frontend.log`
+  - Logs: JSON Lines in `tmp/logs/backend.log` and `tmp/logs/worker.log`; Vite output in `tmp/logs/frontend.log`
+- Run local observability stack:
+  - `yarn observability:up`
+  - Grafana: `http://127.0.0.1:42835`
+  - Stop/remove only observability containers: `yarn observability:stop` / `yarn observability:down`
 - Download metadata JSON (sequential, ≤1 req/s, retries):
   - `yarn tsx scripts/assets/download-metadata.ts`
 - Download originals and produce resized JPGs:

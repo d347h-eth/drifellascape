@@ -57,8 +57,8 @@ start_process backend yarn backend:run
 start_process worker yarn worker:run
 start_process frontend yarn workspace @drifellascape/frontend dev
 
-printf '[dev] frontend: http://localhost:5173\n'
-printf '[dev] backend:  http://localhost:3000\n'
+printf '[dev] frontend: http://localhost:42820\n'
+printf '[dev] backend:  http://localhost:42800\n'
 printf '[dev] logs:     tmp/logs/{backend,worker,frontend}.log\n'
 printf '[dev] press Ctrl+C to stop all runtimes\n'
 

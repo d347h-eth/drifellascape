@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "playwright/test";
 
 const baseURL =
-    process.env.FRONTEND_E2E_BASE_URL?.trim() || "http://127.0.0.1:42711";
+    process.env.FRONTEND_E2E_BASE_URL?.trim() || "http://127.0.0.1:42820";
 const persistSuccessArtifacts =
     process.env.FRONTEND_E2E_PERSIST_SUCCESS_ARTIFACTS === "1";
 
@@ -17,7 +17,7 @@ export default defineConfig({
     webServer: process.env.FRONTEND_E2E_BASE_URL
         ? undefined
         : {
-              command: "yarn dev --host 127.0.0.1 --port 42711 --strictPort",
+              command: "yarn dev --host 127.0.0.1 --port 42820 --strictPort",
               url: baseURL,
               timeout: 60_000,
               reuseExistingServer: !process.env.CI,

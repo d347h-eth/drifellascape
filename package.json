@@ -42,7 +42,11 @@
         "format:check": "prettier . --check",
         "dev": "scripts/dev/run-local.sh",
         "worker:run": "bash scripts/dev/with-env.sh yarn tsx worker/src/index.ts",
-        "backend:run": "bash scripts/dev/with-env.sh yarn tsx backend/src/server.ts"
+        "backend:run": "bash scripts/dev/with-env.sh yarn tsx backend/src/server.ts",
+        "observability:fix-permissions": "node ./scripts/observability/ensure-grafana-provisioning-permissions.mjs",
+        "observability:up": "node ./scripts/observability/compose.mjs up",
+        "observability:stop": "node ./scripts/observability/compose.mjs stop",
+        "observability:down": "node ./scripts/observability/compose.mjs down"
     },
     "recommendations": [
         "esbenp.prettier-vscode"

@@ -1,4 +1,11 @@
 import { initializeDatabase } from "@drifellascape/database";
+import { fetchWithHttpResilience } from "@drifellascape/shared/network/http-fetch-resilience";
+import {
+    recordExternalApiAttempt,
+    recordExternalApiLogicalError,
+    recordExternalApiRetryScheduled,
+} from "./external-api-observability.js";
+import { getWorkerHttpFetchResilienceConfig } from "./http-resilience.js";
 import {
     activateOwnershipVersion,
     cleanupNonActiveOwnership,
@@ -27,9 +34,6 @@ const DRIFELLA_COLLECTION_GROUP =
 const HELIUS_PAGE_LIMIT = 1000;
 const DEFAULT_OWNERSHIP_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 const MIN_OWNERSHIP_SYNC_INTERVAL_MS = 60 * 1000;
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 1000;
-const REQ_TIMEOUT_MS = 30000;
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -85,61 +89,59 @@ async function fetchHeliusPage(
             limit: HELIUS_PAGE_LIMIT,
         },
     };
+    const context = {
+        provider: "helius" as const,
+        endpoint: "get_assets_by_group",
+        method: "POST" as const,
+    };
 
-    let backoff = INITIAL_BACKOFF_MS;
-    let lastErr: unknown;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), REQ_TIMEOUT_MS);
-        try {
-            const res = await fetch(url, {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify(body),
-                signal: controller.signal,
-            });
-            clearTimeout(timer);
-            const text = await res.text();
-            if (!res.ok) {
-                const msg = `Helius HTTP ${res.status} ${res.statusText} ${text.slice(0, 200)}`;
-                if (res.status === 429 || res.status >= 500) {
-                    lastErr = new Error(msg);
-                } else {
-                    throw new Error(msg);
-                }
-            } else {
-                const json = JSON.parse(text) as any;
-                if (json.error) {
-                    throw new Error(
-                        `Helius JSON-RPC ${json.error.code}: ${json.error.message}`,
-                    );
-                }
-                const items = json?.result?.items;
-                if (!Array.isArray(items)) {
-                    throw new Error("Helius response missing result.items");
-                }
-                const rows: {
-                    token_mint_addr: string;
-                    onchain_owner: string;
-                }[] = [];
-                let skipped = 0;
-                for (const item of items) {
-                    const normalized = normalizeHeliusAsset(item);
-                    if (normalized) rows.push(normalized);
-                    else skipped += 1;
-                }
-                return { rows, skipped };
-            }
-        } catch (err) {
-            clearTimeout(timer);
-            lastErr = err;
-        }
-        if (attempt < MAX_RETRIES) {
-            await sleep(backoff);
-            backoff *= 2;
+    const res = await fetchWithHttpResilience({
+        input: url,
+        init: {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+        },
+        config: getWorkerHttpFetchResilienceConfig(),
+        onAttemptComplete: (attempt) =>
+            recordExternalApiAttempt(context, attempt),
+        onRetryScheduled: (retry) =>
+            recordExternalApiRetryScheduled(context, retry),
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(
+            `Helius HTTP ${res.status} ${res.statusText} ${text.slice(0, 200)}`,
+        );
+    }
+    const json = JSON.parse(text) as any;
+    if (json.error) {
+        const error = new Error(
+            `Helius JSON-RPC ${json.error.code}: ${json.error.message}`,
+        );
+        recordExternalApiLogicalError(context, error);
+        throw error;
+    }
+    const items = json?.result?.items;
+    if (!Array.isArray(items)) {
+        const error = new Error("Helius response missing result.items");
+        recordExternalApiLogicalError(context, error);
+        throw error;
+    }
+    const rows: {
+        token_mint_addr: string;
+        onchain_owner: string;
+    }[] = [];
+    let skipped = 0;
+    for (const item of items) {
+        const normalized = normalizeHeliusAsset(item);
+        if (normalized) {
+            rows.push(normalized);
+        } else {
+            skipped += 1;
         }
     }
-    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+    return { rows, skipped };
 }
 
 async function fetchAllHeliusOwnership(apiKey: string): Promise<{

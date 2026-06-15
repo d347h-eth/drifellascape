@@ -1,0 +1,73 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.docker "drifellascape_deploy" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "drifellascape_deploy_logs" {
+  targets = discovery.docker.drifellascape_deploy.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_drifellascape_observability_logs"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "drifellascape_deploy" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.drifellascape_deploy_logs.output
+  labels     = { app = "drifellascape", deployment = "public-web" }
+  forward_to = [loki.process.drifellascape_deploy.receiver]
+}
+
+loki.process "drifellascape_deploy" {
+  stage.json {
+    expressions = {
+      timestamp = "t",
+      level     = "level",
+      component = "component",
+      action    = "action",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level     = "level",
+      component = "component",
+      action    = "action",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:42830/loki/api/v1/push"
+  }
+}

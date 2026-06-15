@@ -18,5 +18,5 @@ drifellascape.art, app.drifellascape.art {
 
 api.drifellascape.art {
   encode zstd gzip
-  reverse_proxy backend:3000
+  reverse_proxy backend:42800
 }

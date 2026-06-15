@@ -150,12 +150,17 @@ To avoid a race between reading the active version id and its rows while the wor
     - `owner` uses the same effective-owner field as owner-filtered token search: listed tokens use the active listing seller, unlisted tokens use the Helius on-chain owner.
     - Before ownership sync runs, the endpoint returns an empty `items` list.
 
+- `GET /healthz`
+
+  - Returns `{ "ok": true }` when the API process can route requests.
+  - The Prometheus metrics sidecar endpoint also exposes `/healthz` on the metrics port when backend metrics are enabled.
+
 Notes:
 
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
 - Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:42800`.
 
 ## Process Flow
 
@@ -174,6 +179,8 @@ Notes:
 - `backend/src/server.ts`
   - Node HTTP server, request routing, JSON responses, and CORS header.
   - Starts DB and refresh loop (`startServer()`).
+- `backend/src/observability.ts`
+  - Initializes the optional Prometheus scrape endpoint and records backend HTTP request count, latency, status class, and in-flight gauges.
 - `backend/src/cache.ts`
   - `ListingsCache` with `ensureLoaded()`, `refreshIfChanged()`, and `getSnapshotUnsafe()`.
   - Holds the current `{ versionId, items }` and guards concurrent refresh.
@@ -195,8 +202,10 @@ Notes:
 In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaults before starting the backend; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
 
 - `BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
-- `BACKEND_PORT` — server port (default `3000`).
+- `BACKEND_PORT` — server port (default `42800`).
 - `BACKEND_DEBUG` — when set, search responses include `anchorDebug`.
+- `BACKEND_METRICS_ENABLED` — enables `/metrics` and `/healthz` on the backend metrics server.
+- `BACKEND_METRICS_HOST` / `BACKEND_METRICS_PORT` — default local endpoint `127.0.0.1:42840`; Compose uses `0.0.0.0` internally.
 
 ## Performance & Capacity
 
@@ -206,6 +215,7 @@ In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaul
 
 ## Error Handling
 
+- Runtime logs are structured JSON Lines on stdout/stderr with `t`, `level`, `msg`, `component`, and `action`. `yarn dev` captures backend output in `tmp/logs/backend.log`; deploy Alloy reads labeled container logs.
 - Errors during cache load or refresh yield 500 with `{ error }` and are logged to stdout/stderr.
 - The server continues running; next refresh attempts will try to recover.
 
@@ -232,4 +242,4 @@ yarn backend:run
 BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:42800`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

@@ -1,0 +1,90 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+local.file_match "drifellascape_backend_logs" {
+  path_targets = [
+    {
+      __path__ = "/var/log/drifellascape/backend.log",
+      app      = "drifellascape",
+      runtime  = "backend-api",
+      host     = "local-dev",
+    },
+  ]
+  sync_period = "5s"
+}
+
+local.file_match "drifellascape_worker_logs" {
+  path_targets = [
+    {
+      __path__ = "/var/log/drifellascape/worker.log",
+      app      = "drifellascape",
+      runtime  = "sync-worker",
+      host     = "local-dev",
+    },
+  ]
+  sync_period = "5s"
+}
+
+local.file_match "drifellascape_frontend_logs" {
+  path_targets = [
+    {
+      __path__ = "/var/log/drifellascape/frontend.log",
+      app      = "drifellascape",
+      runtime  = "frontend-dev",
+      host     = "local-dev",
+    },
+  ]
+  sync_period = "5s"
+}
+
+loki.source.file "drifellascape_backend" {
+  targets       = local.file_match.drifellascape_backend_logs.targets
+  forward_to    = [loki.process.drifellascape_runtime.receiver]
+  tail_from_end = true
+}
+
+loki.source.file "drifellascape_worker" {
+  targets       = local.file_match.drifellascape_worker_logs.targets
+  forward_to    = [loki.process.drifellascape_runtime.receiver]
+  tail_from_end = true
+}
+
+loki.source.file "drifellascape_frontend" {
+  targets       = local.file_match.drifellascape_frontend_logs.targets
+  forward_to    = [loki.process.drifellascape_runtime.receiver]
+  tail_from_end = true
+}
+
+loki.process "drifellascape_runtime" {
+  stage.json {
+    expressions = {
+      timestamp = "t",
+      level     = "level",
+      component = "component",
+      action    = "action",
+    }
+  }
+
+  stage.labels {
+    values = {
+      level     = "level",
+      component = "component",
+      action    = "action",
+    }
+  }
+
+  stage.timestamp {
+    source = "timestamp"
+    format = "RFC3339"
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:42830/loki/api/v1/push"
+  }
+}

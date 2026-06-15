@@ -15,7 +15,7 @@ const API_BASE =
     typeof configuredBase === "string" && configuredBase.length > 0
         ? configuredBase
         : typeof window === "undefined"
-          ? "http://localhost:3000"
+          ? "http://localhost:42800"
           : "";
 
 export const pendingRequests = writable(0);

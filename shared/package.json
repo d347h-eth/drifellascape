@@ -2,5 +2,17 @@
     "name": "@drifellascape/shared",
     "version": "0.0.1",
     "private": true,
-    "type": "module"
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts",
+        "./network/http-fetch-resilience": "./src/network/http-fetch-resilience.ts",
+        "./observability/metrics": "./src/observability/metrics/index.ts",
+        "./utils/logger": "./src/utils/logger.ts"
+    },
+    "dependencies": {
+        "prom-client": "^15.1.3"
+    },
+    "devDependencies": {
+        "@types/node": "24.3.3"
+    }
 }

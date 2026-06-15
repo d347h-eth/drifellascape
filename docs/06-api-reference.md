@@ -1,6 +1,21 @@
 # API Reference — Listings
 
-Base URL: `http://localhost:3000` in local backend dev, or `https://api.drifellascape.art` for the deployed API.
+Base URL: `http://localhost:42800` in local backend dev, or `https://api.drifellascape.art` for the deployed API.
+
+## GET /healthz
+
+Lightweight process health check.
+
+Response 200:
+
+```json
+{ "ok": true }
+```
+
+Notes:
+
+- This endpoint checks that the backend process can route requests.
+- Prometheus scrape endpoints expose their own `/healthz` on the backend/worker metrics ports when metrics are enabled.
 
 ## GET /listings
 

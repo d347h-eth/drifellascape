@@ -1,0 +1,378 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "links": [],
+    "panels": [
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+            "id": 1,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "sum(rate(drifellascape_worker_external_api_request_total{provider=~\"$provider\", endpoint=~\"$endpoint\"}[5m])) by (provider, endpoint, result)",
+                    "legendFormat": "{{provider}} {{endpoint}} {{result}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "External API Request Rate",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ms"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+            "id": 2,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum(rate(drifellascape_worker_external_api_request_duration_ms_bucket{provider=~\"$provider\", endpoint=~\"$endpoint\"}[5m])) by (le, provider, endpoint))",
+                    "legendFormat": "p95 {{provider}} {{endpoint}}",
+                    "range": true,
+                    "refId": "A"
+                },
+                {
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.50, sum(rate(drifellascape_worker_external_api_request_duration_ms_bucket{provider=~\"$provider\", endpoint=~\"$endpoint\"}[5m])) by (le, provider, endpoint))",
+                    "legendFormat": "p50 {{provider}} {{endpoint}}",
+                    "range": true,
+                    "refId": "B"
+                }
+            ],
+            "title": "External API Latency",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+            "id": 3,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "sum(rate(drifellascape_worker_external_api_rate_limited_total{provider=~\"$provider\", endpoint=~\"$endpoint\"}[5m])) by (provider, endpoint, status_code)",
+                    "legendFormat": "{{provider}} {{endpoint}} HTTP {{status_code}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Rate-Limited Responses",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+            "id": 4,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "sum(rate(drifellascape_worker_external_api_retry_scheduled_total{provider=~\"$provider\", endpoint=~\"$endpoint\"}[5m])) by (provider, endpoint, error_class)",
+                    "legendFormat": "{{provider}} {{endpoint}} {{error_class}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Retry Scheduling",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ms"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+            "id": 5,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum(rate(drifellascape_worker_external_api_rate_limiter_wait_ms_bucket[5m])) by (le, provider))",
+                    "legendFormat": "p95 {{provider}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Client Rate-Limiter Wait",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ops"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+            "id": 6,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "sum(rate(drifellascape_worker_worker_run_total[5m])) by (result)",
+                    "legendFormat": "{{result}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Worker Runs",
+            "type": "timeseries"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "thresholds" },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            { "color": "green", "value": null },
+                            { "color": "orange", "value": 600 },
+                            { "color": "red", "value": 1800 }
+                        ]
+                    },
+                    "unit": "s"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+            "id": 7,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "time() - drifellascape_worker_worker_last_success_unix_seconds",
+                    "legendFormat": "seconds since success",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Worker Last Success Age",
+            "type": "stat"
+        },
+        {
+            "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": { "mode": "palette-classic" },
+                    "mappings": [],
+                    "unit": "ms"
+                },
+                "overrides": []
+            },
+            "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+            "id": 8,
+            "options": {
+                "legend": {
+                    "displayMode": "list",
+                    "placement": "bottom",
+                    "showLegend": true
+                },
+                "tooltip": { "mode": "single", "sort": "none" }
+            },
+            "targets": [
+                {
+                    "editorMode": "code",
+                    "expr": "histogram_quantile(0.95, sum(rate(drifellascape_backend_http_request_duration_ms_bucket[5m])) by (le, route))",
+                    "legendFormat": "p95 {{route}}",
+                    "range": true,
+                    "refId": "A"
+                }
+            ],
+            "title": "Backend API Latency",
+            "type": "timeseries"
+        }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 39,
+    "style": "dark",
+    "tags": ["drifellascape", "golden-signals"],
+    "templating": {
+        "list": [
+            {
+                "current": { "selected": false, "text": "All", "value": "$__all" },
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "definition": "label_values(drifellascape_worker_external_api_request_total, provider)",
+                "hide": 0,
+                "includeAll": true,
+                "label": "provider",
+                "multi": true,
+                "name": "provider",
+                "options": [],
+                "query": {
+                    "query": "label_values(drifellascape_worker_external_api_request_total, provider)",
+                    "refId": "PrometheusVariableQueryEditor-VariableQuery"
+                },
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 1,
+                "type": "query"
+            },
+            {
+                "current": { "selected": false, "text": "All", "value": "$__all" },
+                "datasource": { "type": "prometheus", "uid": "prometheus" },
+                "definition": "label_values(drifellascape_worker_external_api_request_total, endpoint)",
+                "hide": 0,
+                "includeAll": true,
+                "label": "endpoint",
+                "multi": true,
+                "name": "endpoint",
+                "options": [],
+                "query": {
+                    "query": "label_values(drifellascape_worker_external_api_request_total, endpoint)",
+                    "refId": "PrometheusVariableQueryEditor-VariableQuery"
+                },
+                "refresh": 1,
+                "regex": "",
+                "skipUrlSync": false,
+                "sort": 1,
+                "type": "query"
+            }
+        ]
+    },
+    "time": { "from": "now-1h", "to": "now" },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "Drifellascape Golden Signals",
+    "uid": "drifellascape-golden-signals",
+    "version": 1,
+    "weekStart": ""
+}

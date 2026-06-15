@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+    - name: Tempo
+      uid: tempo
+      type: tempo
+      access: proxy
+      url: http://127.0.0.1:42831
+      isDefault: false
+      editable: true
+      jsonData:
+          tracesToProfiles:
+              datasourceUid: pyroscope
+              tags:
+                  - key: service.name
+                    value: service_name
+                  - key: worker
+                    value: worker
+              profileTypeId: wall:cpu:nanoseconds:wall:nanoseconds

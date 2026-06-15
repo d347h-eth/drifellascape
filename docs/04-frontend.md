@@ -28,7 +28,7 @@ This document explains the Drifellascape frontend: stack, configuration, data fl
 ## Configuration
 
 - `yarn dev` loads root `.env` as local defaults before starting Vite; already-set env vars still take precedence. If running Vite directly from `frontend/`, copy `frontend/.env.example` to `frontend/.env` or export the vars in your shell.
-- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`. Release builds normally set `https://api.drifellascape.art`.
+- `VITE_API_BASE` — backend base URL. When unset, API calls are same-origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:42800`. Release builds normally set `https://api.drifellascape.art`.
 - `VITE_POLL_MS` — listings poll interval (ms), default `30000`; the runtime interval is clamped to at least 5000 ms.
 - Default page size — 50 (client sends `limit=50` unless overridden)
 
@@ -220,7 +220,7 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 - Full local stack: `yarn dev`
 - Dev: `yarn workspace @drifellascape/frontend dev`
 - E2E: `yarn workspace @drifellascape/frontend test:e2e`
-- Configure API base when bypassing the dev proxy: `VITE_API_BASE=http://localhost:3000` (prod builds set `https://api.drifellascape.art` via the release script)
+- Configure API base when bypassing the dev proxy: `VITE_API_BASE=http://localhost:42800` (prod builds set `https://api.drifellascape.art` via the release script)
 - Optional poll override: `VITE_POLL_MS=15000`
 
 ## Extensibility

@@ -5,7 +5,7 @@
   auto_https off
 }
 
-http://app.drifellascape.art:8080 {
+http://app.drifellascape.art:42888 {
   encode zstd gzip
 
   handle_path /static/* {
@@ -20,7 +20,7 @@ http://app.drifellascape.art:8080 {
   }
 }
 
-http://verify.drifellascape.art:8080 {
+http://verify.drifellascape.art:42888 {
   encode zstd gzip
 
   handle_path /static/* {
@@ -35,7 +35,7 @@ http://verify.drifellascape.art:8080 {
   }
 }
 
-http://api.drifellascape.art:8080 {
+http://api.drifellascape.art:42888 {
   encode zstd gzip
-  reverse_proxy backend:3000
+  reverse_proxy backend:42800
 }

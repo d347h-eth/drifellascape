@@ -167,10 +167,10 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
   - `OWNERSHIP_SYNC_INTERVAL_MS` (default: 600000)
 - Backend
   - `BACKEND_REFRESH_MS` (default: 30000)
-  - `BACKEND_PORT` (default: 3000)
+  - `BACKEND_PORT` (default: 42800)
   - `BACKEND_DEBUG` for optional search response debug fields
 - Frontend
-  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
+  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to http://localhost:42800; release builds default to https://api.drifellascape.art)
   - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)
 
 ## Roadmap & TBDs
@@ -183,7 +183,8 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
 - Frontend UX
   - Deep‑link for exploration mode (`/explore/:mint`) and optional preload for next/prev exploration images.
 - Observability
-  - Health endpoint and metrics for last sync, version id, page counts, and failures.
+  - Implemented: structured JSON runtime logs, `/healthz`, Prometheus metrics endpoints, and Grafana/Loki/Alloy/Prometheus/Tempo/Pyroscope compose profiles for local and deploy.
+  - Worker metrics cover Magic Eden and Helius golden signals: request rate, latency, 429 responses, retry scheduling, client rate-limiter waits, and sync run health.
 
 ## Onboarding Summary
 

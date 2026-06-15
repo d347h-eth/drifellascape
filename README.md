@@ -49,9 +49,9 @@ Run the full local stack:
 yarn dev
 ```
 
-This starts the backend, worker, and frontend. The backend/worker scripts and the full dev script load root `.env` as local defaults when present; already-set env vars still take precedence. Logs are written to `tmp/logs/backend.log`, `tmp/logs/worker.log`, and `tmp/logs/frontend.log`.
+This starts the backend, worker, and frontend. The backend/worker scripts and the full dev script load root `.env` as local defaults when present; already-set env vars still take precedence. Runtime logs are JSON Lines written to `tmp/logs/backend.log` and `tmp/logs/worker.log`; Vite output is written to `tmp/logs/frontend.log`.
 
-Run backend API only (port 3000):
+Run backend API only (port 42800):
 
 ```bash
 yarn backend:run
@@ -68,15 +68,15 @@ yarn worker:run
 #   HELIUS_KEY=... yarn worker:run
 ```
 
-Run frontend (dev server on port 5173):
+Run frontend (dev server on port 42820):
 
 ```bash
 yarn workspace @drifellascape/frontend dev
 # Optional env:
-#   VITE_API_BASE=http://localhost:3000 VITE_POLL_MS=15000 yarn workspace @drifellascape/frontend dev
+#   VITE_API_BASE=http://localhost:42800 VITE_POLL_MS=15000 yarn workspace @drifellascape/frontend dev
 ```
 
-Open http://localhost:5173. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to the backend on port 3000 unless `VITE_API_BASE` is set.
+Open http://localhost:42820. In dev, Vite proxies same‑origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to the backend on port 42800 unless `VITE_API_BASE` is set.
 
 Hotkeys (subset)
 
@@ -102,13 +102,18 @@ Deep‑links
 
 ## Deployment (Shared Edge VPS Workflow)
 
-The VPS setup builds the frontend once per release and serves the static output through the central Caddy stack. Backend and worker services continue to run from source. Public API traffic enters the central Caddy on the external Docker network `public-edge` and is proxied to `drifella-backend:3000`.
+The VPS setup builds the frontend once per release and serves the static output through the central Caddy stack. Backend and worker services continue to run from source. Public API traffic enters the central Caddy on the external Docker network `public-edge` and is proxied to `drifella-backend:42800`.
 
 1. Pull the latest code: `git pull`
 2. Ensure the shared edge network exists, then start the app services:
    ```bash
    docker network inspect public-edge >/dev/null 2>&1 || docker network create public-edge
    docker compose up -d backend worker
+   ```
+   For the deploy compose with observability labels, private Grafana binding, and metrics scrape wiring, use:
+   ```bash
+   cp .env.deploy.example .env.deploy
+   docker compose --env-file .env.deploy -f docker-compose.deploy.yml up -d backend worker
    ```
 3. Build a new frontend release:
    ```bash
@@ -123,8 +128,27 @@ The VPS setup builds the frontend once per release and serves the static output 
    ```
 5. (Optional) Roll back by re-pointing the symlink: `ln -sfn <previous-id> releases/current` followed by another central Caddy reload.
 
-Normal production startup does not use the repo-local Caddy service. The local Caddyfile remains available behind the opt-in `local-caddy` compose profile, and the side-by-side `caddy-verify` profile still serves `releases/current` and `/static/*` on `:8080`.
+Normal production startup does not use the repo-local Caddy service. The local Caddyfile remains available behind the opt-in `local-caddy` compose profile, and the side-by-side `caddy-verify` profile still serves `releases/current` and `/static/*` on `:42888`.
 If you still have the legacy `frontend` container running, clean it up once with `docker compose up -d --remove-orphans`.
+
+## Observability
+
+The local observability profile mirrors the ArtGod stack: Loki for logs, Alloy for log shipping, Prometheus for metrics, Tempo and Pyroscope datasources, and Grafana with file-provisioned datasources and dashboards.
+
+```bash
+yarn observability:up
+# Grafana: http://127.0.0.1:42835
+```
+
+The worker exports Magic Eden and Helius golden-signal metrics on `WORKER_METRICS_PORT` (`42841` by default): request rate, latency histograms, 429 responses, retry scheduling, and client rate-limiter waits. The backend exports API request latency/counts on `BACKEND_METRICS_PORT` (`42840` by default). Use `yarn observability:stop` or `yarn observability:down` to stop/remove only observability containers.
+
+Deploy observability runs from `docker-compose.deploy.yml`:
+
+```bash
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml --profile observability up -d backend worker loki tempo pyroscope alloy prometheus grafana
+```
+
+In deploy, Grafana is not attached to `public-edge`; it is published only on `${OBSERVABILITY_GRAFANA_HOST_BIND_IP}:${OBSERVABILITY_GRAFANA_HOST_BIND_PORT}`. The example binds `10.77.0.1:42835` for WireGuard-only access from the admin machine.
 
 ## Database
 
