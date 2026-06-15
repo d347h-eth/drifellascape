@@ -1,6 +1,6 @@
 # API Reference — Listings
 
-Base URL: `http://localhost:3000` in local backend dev, or `https://api.drifellascape.art` for the deployed API.
+Base URL: `http://localhost:42800` in local backend dev, or `https://api.drifellascape.art` for the deployed API.
 
 ## GET /healthz
 

@@ -6,7 +6,7 @@ services:
         working_dir: /app
         command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn backend:run"
         environment:
-            BACKEND_PORT: ${BACKEND_PORT:-3000}
+            BACKEND_PORT: ${BACKEND_PORT:-42800}
             BACKEND_REFRESH_MS: ${BACKEND_REFRESH_MS:-30000}
             BACKEND_DEBUG: ${BACKEND_DEBUG:-}
             BACKEND_METRICS_ENABLED: ${BACKEND_METRICS_ENABLED:-true}
@@ -159,8 +159,8 @@ services:
         profiles:
             - local-caddy
         ports:
-            - "80:80"
-            - "443:443"
+            - "42880:80"
+            - "42843:443"
         volumes:
             - ./Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy_data:/data
@@ -176,7 +176,7 @@ services:
         profiles:
             - verify
         ports:
-            - "8080:8080"
+            - "42888:42888"
         volumes:
             - ./Caddyfile.verify:/etc/caddy/Caddyfile:ro
             - ./releases:/srv/releases:ro

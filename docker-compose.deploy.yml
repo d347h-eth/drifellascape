@@ -20,14 +20,14 @@ services:
         <<: *drifellascape-node-service
         command: sh -lc "apt-get update && apt-get install -y --no-install-recommends build-essential python3 && rm -rf /var/lib/apt/lists/* && corepack enable && yarn install --immutable && yarn backend:run"
         environment:
-            BACKEND_PORT: ${BACKEND_PORT:-3000}
+            BACKEND_PORT: ${BACKEND_PORT:-42800}
             BACKEND_REFRESH_MS: ${BACKEND_REFRESH_MS:-30000}
             BACKEND_DEBUG: ${BACKEND_DEBUG:-}
             BACKEND_METRICS_ENABLED: ${BACKEND_METRICS_ENABLED:-true}
             BACKEND_METRICS_HOST: 0.0.0.0
             BACKEND_METRICS_PORT: ${BACKEND_METRICS_PORT:-42840}
         expose:
-            - "3000"
+            - "42800"
             - "42840"
         networks:
             default:

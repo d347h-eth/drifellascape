@@ -160,7 +160,7 @@ Notes:
 - `GET /listings` sorting is performed in memory on the cached array by the integer `price` field (raw SOL units). Tie‑breakers are not enforced there.
 - Search endpoint anchor rank queries use the current sort plus `token_mint_addr` as a deterministic tie-breaker.
 - Price formatting, fees, and image rendering are handled by the frontend.
-- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:3000`.
+- In the frontend, API calls default to same‑origin when `VITE_API_BASE` is unset; Vite dev proxies those same-origin `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` requests to `http://localhost:42800`.
 
 ## Process Flow
 
@@ -202,7 +202,7 @@ Notes:
 In local dev, `yarn backend:run` and `yarn dev` load root `.env` as local defaults before starting the backend; already-set env vars still take precedence. In Compose and production, provide these as process/container environment variables.
 
 - `BACKEND_REFRESH_MS` — polling interval for active version changes (default `30000`; values below 5000 are raised to 5000).
-- `BACKEND_PORT` — server port (default `3000`).
+- `BACKEND_PORT` — server port (default `42800`).
 - `BACKEND_DEBUG` — when set, search responses include `anchorDebug`.
 - `BACKEND_METRICS_ENABLED` — enables `/metrics` and `/healthz` on the backend metrics server.
 - `BACKEND_METRICS_HOST` / `BACKEND_METRICS_PORT` — default local endpoint `127.0.0.1:42840`; Compose uses `0.0.0.0` internally.
@@ -242,4 +242,4 @@ yarn backend:run
 BACKEND_PORT=4000 BACKEND_REFRESH_MS=10000 yarn backend:run
 ```
 
-The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:3000`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.
+The frontend defaults to same-origin API calls. In Vite dev, `frontend/vite.config.ts` proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to `http://localhost:42800`; release builds normally set `VITE_API_BASE=https://api.drifellascape.art`.

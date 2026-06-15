@@ -167,10 +167,10 @@ Start from root `.env.example`; copy it to `.env` for local dev and Docker Compo
   - `OWNERSHIP_SYNC_INTERVAL_MS` (default: 600000)
 - Backend
   - `BACKEND_REFRESH_MS` (default: 30000)
-  - `BACKEND_PORT` (default: 3000)
+  - `BACKEND_PORT` (default: 42800)
   - `BACKEND_DEBUG` for optional search response debug fields
 - Frontend
-  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to http://localhost:3000; release builds default to https://api.drifellascape.art)
+  - `VITE_API_BASE` (default: same‑origin; Vite dev proxies `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to http://localhost:42800; release builds default to https://api.drifellascape.art)
   - `VITE_POLL_MS` (default: 30000; runtime polling is clamped to at least 5000)
 
 ## Roadmap & TBDs

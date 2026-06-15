@@ -29,7 +29,7 @@ import type { MarketEventFilter } from "./types.js";
 function getEnvPort(): number {
     const raw = process.env.BACKEND_PORT;
     const n = raw ? Number(raw) : NaN;
-    return Number.isFinite(n) ? n : 3000;
+    return Number.isFinite(n) ? n : 42800;
 }
 
 function parseQuery(url: string): URLSearchParams {

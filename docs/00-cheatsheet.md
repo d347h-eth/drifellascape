@@ -113,7 +113,7 @@ Mobile specifics
 ## Static & Releases
 
 - Images are served from `/static/art/{2560,540h}/{mint}.jpg` by the central Caddy stack; Gallery/Grid currently use the absolute `https://app.drifellascape.art/static/...` base.
-- Frontend is a static bundle served by central Caddy from `releases/current`. Use the `frontend-build` container and symlink flip, then reload central Caddy from its compose directory; verify on `:8080` via the repo-local `caddy-verify` compose profile.
+- Frontend is a static bundle served by central Caddy from `releases/current`. Use the `frontend-build` container and symlink flip, then reload central Caddy from its compose directory; verify on `:42888` via the repo-local `caddy-verify` compose profile.
 
 ## Env Vars
 

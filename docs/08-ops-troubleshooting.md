@@ -5,9 +5,9 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ## Processes & Ports
 
 - Full local dev stack: `yarn dev` (writes `tmp/logs/{backend,worker,frontend}.log`)
-- Backend API: `yarn backend:run` (default port 3000)
+- Backend API: `yarn backend:run` (default port 42800)
 - Worker loop: `yarn worker:run` (default interval 30s)
-- Frontend dev: `yarn workspace @drifellascape/frontend dev` (port 5173)
+- Frontend dev: `yarn workspace @drifellascape/frontend dev` (port 42820)
 - Backend metrics: `/metrics` and `/healthz` on `127.0.0.1:42840` by default when enabled
 - Worker metrics: `/metrics` and `/healthz` on `127.0.0.1:42841` by default when enabled
 - Local observability: `yarn observability:up` (Grafana on `127.0.0.1:42835`)
@@ -74,13 +74,13 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ## Run Sequences
 
-- Dev minimal: `yarn dev`; open http://localhost:5173
+- Dev minimal: `yarn dev`; open http://localhost:42820
 - Local observability:
   ```bash
   yarn observability:up
   # Grafana: http://127.0.0.1:42835
   ```
-- Production: create/verify the external `public-edge` network, run worker as a single service, run backend on both the project network and `public-edge` as `drifella-backend:3000`, and serve frontend static files through the central Caddy stack.
+- Production: create/verify the external `public-edge` network, run worker as a single service, run backend on both the project network and `public-edge` as `drifella-backend:42800`, and serve frontend static files through the central Caddy stack.
   ```bash
   docker network inspect public-edge >/dev/null 2>&1 || docker network create public-edge
   cp .env.deploy.example .env.deploy
@@ -99,14 +99,14 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 ### 7) 405 on `/listings/search` after switching to same-origin static serving
 
 - Symptoms: `405 Method Not Allowed` from `/listings/search`.
-- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the central Caddy stack proxies `api.drifellascape.art` to `drifella-backend:3000` over `public-edge`. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to the backend (no path rewrite), e.g.:
+- Action: The current release script sets `VITE_API_BASE=https://api.drifellascape.art`, and the central Caddy stack proxies `api.drifellascape.art` to `drifella-backend:42800` over `public-edge`. If you intentionally build same-origin API calls instead, ensure that app-domain Caddy routes `/listings*`, `/tokens*`, `/traits*`, `/market*`, and `/owners*` to the backend (no path rewrite), e.g.:
   ```
   route {
-    handle /listings* { reverse_proxy drifella-backend:3000 }
-    handle /tokens* { reverse_proxy drifella-backend:3000 }
-    handle /traits* { reverse_proxy drifella-backend:3000 }
-    handle /market* { reverse_proxy drifella-backend:3000 }
-    handle /owners* { reverse_proxy drifella-backend:3000 }
+    handle /listings* { reverse_proxy drifella-backend:42800 }
+    handle /tokens* { reverse_proxy drifella-backend:42800 }
+    handle /traits* { reverse_proxy drifella-backend:42800 }
+    handle /market* { reverse_proxy drifella-backend:42800 }
+    handle /owners* { reverse_proxy drifella-backend:42800 }
     handle /static/* { root * /srv/static; file_server }
     handle { root * /srv/releases/current; try_files {path} {path}/ /index.html; file_server }
   }
@@ -119,7 +119,7 @@ This guide lists common operations, checks, and troubleshooting steps for Drifel
 
 ### 9) Side‑by‑side verification without touching prod
 
-- Start a temporary repo-local Caddy on `:8080` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
+- Start a temporary repo-local Caddy on `:42888` using the `caddy-verify` compose profile (serves `releases/current` and `/static/*`).
 - Test routes and static assets; tear down when done. This keeps the live Caddy untouched.
 
 ### 10) Market feed is empty or stale

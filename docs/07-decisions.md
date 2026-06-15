@@ -64,7 +64,7 @@
 
 ## ADR-012: Static Serving via Shared Caddy + Release Symlink
 
-- Decision: Serve the built frontend as static files from the central Caddy stack, pointed at this repo's `releases/current`; serve heavy images from this repo's `frontend/static` under `/static/art/...`. Expose the backend to central Caddy on the external Docker network `public-edge` as `drifella-backend:3000`. Keep repo-local Caddy only as an opt-in local/example service, with `caddy-verify` for `:8080` side-by-side checks.
+- Decision: Serve the built frontend as static files from the central Caddy stack, pointed at this repo's `releases/current`; serve heavy images from this repo's `frontend/static` under `/static/art/...`. Expose the backend to central Caddy on the external Docker network `public-edge` as `drifella-backend:42800`. Keep repo-local Caddy only as an opt-in local/example service, with `caddy-verify` for `:42888` side-by-side checks.
 - Rationale: Zero‑downtime swaps, small bundles, simplified production footprint, and one shared public edge for dedicated-server hostnames.
 
 ## ADR-013: Tokens‑only Quick Jump + URL Param
