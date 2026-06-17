@@ -187,10 +187,16 @@ test("sales feed stays open in Gallery and stale events fall back to the exact t
         const api = await mockApi(page, { currentListingExists: false });
         await page.goto("/", { waitUntil: "domcontentloaded" });
 
-        await page.getByRole("button", { name: "Grid" }).click();
+        const statusControls = page.locator(".toggle-strip");
+        await statusControls
+            .getByRole("button", { name: "Gallery", exact: true })
+            .click();
         await expect(
-            page.getByRole("button", { name: "Gallery" }),
-        ).toBeVisible();
+            statusControls.getByRole("button", {
+                name: "Gallery",
+                exact: true,
+            }),
+        ).toBeDisabled();
 
         await page.getByRole("button", { name: "Sales feed" }).click();
         await expect(

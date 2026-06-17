@@ -237,8 +237,10 @@ A full‑screen, map‑like viewer for the original PNG (`image_url` from the ma
 
 - Persistent bottom strip stacked with the filter panel.
 - Buttons (left → right):
-  - Source (shows the current source: Listings or Tokens)
-  - Mode (shows the current mode: Grid, Gallery, or Explore). Enter Exploration from Gallery with `W`.
+  - Traits and Filter
+  - Separator dot
+  - Grid, Gallery, Listings, and Tokens as separate buttons. The current mode/source button is muted and disabled; click the other mode/source button to switch.
+  - Separator dot
   - Sorting (Price ↑/↓ for Listings; Sort #↑/#↓ for Tokens). Resets to first page.
   - Animation (enable/disable snap animation)
   - Autosnap (enable/disable auto finalize to center). Default off on mobile.

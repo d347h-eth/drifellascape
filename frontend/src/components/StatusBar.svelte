@@ -183,41 +183,67 @@
             About
           </button>
         {:else if !isMobile || section === 0}
-          <button class="btn {showTraitsExplorer ? 'active' : ''}" on:click={() => dispatch('toggleTraitsExplorer')} title="Show/Hide traits explorer">
-            Traits
-          </button>
-          <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
-            Filter
-          </button>
-          <button class="btn" on:click={() => dispatch('nextMode')} title="Switch mode">
-            {#if ownersMode}
-              Owners
-            {:else if gridMode}
+          <span class="button-group">
+            <button class="btn {showTraitsExplorer ? 'active' : ''}" on:click={() => dispatch('toggleTraitsExplorer')} title="Show/Hide traits explorer">
+              Traits
+            </button>
+            <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
+              Filter
+            </button>
+          </span>
+          <span class="bar-sep" aria-hidden="true">•</span>
+          <span class="button-group">
+            <button
+              class="btn current"
+              disabled={!inExplore && gridMode}
+              on:click={() => dispatch('selectMode', 'grid')}
+              title="Grid"
+            >
               Grid
-            {:else if inExplore}
-              Explore
-            {:else}
+            </button>
+            <button
+              class="btn current"
+              disabled={!inExplore && !gridMode}
+              on:click={() => dispatch('selectMode', 'gallery')}
+              title="Gallery"
+            >
               Gallery
-            {/if}
-          </button>
-          <button class="btn" on:click={() => dispatch('toggleSource')} title="Toggle data source (Listings/Tokens)">
-            {dataSource === 'tokens' ? 'Tokens' : 'Listings'}
-          </button>
-          <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
-            {sortLabel}
-          </button>
-          <button class="btn {motionEnabled ? 'active' : ''}" on:click={() => dispatch('toggleMotion')} title="Toggle animation">
-            Animation
-          </button>
-          <button class="btn {autoSnapEnabled ? 'active' : ''}" on:click={() => dispatch('toggleAutoSnap')} title="Toggle auto-snap">
-            Autosnap
-          </button>
-          <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
-            Hotkeys
-          </button>
-          <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
-            About
-          </button>
+            </button>
+            <button
+              class="btn current"
+              disabled={dataSource === 'listings'}
+              on:click={() => dispatch('selectSource', 'listings')}
+              title="Listings"
+            >
+              Listings
+            </button>
+            <button
+              class="btn current"
+              disabled={dataSource === 'tokens'}
+              on:click={() => dispatch('selectSource', 'tokens')}
+              title="Tokens"
+            >
+              Tokens
+            </button>
+          </span>
+          <span class="bar-sep" aria-hidden="true">•</span>
+          <span class="button-group">
+            <button class="btn" on:click={() => dispatch('toggleSort')} title="Toggle sort">
+              {sortLabel}
+            </button>
+            <button class="btn {motionEnabled ? 'active' : ''}" on:click={() => dispatch('toggleMotion')} title="Toggle animation">
+              Animation
+            </button>
+            <button class="btn {autoSnapEnabled ? 'active' : ''}" on:click={() => dispatch('toggleAutoSnap')} title="Toggle auto-snap">
+              Autosnap
+            </button>
+            <button class="btn" on:click={() => dispatch('toggleHelp')} title="Show/Hide hotkeys overlay">
+              Hotkeys
+            </button>
+            <button class="btn" on:click={() => dispatch('toggleAbout')} title="About this project">
+              About
+            </button>
+          </span>
         {:else}
           <button class="btn {showTraitBar ? 'active' : ''}" on:click={() => dispatch('toggleTraits')} title="Show/Hide filter panel">
             Filter
@@ -384,7 +410,9 @@
   .left { min-width: 420px; }
   .right { min-width: 40px; justify-content: flex-end; display: flex; align-items: center; white-space: nowrap; }
   .statusbar.collapsed .left { min-width: 0; }
-  .toggle-strip { display: flex; align-items: center; gap: 8px; }
+  .toggle-strip { display: flex; align-items: center; gap: 0; }
+  .button-group { display: inline-flex; align-items: center; gap: 8px; }
+  .bar-sep { opacity: 0.7; margin: 0 6px; }
   .market-buttons { display: flex; align-items: center; gap: 8px; }
   .btn {
     height: 20px; padding: 0 8px; font-size: 12px; line-height: 1; color: #e6e6e6;
@@ -396,6 +424,13 @@
   .btn:hover { background: rgba(255,255,255,0.06); }
   .btn:focus, .btn:focus-visible { outline: none; box-shadow: none; }
   .btn.active { background: rgba(255,255,255,0.12); }
+  .btn.current:disabled {
+    color: rgba(230, 230, 230, 0.48);
+    background: rgba(12,12,14,0.38);
+    border-color: rgba(255,255,255,0.07);
+    cursor: default;
+  }
+  .btn.current:disabled:hover { background: rgba(12,12,14,0.38); }
   .mono { font-variant-numeric: tabular-nums; opacity: 0.95; }
   .sep { opacity: 0.7; margin: 0 6px; }
   .busy { color: #00d0ff; font-size: 16px; line-height: 1; }

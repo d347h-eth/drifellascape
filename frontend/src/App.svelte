@@ -176,19 +176,18 @@
         return OWNER_ADDRESS_RE.test(owner) ? owner : null;
     }
     function toggleDataSource() {
+        selectDataSource(dataSource === 'listings' ? 'tokens' : 'listings');
+    }
+    function selectDataSource(nextSource: DataSource) {
         ownersMode = false;
+        if (dataSource === nextSource) return;
         const cur = currentItem();
         gridTargetMint = cur?.token_mint_addr ?? null;
-        dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+        dataSource = nextSource;
         applyValueFilterAndFetch();
     }
     function switchToTokensSource() {
-        ownersMode = false;
-        if (dataSource === 'tokens') return;
-        const cur = currentItem();
-        gridTargetMint = cur?.token_mint_addr ?? null;
-        dataSource = 'tokens';
-        applyValueFilterAndFetch();
+        selectDataSource('tokens');
     }
 
     let pagingSession = 0;
@@ -962,6 +961,22 @@
         }
         if (isMobile) showMainBar = false;
     }
+    function selectMode(nextMode: 'grid' | 'gallery') {
+        if (nextMode === 'grid') {
+            if (ownersMode) {
+                exitOwnersToGrid();
+                return;
+            }
+            if (exploreIndex !== null || !gridMode) enterGrid();
+            return;
+        }
+        if (ownersMode) return;
+        if (exploreIndex !== null) {
+            closeExplore();
+        } else if (gridMode) {
+            exitToGallery();
+        }
+    }
 
     // --- Infinite scroll for Grid (listings & tokens) ---
     let isLoadingMore = false;
@@ -1659,6 +1674,8 @@
               on:tokenSearch={handleStatusSearch}
               on:resetOwner={resetOwnerFilter}
               on:toggleSource={toggleDataSource}
+              on:selectSource={(e) => selectDataSource(e.detail)}
+              on:selectMode={(e) => selectMode(e.detail)}
               on:nextMode={() => {
                   if (ownersMode) {
                       exitOwnersToGrid();

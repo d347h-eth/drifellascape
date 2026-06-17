@@ -79,8 +79,8 @@
 
 ## Main Bar (Toggles & Indicators)
 
-- Source toggle — displays the current source, Listings or Tokens
-- Mode toggle — displays the current mode, Grid/Gallery/Explore
+- Traits and Filter controls are grouped first.
+- Grid/Gallery and Listings/Tokens are separate buttons; the current mode/source button is muted and disabled.
 - Sorting — Price ↑/↓ (Listings), Sort #↑/#↓ (Tokens); resets to the first page
 - Animation — enable/disable snap animation
 - Autosnap — enable/disable auto finalize to center
