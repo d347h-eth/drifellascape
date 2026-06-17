@@ -1,7 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   import { DEFAULT_MARKET_EVENTS_LIMIT, fetchMarketEvents } from '../lib/search';
-  import type { MarketEventRow, MarketEventType } from '../lib/types';
+  import type {
+    MarketEventOpenDetail,
+    MarketEventRow,
+    MarketEventType,
+  } from '../lib/types';
 
   export let visible = false;
   export let mode: MarketEventType = 'sale';
@@ -9,7 +13,7 @@
 
   const dispatch = createEventDispatcher<{
     close: void;
-    openGallery: string;
+    openGallery: MarketEventOpenDetail;
     ownerSearch: string;
   }>();
 
@@ -72,7 +76,10 @@
   }
 
   function openGallery(event: MarketEventRow) {
-    dispatch('openGallery', event.token_mint_addr);
+    dispatch('openGallery', {
+      mint: event.token_mint_addr,
+      eventType: event.event_type,
+    });
   }
 
   function openOwner(owner: string | null) {
