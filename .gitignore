@@ -18,7 +18,8 @@ node_modules/
 .pnp.cjs
 .pnp.loader.mjs
 
-.env
+.env*
+!.env.*.example
 
 # Builds and caches
 dist/
