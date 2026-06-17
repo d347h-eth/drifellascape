@@ -605,26 +605,46 @@ test("desktop main bar labels show the current state", async ({
 
     try {
         await gotoApp(page);
+        const statusControls = page.locator(".toggle-strip");
 
-        await expect(page.getByRole("button", { name: "Grid" })).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Listings", exact: true }),
+            statusControls.getByRole("button", { name: "Grid", exact: true }),
+        ).toBeDisabled();
+        await expect(
+            statusControls.getByRole("button", {
+                name: "Gallery",
+                exact: true,
+            }),
         ).toBeVisible();
+        await expect(
+            statusControls.getByRole("button", {
+                name: "Listings",
+                exact: true,
+            }),
+        ).toBeDisabled();
 
-        await page
-            .getByRole("button", { name: "Listings", exact: true })
+        await statusControls
+            .getByRole("button", { name: "Tokens", exact: true })
             .click();
         await expect(
-            page.getByRole("button", { name: "Tokens" }),
-        ).toBeVisible();
+            statusControls.getByRole("button", {
+                name: "Tokens",
+                exact: true,
+            }),
+        ).toBeDisabled();
         await expect(
-            page.getByRole("button", { name: "Sort #↑" }),
+            statusControls.getByRole("button", { name: "Sort #↑" }),
         ).toBeVisible();
 
-        await page.getByRole("button", { name: "Grid" }).click();
+        await statusControls
+            .getByRole("button", { name: "Gallery", exact: true })
+            .click();
         await expect(
-            page.getByRole("button", { name: "Gallery" }),
-        ).toBeVisible();
+            statusControls.getByRole("button", {
+                name: "Gallery",
+                exact: true,
+            }),
+        ).toBeDisabled();
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;

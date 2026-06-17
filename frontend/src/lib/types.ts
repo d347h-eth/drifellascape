@@ -94,6 +94,11 @@ export type MarketEventRow = {
     image_url: string | null;
 };
 
+export type MarketEventOpenDetail = {
+    mint: string;
+    eventType: MarketEventType;
+};
+
 export type MarketEventsResponse = {
     type: MarketEventFilter;
     total: number;

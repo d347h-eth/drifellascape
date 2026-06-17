@@ -14,7 +14,16 @@
     import { postSearch, buildSearchBody, DEFAULT_SEARCH_LIMIT, pendingRequests as pendingRequestsStore, fetchTraitsCatalog, fetchOwners } from "./lib/search";
     import { loadInitialPage, loadNextPage, loadPrevPage, dedupeAppend, dedupePrepend } from "./lib/pager";
     import { preserveTopAnchor } from './lib/viewport';
-    import type { Row, ListingTrait, DataSource, TraitsCatalog, MarketEventType, OwnerSummaryRow } from "./lib/types";
+    import type {
+        ApiResponse,
+        Row,
+        ListingTrait,
+        DataSource,
+        TraitsCatalog,
+        MarketEventOpenDetail,
+        MarketEventType,
+        OwnerSummaryRow,
+    } from "./lib/types";
 
     // Types moved to lib/types.ts
 
@@ -102,9 +111,12 @@
     // Sort state per source
     let sortAscListings: boolean = true;
     let sortAscTokens: boolean = true;
-    function currentSort(): string {
-        if (dataSource === 'tokens') return sortAscTokens ? 'token_asc' : 'token_desc';
+    function sortForSource(source: DataSource): string {
+        if (source === 'tokens') return sortAscTokens ? 'token_asc' : 'token_desc';
         return sortAscListings ? 'price_asc' : 'price_desc';
+    }
+    function currentSort(): string {
+        return sortForSource(dataSource);
     }
     function ownerFilter(): string | undefined {
         return activeOwnerAddress ?? undefined;
@@ -164,19 +176,18 @@
         return OWNER_ADDRESS_RE.test(owner) ? owner : null;
     }
     function toggleDataSource() {
+        selectDataSource(dataSource === 'listings' ? 'tokens' : 'listings');
+    }
+    function selectDataSource(nextSource: DataSource) {
         ownersMode = false;
+        if (dataSource === nextSource) return;
         const cur = currentItem();
         gridTargetMint = cur?.token_mint_addr ?? null;
-        dataSource = dataSource === 'listings' ? 'tokens' : 'listings';
+        dataSource = nextSource;
         applyValueFilterAndFetch();
     }
     function switchToTokensSource() {
-        ownersMode = false;
-        if (dataSource === 'tokens') return;
-        const cur = currentItem();
-        gridTargetMint = cur?.token_mint_addr ?? null;
-        dataSource = 'tokens';
-        applyValueFilterAndFetch();
+        selectDataSource('tokens');
     }
 
     let pagingSession = 0;
@@ -950,6 +961,22 @@
         }
         if (isMobile) showMainBar = false;
     }
+    function selectMode(nextMode: 'grid' | 'gallery') {
+        if (nextMode === 'grid') {
+            if (ownersMode) {
+                exitOwnersToGrid();
+                return;
+            }
+            if (exploreIndex !== null || !gridMode) enterGrid();
+            return;
+        }
+        if (ownersMode) return;
+        if (exploreIndex !== null) {
+            closeExplore();
+        } else if (gridMode) {
+            exitToGallery();
+        }
+    }
 
     // --- Infinite scroll for Grid (listings & tokens) ---
     let isLoadingMore = false;
@@ -1138,11 +1165,46 @@
         activeIndex = i;
     }
 
-    async function openMarketEventInGallery(mint: string) {
+    async function landMarketEventResponse(
+        source: DataSource,
+        resp: ApiResponse<Row>,
+        mint: string,
+        idx: number,
+    ) {
+        dataSource = source;
+        items = resp.items ?? [];
+        total = Number(resp.total || 0);
+        baseOffset = Number(resp.offset || 0);
+        versionId = resp.versionId ?? versionId;
+        gridCurrentPage = computeGridPageBackward();
+        const i = idx;
+        activeIndex = i;
+        gridTargetMint = mint;
+        galleryPagingArmed = false;
+        scrollerRef?.cancel?.();
+        gridMode = false;
+        if (isMobile) showMainBar = false;
+        try {
+            const row: any = items[i] as any;
+            const tn = row?.token_num;
+            if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
+                setTokenUrlParam(tn, false);
+            }
+        } catch {}
+        anchorArm(mint);
+        await tick();
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        scrollerRef?.scrollToIndexInstant?.(i);
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+        scrollerRef?.scrollToIndexInstant?.(i);
+        activeIndex = i;
+        galleryLandingActive = false;
+    }
+
+    async function openMarketEventInGallery({ mint }: MarketEventOpenDetail) {
         ownersMode = false;
         galleryLandingActive = true;
         galleryPagingArmed = false;
-        dataSource = 'tokens';
         activeOwnerAddress = null;
         if (selectedValueIds.size > 0) selectedValueIds = new Set();
         loading = true;
@@ -1152,43 +1214,47 @@
         isLoadingPrev = false;
         let landed = false;
         try {
-            const resp = await postSearch('tokens', buildSearchBody({
-                source: 'tokens',
-                valueIds: [],
-                limit: DEFAULT_SEARCH_LIMIT,
-                includeTraits: true,
-                anchorMint: mint,
-                sort: currentSort(),
-            }));
-            items = resp.items ?? [];
-            total = Number(resp.total || 0);
-            baseOffset = Number(resp.offset || 0);
-            versionId = resp.versionId ?? versionId;
-            gridCurrentPage = computeGridPageBackward();
-            const idx = items.findIndex((r) => r.token_mint_addr === mint);
-            if (idx < 0) throw new Error(`Token ${mint} not found in anchored response`);
-            const i = idx;
-            activeIndex = i;
-            gridTargetMint = mint;
-            galleryPagingArmed = false;
-            scrollerRef?.cancel?.();
-            gridMode = false;
-            if (isMobile) showMainBar = false;
-            try {
-                const row: any = items[i] as any;
-                const tn = row?.token_num;
-                if (typeof tn === 'number' && typeof window !== 'undefined' && window.history && window.location) {
-                    setTokenUrlParam(tn, false);
-                }
-            } catch {}
-            anchorArm(mint);
-            await tick();
-            await new Promise((r) => requestAnimationFrame(() => r(null)));
-            scrollerRef?.scrollToIndexInstant?.(i);
-            await new Promise((r) => requestAnimationFrame(() => r(null)));
-            scrollerRef?.scrollToIndexInstant?.(i);
-            activeIndex = i;
-            galleryLandingActive = false;
+            const listingsResp = await postSearch(
+                'listings',
+                buildSearchBody({
+                    source: 'listings',
+                    valueIds: [],
+                    limit: DEFAULT_SEARCH_LIMIT,
+                    includeTraits: true,
+                    anchorMint: mint,
+                    sort: sortForSource('listings'),
+                }),
+            );
+            const listingsIdx = (listingsResp.items ?? []).findIndex(
+                (r) => r.token_mint_addr === mint,
+            );
+            if (listingsIdx >= 0) {
+                await landMarketEventResponse(
+                    'listings',
+                    listingsResp,
+                    mint,
+                    listingsIdx,
+                );
+                landed = true;
+                return;
+            }
+
+            const tokensResp = await postSearch(
+                'tokens',
+                buildSearchBody({
+                    source: 'tokens',
+                    valueIds: [],
+                    limit: DEFAULT_SEARCH_LIMIT,
+                    includeTraits: true,
+                    anchorMint: mint,
+                    sort: sortForSource('tokens'),
+                }),
+            );
+            const tokensIdx = (tokensResp.items ?? []).findIndex(
+                (r) => r.token_mint_addr === mint,
+            );
+            if (tokensIdx < 0) throw new Error(`Token ${mint} not found in anchored response`);
+            await landMarketEventResponse('tokens', tokensResp, mint, tokensIdx);
             landed = true;
         } catch (e: any) {
             error = e?.message || String(e);
@@ -1608,6 +1674,8 @@
               on:tokenSearch={handleStatusSearch}
               on:resetOwner={resetOwnerFilter}
               on:toggleSource={toggleDataSource}
+              on:selectSource={(e) => selectDataSource(e.detail)}
+              on:selectMode={(e) => selectMode(e.detail)}
               on:nextMode={() => {
                   if (ownersMode) {
                       exitOwnersToGrid();
