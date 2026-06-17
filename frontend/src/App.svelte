@@ -1186,8 +1186,7 @@
         galleryLandingActive = false;
     }
 
-    async function openMarketEventInGallery(detail: MarketEventOpenDetail) {
-        const mint = detail.mint;
+    async function openMarketEventInGallery({ mint }: MarketEventOpenDetail) {
         ownersMode = false;
         galleryLandingActive = true;
         galleryPagingArmed = false;
@@ -1200,31 +1199,29 @@
         isLoadingPrev = false;
         let landed = false;
         try {
-            if (detail.eventType === 'listing') {
-                const listingsResp = await postSearch(
+            const listingsResp = await postSearch(
+                'listings',
+                buildSearchBody({
+                    source: 'listings',
+                    valueIds: [],
+                    limit: DEFAULT_SEARCH_LIMIT,
+                    includeTraits: true,
+                    anchorMint: mint,
+                    sort: sortForSource('listings'),
+                }),
+            );
+            const listingsIdx = (listingsResp.items ?? []).findIndex(
+                (r) => r.token_mint_addr === mint,
+            );
+            if (listingsIdx >= 0) {
+                await landMarketEventResponse(
                     'listings',
-                    buildSearchBody({
-                        source: 'listings',
-                        valueIds: [],
-                        limit: DEFAULT_SEARCH_LIMIT,
-                        includeTraits: true,
-                        anchorMint: mint,
-                        sort: sortForSource('listings'),
-                    }),
+                    listingsResp,
+                    mint,
+                    listingsIdx,
                 );
-                const listingsIdx = (listingsResp.items ?? []).findIndex(
-                    (r) => r.token_mint_addr === mint,
-                );
-                if (listingsIdx >= 0) {
-                    await landMarketEventResponse(
-                        'listings',
-                        listingsResp,
-                        mint,
-                        listingsIdx,
-                    );
-                    landed = true;
-                    return;
-                }
+                landed = true;
+                return;
             }
 
             const tokensResp = await postSearch(

@@ -91,7 +91,6 @@ async function mockApi(page: Page, options: MockApiOptions = {}) {
         const body = readSearchBody(route);
         listingSearchBodies.push(body);
         const items =
-            body.anchorMint === soldMint &&
             options.currentListingExists === false
                 ? [listingRows[0], listingRows[2]]
                 : listingRows;
@@ -175,7 +174,7 @@ async function currentGalleryPosition(
     });
 }
 
-test("market feed stays open in Gallery and event clicks land on the exact token", async ({
+test("sales feed stays open in Gallery and stale events fall back to the exact token", async ({
     page,
 }, testInfo) => {
     test.skip(
@@ -185,7 +184,7 @@ test("market feed stays open in Gallery and event clicks land on the exact token
     const diagnostics = capturePageDiagnostics(page);
 
     try {
-        const api = await mockApi(page);
+        const api = await mockApi(page, { currentListingExists: false });
         await page.goto("/", { waitUntil: "domcontentloaded" });
 
         await page.getByRole("button", { name: "Grid" }).click();
@@ -216,8 +215,17 @@ test("market feed stays open in Gallery and event clicks land on the exact token
             })
             .toBe("Token 319");
         await expect(page.locator(".center .token-input")).toHaveValue("#319");
+        await expect(
+            page.locator(".toggle-strip").getByRole("button", {
+                name: "Tokens",
+            }),
+        ).toBeVisible();
 
         await page.waitForTimeout(700);
+        const anchoredListing = api
+            .listingSearchBodies()
+            .find((body) => body.anchorMint === soldMint);
+        expect(anchoredListing?.sort).toBe("price_asc");
         expect(api.tokenSearches()).toBe(1);
         expect(api.tokenSearchBodies()[0]?.anchorMint).toBe(soldMint);
 
@@ -255,6 +263,64 @@ test("market feed stays open in Gallery and event clicks land on the exact token
             .toBe("Token 319:snapped");
         await page.waitForTimeout(700);
         expect(api.tokenSearches()).toBe(1);
+    } catch (error) {
+        await attachDiagnostics(testInfo, diagnostics);
+        throw error;
+    }
+});
+
+test("sales feed event clicks land in Listings mode when the current listing exists", async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== "desktop",
+        "market side-panel is desktop-only",
+    );
+    const diagnostics = capturePageDiagnostics(page);
+
+    try {
+        const api = await mockApi(page);
+        await page.goto("/", { waitUntil: "domcontentloaded" });
+
+        await page.getByRole("button", { name: "Sales feed" }).click();
+        await expect(
+            page.getByRole("dialog", { name: "Sales feed" }),
+        ).toBeVisible();
+
+        await page
+            .getByRole("button", { name: "Open #319 in gallery" })
+            .click();
+
+        await expect(
+            page.getByRole("dialog", { name: "Sales feed" }),
+        ).toBeVisible();
+        await expect
+            .poll(() => currentGalleryToken(page), {
+                message: "current gallery slide",
+            })
+            .toBe("Token 319");
+        await expect(page.locator(".center .token-input")).toHaveValue("#319");
+        await expect(
+            page.locator(".toggle-strip").getByRole("button", {
+                name: "Listings",
+            }),
+        ).toBeVisible();
+        await expect
+            .poll(
+                () =>
+                    api
+                        .listingSearchBodies()
+                        .filter((body) => body.anchorMint === soldMint).length,
+                { message: "anchored current listing probe" },
+            )
+            .toBe(1);
+
+        await page.waitForTimeout(700);
+        expect(api.tokenSearches()).toBe(0);
+        const anchoredListing = api
+            .listingSearchBodies()
+            .find((body) => body.anchorMint === soldMint);
+        expect(anchoredListing?.sort).toBe("price_asc");
     } catch (error) {
         await attachDiagnostics(testInfo, diagnostics);
         throw error;
